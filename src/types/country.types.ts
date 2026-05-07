@@ -1,0 +1,71 @@
+export const COUNTRIES = [
+  "United States",
+  "United Kingdom",
+  "India",
+  "Japan",
+  "Australia",
+  "Canada",
+  "Mexico",
+  "Germany",
+  "France",
+  "Italy",
+  "Spain",
+  "Netherlands",
+  "Sweden",
+  "Norway",
+  "Denmark",
+  "Finland",
+  "Switzerland",
+  "Belgium",
+  "Austria",
+  "Ireland",
+  "Portugal",
+  "Greece",
+  "Poland",
+  "Czech Republic",
+  "Hungary",
+  "Romania",
+  "Bulgaria",
+  "Ukraine",
+  "Russia",
+  "Turkey",
+  "China",
+  "South Korea",
+  "Singapore",
+  "Malaysia",
+  "Thailand",
+  "Indonesia",
+  "Philippines",
+  "Vietnam",
+  "Bangladesh",
+  "Pakistan",
+  "Sri Lanka",
+  "Nepal",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Qatar",
+  "Kuwait",
+  "Egypt",
+  "South Africa",
+  "Nigeria",
+  "Kenya",
+  "Brazil",
+  "Argentina",
+  "Chile",
+  "Colombia",
+  "Peru",
+  "New Zealand",
+] as const;
+
+export type COUNTRY = (typeof COUNTRIES)[number];
+
+export const COUNTRY_OPTIONS: { value: COUNTRY; label: string }[] =
+  COUNTRIES.map((c) => ({
+    value: c,
+    label: c,
+  }));
+
+export function getRandomCountry(): COUNTRY {
+  const randomIndex = Math.floor(Math.random() * COUNTRIES.length);
+  return COUNTRIES[randomIndex];
+}
