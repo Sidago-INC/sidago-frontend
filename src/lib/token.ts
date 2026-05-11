@@ -42,7 +42,6 @@ export const tokenService = {
     return initPromise;
   },
 
-  // 🔥 NEW: wait until ready
   async waitForInit() {
     if (!initialized) {
       await this.init();

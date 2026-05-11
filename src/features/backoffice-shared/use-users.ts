@@ -1,4 +1,5 @@
 
+
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -10,16 +11,10 @@ export type AgentUser = {
   email: string;
 };
 
-type ApiResponse =
-  | { ok: true; count: number; data: AgentUser[] }
-  | { ok: false; error: string };
+type ApiResponse = { ok: true; count: number; data: AgentUser[] };
 
 async function fetchAgents(brand: Brand): Promise<AgentUser[]> {
   const json = (await api.get(`/users?brand=${brand}`)) as ApiResponse;
-  if (!json.ok) {
-    const msg = "error" in json ? json.error : "Failed to load";
-    throw new Error(msg);
-  }
   return json.data;
 }
 

@@ -1,4 +1,5 @@
 
+
 import { createContext, useContext } from "react";
 import { useMe } from "@/hooks/useMe";
 import {
@@ -27,16 +28,12 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading, isError } = useMe();
-  const user = data?.user as AuthUser | undefined;
-  const navigations = user ? getNavigationsForRole(user.role) : [];
+  const user = data?.user;
+  const navigations = user ? getNavigationsForRole(user) : [];
 
   const hasRole = (role: UserRole | UserRole[]) => {
     if (!user) return false;
-
-    if (Array.isArray(role)) {
-      return role.includes(user.role);
-    }
-
+    if (Array.isArray(role)) return role.includes(user.role);
     return user.role === role;
   };
 

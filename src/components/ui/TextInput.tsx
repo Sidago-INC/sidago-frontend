@@ -1,4 +1,5 @@
 
+
 import clsx from "clsx";
 import { InputHTMLAttributes, useId } from "react";
 
@@ -25,7 +26,10 @@ export function TextInput({
   return (
     <div className={clsx("flex w-full flex-col gap-1", wrapperClassName)}>
       {label && (
-        <label htmlFor={inputId} className={clsx("text-sm font-medium", labelClassName)}>
+        <label
+          htmlFor={inputId}
+          className={clsx("text-sm font-medium", labelClassName)}
+        >
           {label}
         </label>
       )}

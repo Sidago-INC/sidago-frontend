@@ -1,17 +1,31 @@
 
+
 import {
   CompanySymbolBadge,
+  DatePickerField,
   Drawer,
+  EditableDrawerFooter,
+  Select,
   TimezoneBadge,
-  TypeBadge,
+  Textarea,
+  TextInput,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import type { RecentInterestRow } from "../_lib/data";
+import {
+  recentInterestAssigneeOptions,
+  recentInterestCallResultOptions,
+  recentInterestLeadTypeOptions,
+  type RecentInterestRow,
+} from "../_lib/data";
 import { ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { getCompanySymbol } from "@/features/backoffice-shared/constants";
-import Comments from "@/features/backoffice-shared/Comments";
+import {
+  getCompanySymbol,
+  getLeadId,
+} from "@/features/backoffice-shared/constants";
+import { showSuccessToast } from "@/lib/toast";
+import Revisions from "@/features/backoffice-shared/Revisions";
 
 type RecentInterestDrawerProps = {
   data: RecentInterestRow[];
@@ -22,6 +36,49 @@ type RecentInterestDrawerProps = {
 };
 
 const iconClass = "h-4 w-4 stroke-[2]";
+
+type EditableRecentInterestState = {
+  companyName: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  leadType: string;
+  created: string;
+  assignedTo: string;
+  followUpDateCleaned: string;
+  callResult: string;
+  notes: string;
+};
+
+function getEditableState(row: RecentInterestRow): EditableRecentInterestState {
+  return {
+    companyName: row.companyName,
+    contactPerson: row.contactPerson,
+    phone: row.phone,
+    email: row.email,
+    leadType: row.leadType,
+    created: row.created ?? "",
+    assignedTo: row.assignedTo,
+    followUpDateCleaned: row.followUpDateCleaned,
+    callResult: row.callResult,
+    notes: row.notes,
+  };
+}
+
+const assigneeSelectOptions = recentInterestAssigneeOptions.map((value) => ({
+  label: value,
+  value,
+}));
+const callResultSelectOptions = recentInterestCallResultOptions.map(
+  (value) => ({
+    label: value,
+    value,
+  }),
+);
+const leadTypeSelectOptions = recentInterestLeadTypeOptions.map((value) => ({
+  label: value,
+  value,
+}));
 
 function escapeHtml(value: string) {
   return value
@@ -41,8 +98,20 @@ export function RecentInterestDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+  const [editModeKey, setEditModeKey] = useState<string | null>(null);
+  const [formState, setFormState] = useState<{
+    key: string;
+    value: EditableRecentInterestState;
+  } | null>(null);
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
+  const rowKey = row?.email ?? "";
+  const isEditMode = rowKey !== "" && editModeKey === rowKey;
+  const initialForm = useMemo(
+    () => (row ? getEditableState(row) : null),
+    [row],
+  );
+  const form = formState?.key === rowKey ? formState.value : initialForm;
 
   const detailItems = useMemo(() => {
     if (!row) {
@@ -72,7 +141,7 @@ export function RecentInterestDrawer({
     }
 
     const params = new URLSearchParams(searchParams.toString());
-    params.set("lead", row.email);
+    params.set("lead", getLeadId(row));
     return `${window.location.origin}${pathname}?${params.toString()}`;
   }, [pathname, row, searchParams]);
 
@@ -85,11 +154,49 @@ export function RecentInterestDrawer({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  if (!row || selectedIndex === null) {
+  if (!row || selectedIndex === null || !form) {
     return null;
   }
 
   const currentIndex = selectedIndex;
+
+  const updateForm = <Key extends keyof EditableRecentInterestState>(
+    key: Key,
+    value: EditableRecentInterestState[Key],
+  ) => {
+    setFormState((current) => ({
+      key: rowKey,
+      value: {
+        ...(current?.key === rowKey && current.value ? current.value : form),
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleReset = () => {
+    setFormState(null);
+  };
+
+  const handleEditStart = () => {
+    if (!rowKey) return;
+    setEditModeKey(rowKey);
+  };
+
+  const handleSave = () => {
+    setFormState({
+      key: rowKey,
+      value: {
+        ...form,
+        companyName: form.companyName.trim(),
+        contactPerson: form.contactPerson.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        notes: form.notes.trim(),
+      },
+    });
+    showSuccessToast("Recent interest changes saved successfully.");
+    setEditModeKey(null);
+  };
 
   const handlePrint = () => {
     if (typeof window === "undefined") {
@@ -203,24 +310,40 @@ export function RecentInterestDrawer({
           </div>
         </div>
       }
-      // footer={<Comments />}
+      footer={
+        isEditMode ? (
+          <EditableDrawerFooter
+            onCancel={() => {
+              setEditModeKey(null);
+              onClose();
+            }}
+            onReset={handleReset}
+            onSave={handleSave}
+          />
+        ) : (
+          <Revisions />
+        )
+      }
     >
-      <div className="space-y-5">
+      <div className="space-y-5" onFocus={handleEditStart}>
         <DetailCard>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <CompanySymbolBadge
-                symbol={getCompanySymbol(row.companyName)}
+                symbol={getCompanySymbol(form.companyName)}
                 index={data.findIndex((item) => item.email === row.email)}
                 className="rounded"
               />
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-widest text-slate-400">
-                  Company
-                </p>
-                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  {row.companyName}
-                </p>
+                <EditableField label="Company">
+                  <TextInput
+                    value={form.companyName}
+                    onChange={(event) =>
+                      updateForm("companyName", event.target.value)
+                    }
+                    className="h-8 text-sm font-semibold"
+                  />
+                </EditableField>
               </div>
             </div>
             <TimezoneBadge
@@ -231,28 +354,86 @@ export function RecentInterestDrawer({
         </DetailCard>
 
         <DetailCard label="Contact Details">
-          <Detail label="Contact Person" value={row.contactPerson} />
-          <Detail label="Phone" value={row.phone} />
-          <Detail label="Email" value={row.email} />
+          <EditableField label="Contact Person">
+            <TextInput
+              value={form.contactPerson}
+              onChange={(event) =>
+                updateForm("contactPerson", event.target.value)
+              }
+              className="text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Phone">
+            <TextInput
+              value={form.phone}
+              onChange={(event) => updateForm("phone", event.target.value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Email">
+            <TextInput
+              type="email"
+              value={form.email}
+              onChange={(event) => updateForm("email", event.target.value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
         </DetailCard>
 
         <DetailCard label="Recent Interest">
-          <Detail
-            label="Lead Type"
-            value={<TypeBadge value={row.leadType} kind="lead" />}
-          />
-          <Detail
-            label="Created"
-            value={row.created}
-          />
-          <Detail label="Assigned To" value={row.assignedTo} />
-          <Detail label="Followup Date" value={row.followUpDateCleaned} />
-          <Detail
-            label="Followup Date(Cleaned)"
-            value={row.followUpDateCleaned}
-          />
-          <Detail label="Call Result" value={row.callResult} />
-          <Detail label="Notes" value={row.notes} />
+          <EditableField label="Lead Type">
+            <Select
+              value={form.leadType}
+              onChange={(value) => updateForm("leadType", String(value))}
+              options={leadTypeSelectOptions}
+              className="py-1.5 text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Created">
+            <TextInput
+              value={form.created}
+              onChange={(event) => updateForm("created", event.target.value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Assigned To">
+            <Select
+              value={form.assignedTo}
+              onChange={(value) => updateForm("assignedTo", String(value))}
+              options={assigneeSelectOptions}
+              className="py-1.5 text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Followup Date">
+            <DatePickerField
+              value={form.followUpDateCleaned}
+              onChange={(value) => updateForm("followUpDateCleaned", value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Followup Date(Cleaned)">
+            <DatePickerField
+              value={form.followUpDateCleaned}
+              onChange={(value) => updateForm("followUpDateCleaned", value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Call Result">
+            <Select
+              value={form.callResult}
+              onChange={(value) => updateForm("callResult", String(value))}
+              options={callResultSelectOptions}
+              className="py-1.5 text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Notes" align="stack">
+            <Textarea
+              value={form.notes}
+              onChange={(event) => updateForm("notes", event.target.value)}
+              rows={4}
+              className="text-xs font-semibold leading-5"
+            />
+          </EditableField>
         </DetailCard>
       </div>
     </Drawer>
@@ -280,15 +461,29 @@ function DetailCard({
   );
 }
 
-function Detail({ label, value }: { label: string; value: React.ReactNode }) {
+function EditableField({
+  label,
+  children,
+  align = "row",
+}: {
+  label: string;
+  children: React.ReactNode;
+  align?: "row" | "stack";
+}) {
   return (
-    <div className="flex items-start justify-between py-1">
-      <p className="text-[10px] uppercase tracking-widest text-slate-400">
+    <div
+      className={
+        align === "stack"
+          ? "space-y-1 py-2"
+          : "flex items-center justify-between gap-4 py-1.5"
+      }
+    >
+      <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <p className="text-xs font-semibold text-slate-600 dark:text-slate-200 truncate">
-        {value}
-      </p>
+      <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
+        {children}
+      </div>
     </div>
   );
 }

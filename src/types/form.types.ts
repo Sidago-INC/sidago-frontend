@@ -1,4 +1,4 @@
-import { Lead } from "./lead.types";
+import type { Lead } from "@/features/agent-calls/_lib/data";
 
 export type CallsFormState = {
   email: string;

@@ -1,6 +1,7 @@
 
+
 import { useMemo, useState } from "react";
-import { Lead } from "@/types";
+import type { Lead } from "./_lib/data";
 import { Info } from "lucide-react";
 import { CardShell, Modal } from "@/components/ui";
 import { AutoCallingBanner } from "./_components/AutoCallingBanner";
@@ -104,7 +105,7 @@ export function AgentCalls() {
         onStop={() => setIsAutoCalling(false)}
       />
 
-      <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+      <main className="mx-auto space-y-4 px-4 py-6">
         <HeroCard currentLead={currentLead} />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

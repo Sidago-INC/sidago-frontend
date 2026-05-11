@@ -1,10 +1,9 @@
 
+
 import {
-  CheckboxInput,
   CompanySymbolBadge,
-  DateInput,
+  DatePickerField,
   Drawer,
-  EmailLink,
   Select,
   Textarea,
   TextInput,
@@ -12,20 +11,19 @@ import {
   TypeBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import { getCompanySymbol, type LeadRow } from "../_lib/data";
-import { ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
-import { isValidElement, useEffect, useMemo, useState } from "react";
+import { getCompanySymbol, getLeadId, type LeadRow } from "../_lib/data";
+import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import Revisions from "@/features/backoffice-shared/Revisions";
+import { AGENT_VALUES } from "@/types/agent.types";
+import { COMPANY_VALUES } from "@/types/company.types";
+import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
+import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
   useUpdateLead,
   type LeadPatchBody,
 } from "@/features/backoffice-shared/use-update-lead";
-import { useUsers } from "@/features/backoffice-shared/use-users";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { COMPANY_VALUES } from "@/types/company.types";
-import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
-import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 
 type CurrentlyHotSvgDrawerProps = {
   data: LeadRow[];
@@ -62,11 +60,6 @@ type EditableDrawerState = {
   bentonHistoryCalls: string;
   bentonHistoryNotes: string;
   bentonToBeCalledOn: string;
-  rm95LeadType: string;
-  rm95ToBeCalledBy: string;
-  rm95HistoryCalls: string;
-  rm95HistoryNotes: string;
-  rm95ToBeCalledOn: string;
 };
 
 function getEditableState(row: LeadRow): EditableDrawerState {
@@ -89,11 +82,6 @@ function getEditableState(row: LeadRow): EditableDrawerState {
     bentonHistoryCalls: defaultHistoryCalls,
     bentonHistoryNotes: defaultHistoryNotes,
     bentonToBeCalledOn: row.bentonLastCallDate,
-    rm95LeadType: row.rm95LeadType,
-    rm95ToBeCalledBy: row.rm95ToBeCalledBy,
-    rm95HistoryCalls: defaultHistoryCalls,
-    rm95HistoryNotes: defaultHistoryNotes,
-    rm95ToBeCalledOn: row.rm95LastCallDate,
   };
 }
 
@@ -107,6 +95,37 @@ function escapeHtml(value: string) {
 
 function stripTimezonePrefix(timezone: string | undefined) {
   return (timezone ?? "").replace(/^\d+-/, "");
+}
+
+function ToggleField({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+        {label}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={
+          checked
+            ? "flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/70"
+            : "flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-slate-100 text-slate-400 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-slate-700"
+        }
+      >
+        <Check size={16} />
+      </button>
+    </div>
+  );
 }
 
 export function CurrentlyHotDrawer({
@@ -126,9 +145,11 @@ export function CurrentlyHotDrawer({
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.email ?? "";
-  const initialForm = useMemo(() => (row ? getEditableState(row) : null), [row]);
+  const initialForm = useMemo(
+    () => (row ? getEditableState(row) : null),
+    [row],
+  );
   const form = formState?.key === rowKey ? formState.value : initialForm;
-
   const updateLead = useUpdateLead();
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
@@ -143,24 +164,13 @@ export function CurrentlyHotDrawer({
       })),
     [],
   );
-
-  // Brand-filtered agent rosters from the DB. Each section's dropdown only
-  // shows users actually assigned to that brand.
-  const { data: svgAgents } = useUsers("svg");
-  const { data: bentonAgents } = useUsers("benton");
-  const { data: rm95Agents } = useUsers("95rm");
-
-  const toAgentOptions = (list: { name: string }[] | undefined) =>
-    (list ?? []).map((u) => ({ label: u.name, value: u.name }));
-
-  const svgAgentOptions = useMemo(() => toAgentOptions(svgAgents), [svgAgents]);
-  const bentonAgentOptions = useMemo(
-    () => toAgentOptions(bentonAgents),
-    [bentonAgents],
-  );
-  const rm95AgentOptions = useMemo(
-    () => toAgentOptions(rm95Agents),
-    [rm95Agents],
+  const agentOptions = useMemo(
+    () =>
+      AGENT_VALUES.map((agent) => {
+        const fullName = `${agent.name} ${agent.surname}`;
+        return { label: fullName, value: fullName };
+      }),
+    [],
   );
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
@@ -202,7 +212,7 @@ export function CurrentlyHotDrawer({
     if (!row || typeof window === "undefined") return "";
 
     const params = new URLSearchParams(searchParams.toString());
-    params.set("lead", row.email);
+    params.set("lead", getLeadId(row));
 
     return `${window.location.origin}${pathname}?${params.toString()}`;
   }, [pathname, row, searchParams]);
@@ -234,11 +244,8 @@ export function CurrentlyHotDrawer({
     }));
   };
 
-  const handleCopyUrl = async () => {
-    if (!drawerUrl) return;
-
-    await navigator.clipboard.writeText(drawerUrl);
-    setCopied(true);
+  const handleReset = () => {
+    setFormState(null);
   };
 
   const handleSave = async () => {
@@ -251,8 +258,6 @@ export function CurrentlyHotDrawer({
       return;
     }
 
-    // Build a body containing ONLY changed fields so we don't overwrite
-    // anything we didn't touch.
     const body: LeadPatchBody = {};
     const leadDiff: NonNullable<LeadPatchBody["lead"]> = {};
 
@@ -260,47 +265,46 @@ export function CurrentlyHotDrawer({
     if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.role !== initialForm.role) leadDiff.role = form.role;
-    if (form.contactType !== initialForm.contactType)
+    if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
-    if (form.notWorked !== initialForm.notWorked)
+    }
+    if (form.notWorked !== initialForm.notWorked) {
       leadDiff.not_work_anymore = form.notWorked;
-    if (form.companyName !== initialForm.companyName)
+    }
+    if (form.companyName !== initialForm.companyName) {
       leadDiff.company_name = form.companyName;
+    }
 
     if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
 
     const brandStates: NonNullable<LeadPatchBody["brandStates"]> = {};
 
-    const svgDiff: NonNullable<NonNullable<LeadPatchBody["brandStates"]>["svg"]> = {};
-    if (form.svgLeadType !== initialForm.svgLeadType)
+    const svgDiff: NonNullable<NonNullable<LeadPatchBody["brandStates"]>["svg"]> =
+      {};
+    if (form.svgLeadType !== initialForm.svgLeadType) {
       svgDiff.lead_type = form.svgLeadType;
-    if (form.svgToBeCalledBy !== initialForm.svgToBeCalledBy)
+    }
+    if (form.svgToBeCalledBy !== initialForm.svgToBeCalledBy) {
       svgDiff.to_be_called_by = form.svgToBeCalledBy || null;
-    if (form.svgToBeCalledOn !== initialForm.svgToBeCalledOn)
+    }
+    if (form.svgToBeCalledOn !== initialForm.svgToBeCalledOn) {
       svgDiff.last_called_date = form.svgToBeCalledOn || null;
+    }
     if (Object.keys(svgDiff).length > 0) brandStates.svg = svgDiff;
 
     const bentonDiff: NonNullable<
       NonNullable<LeadPatchBody["brandStates"]>["benton"]
     > = {};
-    if (form.bentonLeadType !== initialForm.bentonLeadType)
+    if (form.bentonLeadType !== initialForm.bentonLeadType) {
       bentonDiff.lead_type = form.bentonLeadType;
-    if (form.bentonToBeCalledBy !== initialForm.bentonToBeCalledBy)
+    }
+    if (form.bentonToBeCalledBy !== initialForm.bentonToBeCalledBy) {
       bentonDiff.to_be_called_by = form.bentonToBeCalledBy || null;
-    if (form.bentonToBeCalledOn !== initialForm.bentonToBeCalledOn)
+    }
+    if (form.bentonToBeCalledOn !== initialForm.bentonToBeCalledOn) {
       bentonDiff.last_called_date = form.bentonToBeCalledOn || null;
+    }
     if (Object.keys(bentonDiff).length > 0) brandStates.benton = bentonDiff;
-
-    const rm95Diff: NonNullable<
-      NonNullable<LeadPatchBody["brandStates"]>["95rm"]
-    > = {};
-    if (form.rm95LeadType !== initialForm.rm95LeadType)
-      rm95Diff.lead_type = form.rm95LeadType;
-    if (form.rm95ToBeCalledBy !== initialForm.rm95ToBeCalledBy)
-      rm95Diff.to_be_called_by = form.rm95ToBeCalledBy || null;
-    if (form.rm95ToBeCalledOn !== initialForm.rm95ToBeCalledOn)
-      rm95Diff.last_called_date = form.rm95ToBeCalledOn || null;
-    if (Object.keys(rm95Diff).length > 0) brandStates["95rm"] = rm95Diff;
 
     if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
 
@@ -312,12 +316,17 @@ export function CurrentlyHotDrawer({
     try {
       await updateLead.mutateAsync({ leadId: row.leadId, body });
       showSuccessToast("Lead updated");
-      // Reset local form state so the diff snaps to the new baseline once
-      // the table re-fetches.
       setFormState(null);
     } catch (err) {
       showErrorToast(err);
     }
+  };
+
+  const handleCopyUrl = async () => {
+    if (!drawerUrl) return;
+
+    await navigator.clipboard.writeText(drawerUrl);
+    setCopied(true);
   };
 
   const handlePrint = () => {
@@ -413,7 +422,7 @@ export function CurrentlyHotDrawer({
             </button>
             <button
               onClick={handleCopyUrl}
-              title="Print"
+              title="Copy URL"
               className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
               <Link
@@ -424,26 +433,23 @@ export function CurrentlyHotDrawer({
         </div>
       }
       footer={
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setFormState(null)}
-              disabled={!isDirty || updateLead.isPending}
-              className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              Discard
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!isDirty || updateLead.isPending || !row?.leadId}
-              className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {updateLead.isPending ? "Saving…" : "Save"}
-            </button>
-          </div>
-          <Revisions />
+        <div className="flex items-center justify-end gap-2 m-4">
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={!isDirty || updateLead.isPending}
+            className="cursor-pointer rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Discard
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!isDirty || updateLead.isPending || !row?.leadId}
+            className="cursor-pointer rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {updateLead.isPending ? "Saving..." : "Save"}
+          </button>
         </div>
       }
     >
@@ -515,19 +521,17 @@ export function CurrentlyHotDrawer({
               className="py-1.5 text-xs"
             />
           </EditableField>
-          <EditableField label="Not Work Anymore">
-            <CheckboxInput
+          <div className="py-1.5">
+            <ToggleField
+              label="Not Work Anymore"
               checked={form.notWorked}
-              onChange={(event) =>
-                updateForm("notWorked", event.target.checked)
-              }
-              labelClassName="justify-end"
+              onChange={(checked) => updateForm("notWorked", checked)}
             />
-          </EditableField>
+          </div>
         </DetailCard>
 
         <DetailCard label="Other Contacts">
-          <EditableField label="Contacts" align="stack" readOnly>
+          <EditableField label="Contacts" align="stack">
             <Textarea
               value={form.otherContacts}
               onChange={(event) =>
@@ -552,21 +556,19 @@ export function CurrentlyHotDrawer({
             <Select
               value={form.svgToBeCalledBy}
               onChange={(value) => updateForm("svgToBeCalledBy", String(value))}
-              options={svgAgentOptions}
+              options={agentOptions}
               placeholder="Select assignee"
               className="py-1.5 text-xs"
             />
           </EditableField>
           <EditableField label="To Be Called On">
-            <DateInput
+            <DatePickerField
               value={form.svgToBeCalledOn}
-              onChange={(event) =>
-                updateForm("svgToBeCalledOn", event.target.value)
-              }
+              onChange={(value) => updateForm("svgToBeCalledOn", value)}
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="History Calls" align="stack" readOnly>
+          <EditableField label="History Calls" align="stack">
             <Textarea
               value={form.svgHistoryCalls}
               onChange={(event) =>
@@ -575,7 +577,7 @@ export function CurrentlyHotDrawer({
               className="text-xs font-semibold leading-5"
             />
           </EditableField>
-          <EditableField label="History Notes" align="stack" readOnly>
+          <EditableField label="History Notes" align="stack">
             <Textarea
               value={form.svgHistoryNotes}
               onChange={(event) =>
@@ -602,21 +604,19 @@ export function CurrentlyHotDrawer({
               onChange={(value) =>
                 updateForm("bentonToBeCalledBy", String(value))
               }
-              options={bentonAgentOptions}
+              options={agentOptions}
               placeholder="Select assignee"
               className="py-1.5 text-xs"
             />
           </EditableField>
           <EditableField label="To Be Called On">
-            <DateInput
+            <DatePickerField
               value={form.bentonToBeCalledOn}
-              onChange={(event) =>
-                updateForm("bentonToBeCalledOn", event.target.value)
-              }
+              onChange={(value) => updateForm("bentonToBeCalledOn", value)}
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="History Calls" align="stack" readOnly>
+          <EditableField label="History Calls" align="stack">
             <Textarea
               value={form.bentonHistoryCalls}
               onChange={(event) =>
@@ -625,61 +625,11 @@ export function CurrentlyHotDrawer({
               className="text-xs font-semibold leading-5"
             />
           </EditableField>
-          <EditableField label="History Notes" align="stack" readOnly>
+          <EditableField label="History Notes" align="stack">
             <Textarea
               value={form.bentonHistoryNotes}
               onChange={(event) =>
                 updateForm("bentonHistoryNotes", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
-            />
-          </EditableField>
-        </DetailCard>
-
-        <DetailCard label="95RM Details">
-          <EditableField label="Lead Type">
-            <Select
-              value={form.rm95LeadType}
-              onChange={(value) => updateForm("rm95LeadType", String(value))}
-              options={leadTypeOptions}
-              placeholder="Select lead type"
-              className="py-1.5 text-xs"
-            />
-          </EditableField>
-          <EditableField label="To Be Called By">
-            <Select
-              value={form.rm95ToBeCalledBy}
-              onChange={(value) =>
-                updateForm("rm95ToBeCalledBy", String(value))
-              }
-              options={rm95AgentOptions}
-              placeholder="Select assignee"
-              className="py-1.5 text-xs"
-            />
-          </EditableField>
-          <EditableField label="To Be Called On">
-            <DateInput
-              value={form.rm95ToBeCalledOn}
-              onChange={(event) =>
-                updateForm("rm95ToBeCalledOn", event.target.value)
-              }
-              className="text-xs font-semibold"
-            />
-          </EditableField>
-          <EditableField label="History Calls" align="stack" readOnly>
-            <Textarea
-              value={form.rm95HistoryCalls}
-              onChange={(event) =>
-                updateForm("rm95HistoryCalls", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
-            />
-          </EditableField>
-          <EditableField label="History Notes" align="stack" readOnly>
-            <Textarea
-              value={form.rm95HistoryNotes}
-              onChange={(event) =>
-                updateForm("rm95HistoryNotes", event.target.value)
               }
               className="text-xs font-semibold leading-5"
             />
@@ -700,13 +650,8 @@ export function CurrentlyHotDrawer({
               label="Benton Lead Type"
               value={<TypeBadge value={form.bentonLeadType} kind="lead" />}
             />
-            <AssociationDetail
-              label="95RM Lead Type"
-              value={<TypeBadge value={form.rm95LeadType} kind="lead" />}
-            />
           </DetailCard>
         </DetailCard>
-
       </div>
     </Drawer>
   );
@@ -737,16 +682,11 @@ function EditableField({
   label,
   children,
   align = "row",
-  readOnly = false,
 }: {
   label: string;
   children: React.ReactNode;
   align?: "row" | "stack";
-  readOnly?: boolean;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const preview = getEditablePreview(label, children);
-
   return (
     <div
       className={
@@ -759,81 +699,9 @@ function EditableField({
         {label}
       </p>
       <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
-        {readOnly ? (
-          <div
-            aria-readonly
-            className={`w-full rounded border border-slate-200 bg-slate-100 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 ${
-              align === "stack"
-                ? "min-h-[98px] px-3 py-2 text-left whitespace-pre-line"
-                : "min-h-[30px] px-3 py-1.5 text-left truncate"
-            }`}
-          >
-            {preview}
-          </div>
-        ) : isEditing ? (
-          children
-        ) : (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setIsEditing(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                setIsEditing(true);
-              }
-            }}
-            className={`w-full cursor-text rounded border border-gray-300 bg-white text-xs font-semibold text-slate-600 transition focus:border-indigo-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-slate-200 ${
-              align === "stack"
-                ? "min-h-[98px] px-3 py-2 text-left whitespace-pre-line"
-                : "min-h-[30px] px-3 py-1.5 text-left truncate"
-            }`}
-          >
-            {preview}
-          </div>
-        )}
+        {children}
       </div>
     </div>
-  );
-}
-
-function getEditablePreview(
-  label: string,
-  children: React.ReactNode,
-): React.ReactNode {
-  if (!isValidElement(children)) return <EmptyPreview label={label} />;
-
-  const props = children.props as {
-    value?: unknown;
-    checked?: boolean;
-    options?: Array<{ label: string; value: string | number }>;
-  };
-
-  if (typeof props.checked === "boolean") {
-    return props.checked ? "Yes" : "No";
-  }
-
-  const value = props.value == null ? "" : String(props.value);
-  if (!value) return <EmptyPreview label={label} />;
-
-  if (label.toLowerCase() === "email") {
-    return <EmailLink value={value} />;
-  }
-
-  const option = props.options?.find((item) => String(item.value) === value);
-  return option?.label ?? value;
-}
-
-function EmptyPreview({
-  label,
-}: {
-  label: string;
-}) {
-  return (
-    <span
-      aria-label={`Empty ${label}`}
-      className="block"
-    />
   );
 }
 

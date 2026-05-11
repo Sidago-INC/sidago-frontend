@@ -15,7 +15,8 @@ import type { HotLeadRow } from "@/features/backoffice-shared/types";
 import { generateHotLeadRows } from "@/features/backoffice-shared/lead-mapper";
 
 export const svgCurrentlyHotLeadsData: HotLeadRow[] = generateHotLeadRows(10);
-export const bentonCurrentlyHotLeadsData: HotLeadRow[] = generateHotLeadRows(10);
+export const bentonCurrentlyHotLeadsData: HotLeadRow[] =
+  generateHotLeadRows(10);
 export const rm95CurrentlyHotLeadsData: HotLeadRow[] = generateHotLeadRows(10);
 
 export const currentlyHotLeadsDataByCompany = {

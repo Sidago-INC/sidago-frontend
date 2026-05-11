@@ -1,6 +1,7 @@
 
+
 import { Button } from "@/components/ui";
-import { Lead } from "@/types";
+import type { Lead } from "../_lib/data";
 import { CircleMinus, PlayCircle } from "lucide-react";
 import { PingDot } from "./PingDot";
 

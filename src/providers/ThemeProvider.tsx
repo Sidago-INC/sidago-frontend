@@ -1,4 +1,5 @@
 
+
 import React, {
   createContext,
   useContext,
@@ -36,8 +37,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       (window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light");
-    setThemeState(resolved);
     applyTheme(resolved);
+    window.setTimeout(() => {
+      setThemeState(resolved);
+    }, 0);
   }, []);
 
   useEffect(() => {

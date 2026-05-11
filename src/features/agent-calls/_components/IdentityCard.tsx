@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Mail, UserRound } from "lucide-react";
-import { CallsFormState } from "@/types";
+import type { CallsFormState } from "@/types";
 
 type Props = {
   form: CallsFormState;

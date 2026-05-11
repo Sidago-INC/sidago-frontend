@@ -1,22 +1,15 @@
 
+
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { RecentInterestRow } from "./data";
 
 type Brand = "svg" | "95rm" | "benton";
 
-type ApiResponse =
-  | { ok: true; count: number; data: RecentInterestRow[] }
-  | { ok: false; error: string };
+type ApiResponse = { ok: true; count: number; data: RecentInterestRow[] };
 
 async function fetchRecentInterest(brand: Brand): Promise<RecentInterestRow[]> {
   const json = (await api.get(`/reports/recent-interest?brand=${brand}`)) as ApiResponse;
-
-  if (!json.ok) {
-    const message = "error" in json ? json.error : "Failed to load";
-    throw new Error(message);
-  }
-
   return json.data;
 }
 
