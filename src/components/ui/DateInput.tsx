@@ -1,4 +1,5 @@
 
+
 import clsx from "clsx";
 import { CalendarDays } from "lucide-react";
 import { InputHTMLAttributes, useId } from "react";
@@ -27,7 +28,10 @@ export function DateInput({
   return (
     <div className={clsx("flex w-full flex-col gap-1", wrapperClassName)}>
       {label && (
-        <label htmlFor={inputId} className={clsx("text-sm font-medium", labelClassName)}>
+        <label
+          htmlFor={inputId}
+          className={clsx("text-sm font-medium", labelClassName)}
+        >
           {label}
         </label>
       )}

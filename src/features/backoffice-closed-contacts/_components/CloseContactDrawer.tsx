@@ -1,10 +1,10 @@
 
+
 import {
   CheckboxInput,
   CompanySymbolBadge,
-  DateInput,
+  DatePickerField,
   Drawer,
-  EmailLink,
   Select,
   Textarea,
   TextInput,
@@ -13,8 +13,10 @@ import {
 import type { Column } from "@/components/ui/Table";
 import type { ClosedContactRow } from "../_lib/data";
 import {
+  type ClosedContactsTabKey,
   contactTypeOptions,
   getCompanySymbol,
+  getLeadId,
   leadTypeOptions,
 } from "../_lib/data";
 import {
@@ -32,9 +34,8 @@ import {
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
-import { isValidElement, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import Comments from "@/features/backoffice-shared/Comments";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import {
   useUpdateLead,
@@ -45,6 +46,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 type ClosedContactDrawerProps = {
   data: ClosedContactRow[];
   columns?: Column<ClosedContactRow>[];
+  tabKey: ClosedContactsTabKey;
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;
@@ -129,7 +131,7 @@ function getEditableState(row: ClosedContactRow): EditableClosedContactState {
     notes: "",
     additionalContacts: "",
     doesNotWorkAnymore: false,
-    callBackDate: row.callBackDate,
+    callBackDate: row.callBackDate ?? "",
     selectedOutcome: "",
   };
 }
@@ -145,6 +147,7 @@ function escapeHtml(value: string) {
 export function ClosedContactDrawer({
   data,
   columns,
+  tabKey,
   selectedIndex,
   onSelectedIndexChange,
   onClose,
@@ -159,17 +162,15 @@ export function ClosedContactDrawer({
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.email ?? "";
-  const initialForm = useMemo(
-    () => (row ? getEditableState(row) : null),
-    [row],
-  );
-  const form = formState?.key === rowKey ? formState.value : initialForm;
-
+  const initialForm = useMemo(() => (row ? getEditableState(row) : null), [row]);
+  const form =
+    formState?.key === rowKey
+      ? formState.value
+      : initialForm;
   const updateLead = useUpdateLead();
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
-    // Only persistable fields drive the dirty flag — `notes`, `callBackDate`,
-    // and `selectedOutcome` have no save target so we ignore them here.
+
     return (
       form.fullName !== initialForm.fullName ||
       form.phone !== initialForm.phone ||
@@ -204,9 +205,10 @@ export function ClosedContactDrawer({
     if (!row || typeof window === "undefined") return "";
 
     const params = new URLSearchParams(searchParams.toString());
-    params.set("lead", row.email);
+    params.set("tab", tabKey);
+    params.set("lead", getLeadId(row));
     return `${window.location.origin}${pathname}?${params.toString()}`;
-  }, [pathname, row, searchParams]);
+  }, [pathname, row, searchParams, tabKey]);
 
   useEffect(() => {
     if (!copied) return;
@@ -231,30 +233,34 @@ export function ClosedContactDrawer({
     }));
   };
 
-  const handleCopyUrl = async () => {
-    if (!drawerUrl) return;
-    await navigator.clipboard.writeText(drawerUrl);
-    setCopied(true);
+  const handleReset = () => {
+    setFormState(null);
   };
 
   const handleSave = async () => {
     if (!row || !form || !initialForm) return;
 
     if (!row.leadId) {
-      showErrorToast(
-        new Error("Cannot save: this row has no leadId (mock data?)"),
-      );
+      showErrorToast(new Error("Cannot save: this row has no leadId (mock data?)"));
       return;
     }
 
     const body: LeadPatchBody = {};
     const leadDiff: NonNullable<LeadPatchBody["lead"]> = {};
 
+    if (form.fullName !== initialForm.fullName) {
+      leadDiff.full_name = form.fullName;
+    }
+    if (form.phone !== initialForm.phone) {
+      leadDiff.phone = form.phone;
+    }
     if (form.email !== initialForm.email) leadDiff.email = form.email;
-    if (form.contactType !== initialForm.contactType)
+    if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
-    if (form.doesNotWorkAnymore !== initialForm.doesNotWorkAnymore)
+    }
+    if (form.doesNotWorkAnymore !== initialForm.doesNotWorkAnymore) {
       leadDiff.not_work_anymore = form.doesNotWorkAnymore;
+    }
 
     if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
 
@@ -276,6 +282,12 @@ export function ClosedContactDrawer({
     } catch (err) {
       showErrorToast(err);
     }
+  };
+
+  const handleCopyUrl = async () => {
+    if (!drawerUrl) return;
+    await navigator.clipboard.writeText(drawerUrl);
+    setCopied(true);
   };
 
   const handlePrint = () => {
@@ -351,9 +363,6 @@ export function ClosedContactDrawer({
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {row.lead}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Row {currentIndex + 1} of {data.length}
-              </p>
             </div>
           </div>
 
@@ -389,9 +398,9 @@ export function ClosedContactDrawer({
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => setFormState(null)}
+            onClick={handleReset}
             disabled={!isDirty || updateLead.isPending}
-            className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="cursor-pointer rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Discard
           </button>
@@ -399,9 +408,9 @@ export function ClosedContactDrawer({
             type="button"
             onClick={handleSave}
             disabled={!isDirty || updateLead.isPending || !row?.leadId}
-            className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {updateLead.isPending ? "Saving…" : "Save"}
+            {updateLead.isPending ? "Saving..." : "Save"}
           </button>
         </div>
       }
@@ -431,8 +440,20 @@ export function ClosedContactDrawer({
 
         {/* Contact info */}
         <DetailCard label="Personal Details">
-          <Detail label="Full Name" value={form.fullName || "-"} />
-          <Detail label="Phone" value={form.phone || "-"} />
+          <EditableField label="Full Name">
+            <TextInput
+              value={form.fullName}
+              onChange={(event) => updateForm("fullName", event.target.value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
+          <EditableField label="Phone">
+            <TextInput
+              value={form.phone}
+              onChange={(event) => updateForm("phone", event.target.value)}
+              className="text-xs font-semibold"
+            />
+          </EditableField>
           <EditableField label="Email">
             <TextInput
               type="email"
@@ -469,7 +490,7 @@ export function ClosedContactDrawer({
         </DetailCard>
 
         <DetailCard label="Notes">
-          <EditableField label="Notes" align="stack" readOnly>
+          <EditableField label="Notes" align="stack">
             <Textarea
               value={form.notes}
               onChange={(event) => updateForm("notes", event.target.value)}
@@ -486,12 +507,10 @@ export function ClosedContactDrawer({
               labelClassName="justify-end"
             />
           </EditableField>
-          <EditableField label="Call Back Date" readOnly>
-            <DateInput
-              value={form.callBackDate}
-              onChange={(event) =>
-                updateForm("callBackDate", event.target.value)
-              }
+          <EditableField label="Call Back Date">
+            <DatePickerField
+              value={form.callBackDate ?? ""}
+              onChange={(value) => updateForm("callBackDate", value)}
               className="text-xs font-semibold"
             />
           </EditableField>
@@ -510,7 +529,16 @@ export function ClosedContactDrawer({
         </DetailCard>
 
         <DetailCard label="Additional Contacts">
-          <Detail label="Contacts" value="-" />
+          <EditableField label="Contacts" align="stack">
+            <Textarea
+              value={form.additionalContacts}
+              onChange={(event) =>
+                updateForm("additionalContacts", event.target.value)
+              }
+              className="text-xs font-semibold leading-5"
+              placeholder="Add contacts"
+            />
+          </EditableField>
         </DetailCard>
 
         <DetailCard label="Call Outcome">
@@ -569,16 +597,11 @@ function EditableField({
   label,
   children,
   align = "row",
-  readOnly = false,
 }: {
   label: string;
   children: React.ReactNode;
   align?: "row" | "stack";
-  readOnly?: boolean;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const preview = getEditablePreview(label, children);
-
   return (
     <div
       className={
@@ -591,86 +614,16 @@ function EditableField({
         {label}
       </p>
       <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
-        {readOnly ? (
-          <div
-            aria-readonly
-            className={`w-full rounded border border-slate-200 bg-slate-100 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 ${
-              align === "stack"
-                ? "min-h-[98px] px-3 py-2 text-left whitespace-pre-line"
-                : "min-h-[30px] px-3 py-1.5 text-left truncate"
-            }`}
-          >
-            {preview}
-          </div>
-        ) : isEditing ? (
-          children
-        ) : (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setIsEditing(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                setIsEditing(true);
-              }
-            }}
-            className={`w-full cursor-text rounded border border-gray-300 bg-white text-xs font-semibold text-slate-600 transition focus:border-indigo-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-slate-200 ${
-              align === "stack"
-                ? "min-h-[98px] px-3 py-2 text-left whitespace-pre-line"
-                : "min-h-[30px] px-3 py-1.5 text-left truncate"
-            }`}
-          >
-            {preview}
-          </div>
-        )}
+        {children}
       </div>
     </div>
   );
 }
 
-function getEditablePreview(
-  label: string,
-  children: React.ReactNode,
-): React.ReactNode {
-  if (!isValidElement(children)) return <EmptyPreview label={label} />;
-
-  const props = children.props as {
-    value?: unknown;
-    checked?: boolean;
-    options?: Array<{ label: string; value: string | number }>;
-  };
-
-  if (typeof props.checked === "boolean") {
-    return props.checked ? "Yes" : "No";
-  }
-
-  const value = props.value == null ? "" : String(props.value);
-  if (!value) return <EmptyPreview label={label} />;
-
-  if (label.toLowerCase() === "email") {
-    return <EmailLink value={value} />;
-  }
-
-  const option = props.options?.find((item) => String(item.value) === value);
-  return option?.label ?? value;
-}
-
-function EmptyPreview({
-  label,
-}: {
-  label: string;
-}) {
-  return (
-    <span
-      aria-label={`Empty ${label}`}
-      className="block"
-    />
-  );
-}
-
 function HistoryText({ value }: { value: string }) {
   return (
-    <span className="block whitespace-pre-line text-left leading-5">{value}</span>
+    <span className="block whitespace-pre-line text-left leading-5">
+      {value}
+    </span>
   );
 }

@@ -1,5 +1,4 @@
 import React from "react";
-
 import { Cog, Paperclip, Workflow } from "lucide-react";
 import { Badge } from "./Badge";
 import { Avatar } from "./Avatar";

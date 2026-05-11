@@ -1,4 +1,5 @@
 
+
 import React from "react";
 import { useRecentInterest } from "../_lib/use-recent-interest";
 import { RecentInterestTable } from "./RecentInterestTable";

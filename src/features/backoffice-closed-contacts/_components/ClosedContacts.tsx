@@ -1,13 +1,26 @@
 
+
 import clsx from "clsx";
-import React, { useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import React, { useMemo } from "react";
 import { closedContactsTabs, type ClosedContactsTabKey } from "../_lib/data";
 import { useClosedContracts } from "../_lib/use-closed-contacts";
 import { ClosedContactsTable } from "./ClosedContactsTable";
 
+function isClosedContactsTabKey(
+  value: string | null,
+): value is ClosedContactsTabKey {
+  return closedContactsTabs.some((tab) => tab.key === value);
+}
+
 export function ClosedContacts() {
-  const [activeTab, setActiveTab] =
-    useState<ClosedContactsTabKey>("svg-current");
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const activeTab: ClosedContactsTabKey = isClosedContactsTabKey(tabParam)
+    ? tabParam
+    : "svg-current";
 
   const activeView = useMemo(
     () =>
@@ -21,6 +34,15 @@ export function ClosedContacts() {
     activeView.brand,
   );
 
+  const updateTab = (tabKey: ClosedContactsTabKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", tabKey);
+    params.delete("lead");
+
+    const query = params.toString();
+    navigate(query ? `${pathname}?${query}` : pathname, { replace: true });
+  };
+
   return (
     <div className="space-y-4">
       <div className="overflow-x-auto">
@@ -32,7 +54,7 @@ export function ClosedContacts() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => updateTab(tab.key)}
                 className={clsx(
                   "whitespace-nowrap rounded-xl px-4 py-2 text-sm font-medium transition cursor-pointer",
                   isActive
@@ -48,15 +70,21 @@ export function ClosedContacts() {
       </div>
 
       {isLoading ? (
-        <div className="flex min-h-[200px] items-center justify-center text-sm text-gray-500">
-          Loading closed contracts…
+        <div className="px-4 py-8 text-sm text-slate-500 dark:text-slate-400">
+          Loading closed contacts...
         </div>
       ) : isError ? (
-        <div className="flex min-h-[200px] items-center justify-center text-sm text-red-500">
-          Failed to load: {error instanceof Error ? error.message : String(error)}
+        <div className="px-4 py-8 text-sm text-rose-600 dark:text-rose-400">
+          {error instanceof Error
+            ? error.message
+            : "Failed to load closed contacts."}
         </div>
       ) : (
-        <ClosedContactsTable data={data ?? []} title={activeView.title} />
+        <ClosedContactsTable
+          data={data ?? []}
+          tabKey={activeView.key}
+          title={activeView.title}
+        />
       )}
     </div>
   );

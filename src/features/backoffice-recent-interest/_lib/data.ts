@@ -14,7 +14,7 @@ export type RecentInterestRow = {
   notes: string;
   phone: string;
   timezone: string;
-  created?:string;
+  created?: string;
 };
 
 export const recentInterestLeadOptions = [
@@ -59,6 +59,9 @@ export const recentInterestLeadTypeOptions = [
   "Referral",
 ];
 
-export const svgRecentInterestData: RecentInterestRow[] = generateRecentInterestRows(10);
-export const rm95RecentInterestData: RecentInterestRow[] = generateRecentInterestRows(10);
-export const bentonRecentInterestData: RecentInterestRow[] = generateRecentInterestRows(10);
+export const svgRecentInterestData: RecentInterestRow[] =
+  generateRecentInterestRows(10);
+export const rm95RecentInterestData: RecentInterestRow[] =
+  generateRecentInterestRows(10);
+export const bentonRecentInterestData: RecentInterestRow[] =
+  generateRecentInterestRows(10);

@@ -1,16 +1,24 @@
 import {
+  adminOnlyNavigation,
   agentNavigation,
   backofficeNavigation,
+  flattenNavigationHrefs,
   type UserRole,
 } from "./navigation";
 
 export const AUTH_NOTICE_KEY = "sidago_auth_notice";
 
-const agentRoutes = new Set(agentNavigation.map((item) => item.href));
+const agentRoutes = new Set(flattenNavigationHrefs(agentNavigation));
 
-const backofficeRoutes = new Set(backofficeNavigation.map((item) => item.href));
+const backofficeRoutes = new Set(flattenNavigationHrefs(backofficeNavigation));
 
-const allProtectedRoutes = new Set([...agentRoutes, ...backofficeRoutes]);
+const adminRoutes = new Set(flattenNavigationHrefs(adminOnlyNavigation));
+
+const allProtectedRoutes = new Set([
+  ...adminRoutes,
+  ...agentRoutes,
+  ...backofficeRoutes,
+]);
 
 export function getDashboardRouteForRole(role: UserRole): string {
   switch (role) {

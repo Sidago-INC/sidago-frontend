@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Clock3 } from "lucide-react";
+import { Check, Clock3 } from "lucide-react";
 
 const COMPANY_BADGE_COLORS = [
   "bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-800",
@@ -38,6 +38,11 @@ const CONTACT_TYPE_STYLES: Record<string, string> = {
 };
 
 const CAMPAIGN_TYPE_STYLES: Record<string, string> = {
+  SVG: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300",
+  BENTON:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  "95RM":
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
   "Current Interest":
     "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300",
   Reactivation:
@@ -59,6 +64,14 @@ const TIMEZONE_STYLES = [
   "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
   "border-pink-200 bg-pink-100 text-pink-700 dark:border-pink-800 dark:bg-pink-950/40 dark:text-pink-300",
   "border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
+] as const;
+
+const EMAIL_PRIORITY_STYLES = [
+  "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
+  "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  "border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+  "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
 ] as const;
 
 function getTimezoneStyle(label: string) {
@@ -191,6 +204,54 @@ export const TimezoneBadge = ({
     >
       <Clock3 className="h-3.5 w-3.5" />
       {label}
+    </span>
+  );
+};
+
+export const EmailPriorityBadge = ({
+  value,
+  className,
+}: {
+  value: string;
+  className?: string;
+}) => {
+  const priorityNumber = Number(value.match(/\d+/)?.[0] ?? 1);
+  const priorityStyle =
+    EMAIL_PRIORITY_STYLES[(priorityNumber - 1) % EMAIL_PRIORITY_STYLES.length];
+
+  return (
+    <span
+      className={badgeClassName(
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        priorityStyle,
+        className,
+      )}
+    >
+      {value}
+    </span>
+  );
+};
+
+export const BooleanCheckBadge = ({
+  checked,
+  className,
+}: {
+  checked: boolean;
+  className?: string;
+}) => {
+  return (
+    <span
+      className={badgeClassName(
+        "inline-flex h-7 w-7 items-center justify-center rounded-full border",
+        checked
+          ? "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+          : "border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500",
+        className,
+      )}
+      aria-label={checked ? "Yes" : "No"}
+      title={checked ? "Yes" : "No"}
+    >
+      <Check className="h-3.5 w-3.5" />
     </span>
   );
 };

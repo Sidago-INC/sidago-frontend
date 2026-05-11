@@ -1,0 +1,4 @@
+symbol,name,timezone,country,description,estimatedMarketCap,primaryVenue,city,state,website,twitterHandle,zip
+RVO,Rivorix Ops,1-EST,United States,Revenue operations tooling for distributed sales teams.,$1.4B,NYSE,Chicago,IL,https://rivorix.example,@rivorix,60601
+ALN,AtlasLine Networks,2-CST,United States,Network visibility software for enterprise infrastructure teams.,$860M,NASDAQ,Dallas,TX,https://atlasline.example,@atlasline,75201
+MTR,Monterra Systems,5-GMT,United Kingdom,Data governance products for regulated finance organizations.,$2.1B,LSE,London,England,https://monterra.example,@monterra,EC1A 1BB

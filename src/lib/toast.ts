@@ -22,29 +22,21 @@ export const getErrorMessage = (error: unknown): string => {
   return msg;
 };
 
-// 🔴 Error Toast
 export const showErrorToast = (error: unknown) => {
   const message = getErrorMessage(error);
-  toast.error(message, {
-    style: { whiteSpace: "pre-line" },
-  });
+  toast.error(message, { style: { whiteSpace: "pre-line" } });
 };
 
-// ✅ Success Toast
 export const showSuccessToast = (message?: string) => {
-  toast.success(message || "Operation successful ✅", {
+  toast.success(message || "Operation successful", {
     style: { whiteSpace: "pre-line" },
   });
 };
 
-// ℹ️ Info Toast
 export const showInfoToast = (message: string) => {
-  toast.info(message, {
-    style: { whiteSpace: "pre-line" },
-  });
+  toast.info(message, { style: { whiteSpace: "pre-line" } });
 };
 
-// 🔄 Promise Toast
 export const showPromiseToast = async <T>(
   promise: Promise<T>,
   messages?: {
@@ -57,15 +49,13 @@ export const showPromiseToast = async <T>(
     promise,
     {
       pending: messages?.pending || "Processing...",
-      success: messages?.success || "Done successfully ✅",
+      success: messages?.success || "Done successfully",
       error: {
         render({ data }) {
           return getErrorMessage(data);
         },
       },
     },
-    {
-      style: { whiteSpace: "pre-line" },
-    },
+    { style: { whiteSpace: "pre-line" } },
   );
 };

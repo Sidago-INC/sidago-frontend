@@ -1,6 +1,7 @@
 
+
 import { Button } from "@/components/ui";
-import { Lead } from "@/types";
+import type { Lead } from "../_lib/data";
 import { SkipForward } from "lucide-react";
 import { CallsLogo } from "./CallsLogo";
 import { LeadSelector } from "./LeadSelector";

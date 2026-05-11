@@ -1,4 +1,3 @@
-
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/providers/AuthProvider";
 import { NavigationItem } from "@/lib/navigation";
@@ -27,7 +26,7 @@ export function useRouteMeta() {
     ? {
         label: match.label,
         icon: match.icon,
-        href: match.href,
+        href: match.href ?? pathname,
       }
     : {
         label: "Page",

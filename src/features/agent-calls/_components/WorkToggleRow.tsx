@@ -1,4 +1,4 @@
-import { CallsFormState } from "@/types";
+import type { CallsFormState } from "@/types";
 
 export function WorkToggleRow({
   value,

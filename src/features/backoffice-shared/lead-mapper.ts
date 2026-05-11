@@ -1,4 +1,5 @@
-import { generateRandomLeads, type LEAD } from "@/types/lead.types";
+import { generateRandomLeads } from "@/lib/mocks/leads";
+import type { LEAD } from "@/types/lead.types";
 import type { HotLeadRow } from "./types";
 
 const CAMPAIGN_TYPES = [
@@ -22,7 +23,10 @@ function isoToActionDate(iso: string | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
   const date = d.toISOString().split("T")[0];
-  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   return `${date} ${time}`;
 }
 
@@ -80,7 +84,7 @@ export function leadToRecentInterestRow(
   notes: string;
   phone: string;
   timezone: string;
-  created?:string;
+  created?: string;
 } {
   const followUpIso = lead.follow_up_date ?? lead.next_follow_up_date_sidago;
   return {
