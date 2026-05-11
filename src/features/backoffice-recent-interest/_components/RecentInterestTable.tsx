@@ -1,9 +1,14 @@
 
+
 import { CampaignBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
-import { getLeadId, getLeadIdOptions } from "@/features/backoffice-shared/constants";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import React, { useMemo } from "react";
+import {
+  getLeadId,
+  getLeadIdOptions,
+} from "@/features/backoffice-shared/constants";
+import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { useSearchParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 import { RecentInterestDrawer } from "./RecentInterestDrawer";
 import {
   RecentInterestRow,
@@ -19,33 +24,16 @@ type RecentInterestTableProps = {
 };
 
 export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const selectedLead = searchParams.get("lead");
 
-  const selectedIndex = useMemo(() => {
-    const selectedLead = searchParams.get("lead");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
+    findDrawerRouteIndex(data, selectedLead),
+  );
 
-    if (!selectedLead) {
-      return null;
-    }
-
-    const nextIndex = data.findIndex((row) => row.email === selectedLead);
-    return nextIndex >= 0 ? nextIndex : null;
-  }, [data, searchParams]);
-
-  const updateRouteForIndex = (index: number | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (index === null) {
-      params.delete("lead");
-    } else {
-      params.set("lead", data[index].email);
-    }
-
-    const query = params.toString();
-    navigate(query ? `${pathname}?${query}` : pathname, { replace: true });
-  };
+  useEffect(() => {
+    setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
+  }, [data, selectedLead]);
 
   const columns = useMemo<Column<RecentInterestRow>[]>(
     () => [
@@ -119,15 +107,15 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
         title={title}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
-          updateRouteForIndex(index >= 0 ? index : null);
+          setSelectedIndex(index >= 0 ? index : null);
         }}
       />
       <RecentInterestDrawer
         data={data}
         columns={columns}
         selectedIndex={selectedIndex}
-        onSelectedIndexChange={updateRouteForIndex}
-        onClose={() => updateRouteForIndex(null)}
+        onSelectedIndexChange={setSelectedIndex}
+        onClose={() => setSelectedIndex(null)}
       />
     </div>
   );

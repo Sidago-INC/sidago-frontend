@@ -1,4 +1,5 @@
 
+
 import React from "react";
 import { useRecentInterest } from "../_lib/use-recent-interest";
 import { RecentInterestTable } from "./RecentInterestTable";
@@ -22,5 +23,7 @@ export function RecentInterestSvg() {
     );
   }
 
-  return <RecentInterestTable data={data ?? []} title="Recent Interest - SVG" />;
+  return (
+    <RecentInterestTable data={data ?? []} title="Recent Interest - SVG" />
+  );
 }

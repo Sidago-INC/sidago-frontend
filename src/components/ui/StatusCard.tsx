@@ -1,4 +1,5 @@
 
+
 import clsx from "clsx";
 import React, { ReactNode } from "react";
 
@@ -25,6 +26,19 @@ type StatusCardProps = {
   metricClassName?: string;
   metricLabelClassName?: string;
   metricValueClassName?: string;
+};
+
+type SimpleStatusCardProps = {
+  title: ReactNode;
+  value: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  titleClassName?: string;
+  valueClassName?: string;
+  descriptionClassName?: string;
+  iconWrapperClassName?: string;
 };
 
 export function StatusCard({
@@ -106,6 +120,70 @@ export function StatusCard({
 
         {children}
         {footer}
+      </div>
+    </div>
+  );
+}
+
+export function SimpleStatusCard({
+  title,
+  value,
+  description,
+  icon,
+  className,
+  bodyClassName,
+  titleClassName,
+  valueClassName,
+  descriptionClassName,
+  iconWrapperClassName,
+}: SimpleStatusCardProps) {
+  return (
+    <div
+      className={clsx(
+        "overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800",
+        className,
+      )}
+    >
+      <div className={clsx("flex h-full flex-col gap-4 p-6", bodyClassName)}>
+        {icon ? (
+          <div
+            className={clsx(
+              "flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100",
+              iconWrapperClassName,
+            )}
+          >
+            {icon}
+          </div>
+        ) : null}
+
+        <div className="flex w-full flex-col gap-2">
+          <p
+            className={clsx(
+              "w-full text-lg font-bold text-slate-900 dark:text-slate-100",
+              titleClassName,
+            )}
+          >
+            {title}
+          </p>
+          <p
+            className={clsx(
+              "w-full text-3xl font-bold text-slate-950 dark:text-slate-50",
+              valueClassName,
+            )}
+          >
+            {value}
+          </p>
+          {description ? (
+            <p
+              className={clsx(
+                "w-full text-sm text-slate-600 dark:text-slate-300",
+                descriptionClassName,
+              )}
+            >
+              {description}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );

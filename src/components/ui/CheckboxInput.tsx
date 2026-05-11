@@ -1,8 +1,12 @@
 
+
 import clsx from "clsx";
 import { InputHTMLAttributes, useId } from "react";
 
-type CheckboxInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
+type CheckboxInputProps = Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type"
+> & {
   label?: string;
   error?: string;
   wrapperClassName?: string;

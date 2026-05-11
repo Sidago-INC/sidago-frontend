@@ -16,10 +16,10 @@ export function OutcomeButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${className}`}
+      className={`flex min-h-[52px] w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-xl px-3 py-3 text-center text-sm font-semibold leading-tight whitespace-nowrap transition-all ${className}`}
     >
-      <Icon className="h-4 w-4" />
-      {label}
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
     </button>
   );
 }

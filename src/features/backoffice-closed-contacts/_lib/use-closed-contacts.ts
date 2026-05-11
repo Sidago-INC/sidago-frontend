@@ -1,4 +1,5 @@
 
+
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ClosedContactRow } from "./data";
@@ -6,9 +7,7 @@ import type { ClosedContactRow } from "./data";
 type Brand = "svg" | "95rm" | "benton";
 type Category = "current" | "historical" | "all";
 
-type ApiResponse =
-  | { ok: true; count: number; data: ClosedContactRow[] }
-  | { ok: false; error: string };
+type ApiResponse = { ok: true; count: number; data: ClosedContactRow[] };
 
 async function fetchClosedContracts(
   category: Category,
@@ -17,12 +16,6 @@ async function fetchClosedContracts(
   const params = new URLSearchParams({ category });
   if (brand) params.set("brand", brand);
   const json = (await api.get(`/reports/closed-contracts?${params.toString()}`)) as ApiResponse;
-
-  if (!json.ok) {
-    const message = "error" in json ? json.error : "Failed to load";
-    throw new Error(message);
-  }
-
   return json.data;
 }
 

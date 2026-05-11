@@ -1,4 +1,4 @@
-import { Lead } from "@/types";
+import type { Lead } from "../_lib/data";
 import { CardShell } from "@/components/ui/CardShell";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Phone } from "lucide-react";

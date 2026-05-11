@@ -1,4 +1,5 @@
 
+
 import { AnimatePresence, motion } from "framer-motion";
 import { ReactNode, useState } from "react";
 
@@ -28,6 +29,7 @@ export function DropdownPanel({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
               className={panelClassName}
             >
               {children}

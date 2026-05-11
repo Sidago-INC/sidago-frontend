@@ -51,38 +51,37 @@ export interface Agent {
   all_points: number;
 }
 
-
 export type AGENT_TYPE = {
-  name:string;
-  surname:string;
-  email?:string;
-}
+  name: string;
+  surname: string;
+  email?: string;
+};
 
 export const AGENT_VALUES: AGENT_TYPE[] = [
   {
     name: "John",
     surname: "Doe",
-    email: "john.doe@example.com"
+    email: "john.doe@example.com",
   },
   {
     name: "Jane",
     surname: "Smith",
-    email: "jane.smith@example.com"
+    email: "jane.smith@example.com",
   },
   {
     name: "Michael",
     surname: "Johnson",
-    email: "michael.johnson@example.com"
+    email: "michael.johnson@example.com",
   },
   {
     name: "Emily",
     surname: "Davis",
-    email: "emily.davis@example.com"
+    email: "emily.davis@example.com",
   },
   {
     name: "David",
     surname: "Wilson",
-    email: "david.wilson@example.com"
+    email: "david.wilson@example.com",
   },
 ];
 
