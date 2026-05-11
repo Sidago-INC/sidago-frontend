@@ -4,7 +4,7 @@ import { SidebarItem } from "./SidebarItem";
 import { ShieldCheck, X } from "lucide-react";
 import { NavigationItem } from "@/lib/navigation";
 import { useAuth } from "@/providers/AuthProvider";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { SidebarRoleBadge } from "./SidebarRoleBadge";
 
 export type Props = {
@@ -20,6 +20,7 @@ export default function Mobilebar({
 }: Props) {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
 
   return (
     <AnimatePresence>
@@ -57,10 +58,11 @@ export default function Mobilebar({
             <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
               {navigations.map((item) => (
                 <SidebarItem
-                  key={item.href}
+                  key={item.href ?? item.label}
                   item={item}
                   isCollapsed={false}
-                  isActive={pathname === item.href}
+                  currentPath={pathname}
+                  currentSearch={searchParams.toString()}
                   allowLabelWrap
                 />
               ))}

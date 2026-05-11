@@ -1,0 +1,4 @@
+companyName,fullName,contactType,svgLeadType,svgToBeCalledBy,bentonLeadType,bentonToBeCalledBy,rm95LeadType,rm95ToBeCalledBy,phone,email,role
+NovaTech Solutions,Alice Monroe,Prospecting,Hot,Hasib,General,Nafis,On Hold,Rafi,+15551230001,alice.monroe@example.com,Operations Manager
+Aurora Dynamics,Marcus Lee,Validated,General,Asha,Hot,Tanvir,General,Maliha,+15551230002,marcus.lee@example.com,Revenue Director
+SkyBridge Innovations,Sophia Grant,Prospecting,On Hold,Rafi,General,Asha,Hot,Hasib,+15551230003,sophia.grant@example.com,Partnerships Lead

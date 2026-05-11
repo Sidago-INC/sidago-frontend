@@ -1,4 +1,5 @@
 
+
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import React, { useMemo } from "react";
@@ -12,37 +13,33 @@ import {
   getLeadIdOptions,
   leadTypeOptions,
   timezoneOptions,
+  type ClosedContactsTabKey,
 } from "../_lib/data";
 import { ClosedContactDrawer } from "./CloseContactDrawer";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 
 type ClosedContactsTableProps = {
   data: ClosedContactRow[];
+  tabKey: ClosedContactsTabKey;
   title: string;
 };
 
-export function ClosedContactsTable({ data, title }: ClosedContactsTableProps) {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
+export function ClosedContactsTable({
+  data,
+  tabKey,
+  title,
+}: ClosedContactsTableProps) {
   const [searchParams] = useSearchParams();
+  const selectedLead = searchParams.get("lead");
 
-  const selectedIndex = useMemo(() => {
-    const selectedLead = searchParams.get("lead");
-    if (!selectedLead) return null;
-    const idx = data.findIndex((row) => row.email === selectedLead);
-    return idx >= 0 ? idx : null;
-  }, [data, searchParams]);
+  const [selectedIndex, setSelectedIndex] = React.useState<number | null>(() =>
+    findDrawerRouteIndex(data, selectedLead),
+  );
 
-  const updateRouteForIndex = (index: number | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (index === null) {
-      params.delete("lead");
-    } else {
-      params.set("lead", data[index].email);
-    }
-    const query = params.toString();
-    navigate(query ? `${pathname}?${query}` : pathname, { replace: true });
-  };
+  React.useEffect(() => {
+    setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
+  }, [data, selectedLead]);
 
   const columns = useMemo<Column<ClosedContactRow>[]>(
     () => [
@@ -135,15 +132,16 @@ export function ClosedContactsTable({ data, title }: ClosedContactsTableProps) {
         title={title}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
-          updateRouteForIndex(index >= 0 ? index : null);
+          setSelectedIndex(index >= 0 ? index : null);
         }}
       />
       <ClosedContactDrawer
         data={data}
         columns={columns}
+        tabKey={tabKey}
         selectedIndex={selectedIndex}
-        onSelectedIndexChange={updateRouteForIndex}
-        onClose={() => updateRouteForIndex(null)}
+        onSelectedIndexChange={setSelectedIndex}
+        onClose={() => setSelectedIndex(null)}
       />
     </div>
   );

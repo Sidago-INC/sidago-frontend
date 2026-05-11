@@ -1,7 +1,8 @@
 
+
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CurrentlyHotDrawer } from "./CurrentlyHotDrawer";
 import {
   assigneeOptions,
@@ -14,7 +15,8 @@ import {
   leadTypeOptions,
   timezoneOptions,
 } from "../_lib/data";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
+import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 
 type CurrentlyHotTableProps = {
   data: LeadRow[];
@@ -27,33 +29,16 @@ export function CurrentlyHotTable({
   title,
   variant,
 }: CurrentlyHotTableProps) {
-  const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const selectedLead = searchParams.get("lead");
 
-  const selectedIndex = useMemo(() => {
-    const selectedLead = searchParams.get("lead");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
+    findDrawerRouteIndex(data, selectedLead),
+  );
 
-    if (!selectedLead) {
-      return null;
-    }
-
-    const nextIndex = data.findIndex((row) => row.email === selectedLead);
-    return nextIndex >= 0 ? nextIndex : null;
-  }, [data, searchParams]);
-
-  const updateRouteForIndex = (index: number | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (index === null) {
-      params.delete("lead");
-    } else {
-      params.set("lead", data[index].email);
-    }
-
-    const query = params.toString();
-    navigate(query ? `${pathname}?${query}` : pathname, { replace: true });
-  };
+  useEffect(() => {
+    setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
+  }, [data, selectedLead]);
 
   const columns = useMemo<Column<LeadRow>[]>(() => {
     const baseColumns: Column<LeadRow>[] = [
@@ -248,15 +233,15 @@ export function CurrentlyHotTable({
         title={title}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
-          updateRouteForIndex(index >= 0 ? index : null);
+          setSelectedIndex(index >= 0 ? index : null);
         }}
       />
       <CurrentlyHotDrawer
         data={data}
         columns={columns}
         selectedIndex={selectedIndex}
-        onSelectedIndexChange={updateRouteForIndex}
-        onClose={() => updateRouteForIndex(null)}
+        onSelectedIndexChange={setSelectedIndex}
+        onClose={() => setSelectedIndex(null)}
       />
     </div>
   );

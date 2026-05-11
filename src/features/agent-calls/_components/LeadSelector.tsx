@@ -1,5 +1,5 @@
 import { Select } from "@/components/ui/Select";
-import { Lead } from "@/types";
+import type { Lead } from "../_lib/data";
 
 type Props = {
   leads: Lead[];
