@@ -31,17 +31,27 @@ export function getDashboardRouteForRole(role: UserRole): string {
   }
 }
 
+function matchesRoute(routes: Set<string>, pathname: string): boolean {
+  if (routes.has(pathname)) return true;
+  // Allow dynamic sub-paths (e.g. /fix-leads/:leadId under /fix-leads). Match
+  // by prefix + "/" so /fix-leadsx doesn't accidentally satisfy /fix-leads.
+  for (const route of routes) {
+    if (pathname.startsWith(route + "/")) return true;
+  }
+  return false;
+}
+
 export function hasRouteAccess(role: UserRole, pathname: string): boolean {
   if (role === "admin") {
-    return allProtectedRoutes.has(pathname);
+    return matchesRoute(allProtectedRoutes, pathname);
   }
 
   if (role === "agent") {
-    return agentRoutes.has(pathname);
+    return matchesRoute(agentRoutes, pathname);
   }
 
   if (role === "backoffice") {
-    return backofficeRoutes.has(pathname);
+    return matchesRoute(backofficeRoutes, pathname);
   }
 
   return false;

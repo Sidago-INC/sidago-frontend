@@ -34,6 +34,11 @@ const REQUIRED_COLUMNS: Array<keyof LeadCreateFormValues> = [
 ];
 
 const templateExampleRow: LeadCreateFormValues = {
+  // companyId is column-empty in the template — bulk imports historically
+  // attach all rows to a single "Pending Assignment" placeholder downstream;
+  // when the bulk flow is migrated to the DB this becomes a real
+  // company-symbol lookup column instead.
+  companyId: "",
   fullName: "Jamie Lee Carter",
   firstName: "Jamie",
   lastName: "Carter",
@@ -62,6 +67,7 @@ function normalizeLeadForm(
   values: Record<string, string>,
 ): LeadCreateFormValues {
   return {
+    companyId: values.companyId?.trim() ?? "",
     fullName: values.fullName?.trim() ?? "",
     firstName: values.firstName?.trim() ?? "",
     lastName: values.lastName?.trim() ?? "",
