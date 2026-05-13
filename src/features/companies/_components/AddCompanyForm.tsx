@@ -7,14 +7,15 @@ import {
   Textarea,
   TextInput,
 } from "@/components/ui";
-import { showSuccessToast } from "@/lib/toast";
+import { api } from "@/lib/api";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
 import { companyValidationSchema } from "@/lib/validation/company";
 import { type COMPANY } from "@/types/company.types";
 import { TIMEZONE_OPTIONS } from "@/types/timezone.types";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { getStoredCompanies, saveStoredCompanies } from "../_lib/storage";
 import { CountryPicker } from "./CountryPicker";
 
 const blankCompany: COMPANY = {
@@ -56,12 +57,21 @@ function normalizeCompany(company: COMPANY): COMPANY {
   };
 }
 
+type CreateCompanyResponse = {
+  ok: true;
+  id: string;
+  symbol: string;
+  name: string;
+};
+
 export function AddCompanyForm() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<COMPANY>(blankCompany);
   const [errors, setErrors] = useState<Partial<Record<keyof COMPANY, string>>>(
     {},
   );
+  const [isSaving, setIsSaving] = useState(false);
 
   const updateField = (field: keyof COMPANY, value: string) => {
     setForm((current) => ({
@@ -79,28 +89,46 @@ export function AddCompanyForm() {
     setErrors({});
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const nextCompany = normalizeCompany(form);
     const nextErrors = validateForm(nextCompany, companyValidationSchema);
-    const currentCompanies = getStoredCompanies();
-    const duplicateSymbol = currentCompanies.some(
-      (company) => normalizeSymbol(company.symbol) === nextCompany.symbol,
-    );
-
-    if (duplicateSymbol) {
-      nextErrors.symbol = "A company with this symbol already exists.";
-    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
 
-    saveStoredCompanies([nextCompany, ...currentCompanies]);
-    setForm(nextCompany);
-    setErrors({});
-    showSuccessToast("Company created successfully.");
-    navigate(`/companies?company=${encodeURIComponent(nextCompany.symbol)}`);
+    setIsSaving(true);
+    try {
+      // primaryVenue is intentionally not sent — the DB has no column for it,
+      // so it stays as form-only UI state until the schema picks it up.
+      const response = (await api.post("/companies", {
+        companySymbol: nextCompany.symbol,
+        companyName: nextCompany.name,
+        timezone: nextCompany.timezone,
+        country: nextCompany.country,
+        description: nextCompany.description,
+        estimatedMarketcap: nextCompany.estimatedMarketCap,
+        city: nextCompany.city,
+        state: nextCompany.state,
+        zip: nextCompany.zip,
+        website: nextCompany.website,
+        twitter: nextCompany.twitterHandle,
+      })) as CreateCompanyResponse;
+
+      // The Add Lead form's company dropdown caches this list — drop the
+      // cache so the new row is pickable without a hard refresh.
+      queryClient.invalidateQueries({ queryKey: ["companies", "picker"] });
+
+      setForm(blankCompany);
+      setErrors({});
+      showSuccessToast(`Company "${response.symbol}" saved.`);
+      navigate(`/companies?company=${encodeURIComponent(response.symbol)}`);
+    } catch (err) {
+      showErrorToast(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -222,16 +250,18 @@ export function AddCompanyForm() {
             <button
               type="button"
               onClick={handleClear}
-              className="inline-flex h-10 cursor-pointer items-center justify-center rounded border border-slate-200 px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              disabled={isSaving}
+              className="inline-flex h-10 cursor-pointer items-center justify-center rounded border border-slate-200 px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Clear
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+              disabled={isSaving}
+              className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Company
+              {isSaving ? "Saving..." : "Save Company"}
             </button>
           </div>
         </CardContent>

@@ -28,6 +28,7 @@ import { AdditionalContactsForm } from "@/features/additional-contacts/_componen
 import { Level2Update } from "@/features/level-2-update/_components/Level2Update";
 import { Level2History } from "@/features/level-2-history/_components/Level2History";
 import { FixLeads } from "@/features/fix-leads/_components/FixLeads";
+import { FixLeadEditForm } from "@/features/fix-leads/_components/FixLeadEditForm";
 import { LeadsStats } from "@/features/leads-stats/_components/LeadsStats";
 import { BlockedEmail } from "@/features/blocked-email/_components/BlockedEmail";
 import { EmailBlocklistDirectory } from "@/features/email-blocklist-directory/_components/EmailBlocklistDirectory";
@@ -114,6 +115,7 @@ export default function App() {
                 <Route path="/level-2-update" element={<P><Level2Update /></P>} />
                 <Route path="/level-2-history" element={<P><Level2History /></P>} />
                 <Route path="/fix-leads" element={<P><FixLeads /></P>} />
+                <Route path="/fix-leads/:leadId" element={<P><FixLeadEditForm /></P>} />
                 <Route path="/leads-stats" element={<P><LeadsStats /></P>} />
                 <Route path="/additional-contacts" element={<P><AdditionalContactsForm /></P>} />
 

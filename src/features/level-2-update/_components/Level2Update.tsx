@@ -12,19 +12,23 @@ import {
 import { type Column } from "@/components/ui/Table";
 import clsx from "clsx";
 import { FileText, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
+import { api } from "@/lib/api";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { useUsers } from "@/features/backoffice-shared/use-users";
 import {
   createEmptyLevel2UpdateRow,
-  level2AgentOptions,
-  level2LeadOptions,
   level2ResultUpdateOptions,
   level2UpdateCampaignOptions,
-  level2UpdateLeadTypeOptions,
-  level2UpdateRows,
   type Level2UpdateRow,
 } from "../_lib/data";
+import {
+  useLeadOptions,
+  useLogLevel2Result,
+  type BrandStatesResponse,
+} from "../_lib/hooks";
 
 const cellInputClass =
   "h-8 min-w-[8rem] w-full rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 hover:bg-slate-50 focus:border-slate-200 focus:bg-white focus:text-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500 dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900";
@@ -38,8 +42,18 @@ const readTextClass =
 const cellSelectClass =
   "h-8 min-w-[8rem] rounded-lg border-transparent bg-transparent px-2 py-1 text-sm shadow-none hover:bg-slate-50 focus:border-slate-200 dark:border-transparent dark:bg-transparent dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900";
 
+// Lead labels are "<EXCHANGE>:<SYMBOL> - <Full Name>" — the default 8rem
+// trigger truncates everything past the exchange. Give it room.
+const leadSelectClass =
+  "h-8 min-w-[18rem] rounded-lg border-transparent bg-transparent px-2 py-1 text-sm shadow-none hover:bg-slate-50 focus:border-slate-200 dark:border-transparent dark:bg-transparent dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900";
+
 const cellSelectOptionsClass =
   "z-[300] max-h-72 rounded-xl border-slate-200 p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950";
+
+// The Select panel inherits the trigger width via --button-width. Override
+// it so the lead dropdown shows the full label even on narrow trigger states.
+const leadSelectOptionsClass =
+  "z-[300] !w-[26rem] max-w-[90vw] max-h-72 rounded-xl border-slate-200 p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950";
 
 function ReadText({
   value,
@@ -61,134 +75,114 @@ function ReadText({
   return <span className={readTextClass}>{value}</span>;
 }
 
+// Each result option belongs to one of four buckets — every option in the
+// same bucket shares a colour so the History/Update tables read at a glance.
+//
+//   positive  → green   (sale-side wins)
+//   callback  → amber   (will revisit, not closed yet)
+//   negative  → rose    (dead-end outcomes)
+//   admin     → indigo  (Force / Block — operator overrides, not call results)
+const RESULT_CATEGORY: Record<
+  string,
+  "positive" | "callback" | "negative" | "admin"
+> = {
+  Intersted: "positive",
+  "Contract Closed": "positive",
+
+  "Call back Lead": "callback",
+  "needs more time": "callback",
+  "no answer": "callback",
+  "left message": "callback",
+
+  "bad number": "negative",
+  "wrong number": "negative",
+  "not interested": "negative",
+  DNC: "negative",
+
+  "Force Fix": "admin",
+  "Force General": "admin",
+  "Force Void": "admin",
+  "Block Email to": "admin",
+};
+
+const ADMIN_BADGE_CLASS =
+  "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800";
+
 function ResultBadge({ value }: { value: string }) {
   if (!value.trim()) {
     return <Badge className="text-slate-400 dark:text-slate-500">Select</Badge>;
   }
 
-  if (value === "Fixed") {
-    return <Badge variant="success">{value}</Badge>;
-  }
+  const category = RESULT_CATEGORY[value];
 
-  if (value === "Sent To Fix" || value === "On Hold") {
-    return <Badge variant="warning">{value}</Badge>;
-  }
-
-  if (value === "Can't Locate") {
-    return <Badge variant="error">{value}</Badge>;
-  }
+  if (category === "positive") return <Badge variant="success">{value}</Badge>;
+  if (category === "callback") return <Badge variant="warning">{value}</Badge>;
+  if (category === "negative") return <Badge variant="error">{value}</Badge>;
+  if (category === "admin")
+    return <Badge className={ADMIN_BADGE_CLASS}>{value}</Badge>;
 
   return <Badge>{value}</Badge>;
 }
 
-function LeadEditor({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Select
-      value={value}
-      options={level2LeadOptions}
-      placeholder="Select lead"
-      searchable
-      searchPlaceholder="Search lead"
-      onChange={(nextValue) => onChange(String(nextValue))}
-      className={cellSelectClass}
-      optionsClassName={cellSelectOptionsClass}
-    />
-  );
-}
-
-function CampaignEditor({
-  value,
-  onChange,
-}: {
-  value: BRAND | "";
-  onChange: (value: BRAND | "") => void;
-}) {
-  return (
-    <Select
-      value={value}
-      options={level2UpdateCampaignOptions}
-      placeholder="Select campaign"
-      searchable
-      searchPlaceholder="Search campaign"
-      onChange={(nextValue) => onChange(String(nextValue) as BRAND | "")}
-      className={cellSelectClass}
-      optionsClassName={cellSelectOptionsClass}
-    />
-  );
-}
-
-function LeadTypeEditor({
-  value,
-  onChange,
-}: {
-  value: LEAD_TYPE | "";
-  onChange: (value: LEAD_TYPE | "") => void;
-}) {
-  return (
-    <Select
-      value={value}
-      options={level2UpdateLeadTypeOptions}
-      placeholder="Select type"
-      searchable
-      searchPlaceholder="Search type"
-      onChange={(nextValue) => onChange(String(nextValue) as LEAD_TYPE | "")}
-      className={cellSelectClass}
-      optionsClassName={cellSelectOptionsClass}
-    />
-  );
-}
-
-function ResultEditor({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Select
-      value={value}
-      options={level2ResultUpdateOptions}
-      placeholder="Select result"
-      searchable
-      searchPlaceholder="Search result"
-      onChange={(nextValue) => onChange(String(nextValue))}
-      className={cellSelectClass}
-      optionsClassName={cellSelectOptionsClass}
-    />
-  );
-}
-
-function AgentEditor({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Select
-      value={value}
-      options={level2AgentOptions}
-      placeholder="Select agent"
-      searchable
-      searchPlaceholder="Search agent"
-      onChange={(nextValue) => onChange(String(nextValue))}
-      className={cellSelectClass}
-      optionsClassName={cellSelectOptionsClass}
-    />
-  );
+// Maps the frontend BRAND value to the lowercase brand code the API expects.
+function brandCodeFor(brand: BRAND | ""): "svg" | "95rm" | "benton" | null {
+  if (brand === "SVG") return "svg";
+  if (brand === "BENTON") return "benton";
+  if (brand === "95RM") return "95rm";
+  return null;
 }
 
 export function Level2Update() {
-  const [rows, setRows] = useState(level2UpdateRows);
+  const [rows, setRows] = useState<Level2UpdateRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+
+  const { data: leadOptionsRaw, isLoading: leadsLoading } = useLeadOptions();
+  // One agents query per brand — each result is cached for 5 minutes, so even
+  // with three hooks the network footprint is tiny. Per-row agent options are
+  // derived from whichever brand the row's campaign points at, so picking
+  // Benton can never surface an SVG-only agent.
+  const svgAgents = useUsers("svg");
+  const rm95Agents = useUsers("95rm");
+  const bentonAgents = useUsers("benton");
+  const logResult = useLogLevel2Result();
+
+  const leadOptions = useMemo(
+    () =>
+      (leadOptionsRaw ?? []).map((l) => ({
+        value: l.id,
+        label: l.label || l.fullName || l.leadIdExternal || l.id,
+      })),
+    [leadOptionsRaw],
+  );
+
+  const leadLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const opt of leadOptions) map.set(opt.value, opt.label);
+    return map;
+  }, [leadOptions]);
+
+  const getAgentOptions = (campaign: BRAND | "") => {
+    if (campaign === "SVG") {
+      return (svgAgents.data ?? []).map((a) => ({ value: a.name, label: a.name }));
+    }
+    if (campaign === "95RM") {
+      return (rm95Agents.data ?? []).map((a) => ({ value: a.name, label: a.name }));
+    }
+    if (campaign === "BENTON") {
+      return (bentonAgents.data ?? []).map((a) => ({
+        value: a.name,
+        label: a.name,
+      }));
+    }
+    return [];
+  };
+
+  const isAgentsLoadingFor = (campaign: BRAND | "") => {
+    if (campaign === "SVG") return svgAgents.isLoading;
+    if (campaign === "95RM") return rm95Agents.isLoading;
+    if (campaign === "BENTON") return bentonAgents.isLoading;
+    return false;
+  };
 
   const updateRow = <K extends keyof Level2UpdateRow>(
     rowId: string,
@@ -197,6 +191,12 @@ export function Level2Update() {
   ) => {
     setRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, [key]: value } : row)),
+    );
+  };
+
+  const patchRow = (rowId: string, patch: Partial<Level2UpdateRow>) => {
+    setRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
     );
   };
 
@@ -211,26 +211,78 @@ export function Level2Update() {
     setEditingRowId((current) => (current === rowId ? null : current));
   };
 
-  const handleLogResult = (rowId: string) => {
-    const today = new Date().toISOString().slice(0, 10);
+  const handleCampaignChange = (rowId: string, nextCampaign: BRAND | "") => {
+    // Resetting level_2_agent prevents a stale SVG agent name from sticking
+    // around when the user switches the row to Benton — that would fail at
+    // log time with "User not found" because the resolver only matches the
+    // agent name, not the brand. Better to clear it and force a re-pick.
+    patchRow(rowId, { campaign: nextCampaign, level_2_agent: "" });
+  };
 
-    setRows((current) =>
-      current.map((row) => {
-        if (row.id !== rowId) {
-          return row;
-        }
+  const handleLeadChange = async (rowId: string, leadId: string) => {
+    const label = leadLabelById.get(leadId) ?? "";
+    // Reset the brand lead types until the fetch resolves so the user never
+    // sees stale data from the previously selected lead.
+    patchRow(rowId, {
+      lead: leadId,
+      lead_label: label,
+      lead_type_sidago: "",
+      lead_type_benton: "",
+      lead_type_95rm: "",
+    });
 
-        const resultLabel = row.level_2_result_update.trim() || "No result";
-        const noteEntry = `[${today}] ${resultLabel}`;
+    if (!leadId) return;
 
-        return {
-          ...row,
-          updated_notes: row.updated_notes
-            ? `${row.updated_notes} | ${noteEntry}`
-            : noteEntry,
-        };
-      }),
-    );
+    try {
+      const json = (await api.get(
+        `/leads/${leadId}/brand-states`,
+      )) as BrandStatesResponse;
+      patchRow(rowId, {
+        lead_type_sidago: (json.brandStates.svg.leadType ?? "") as LEAD_TYPE | "",
+        lead_type_benton: (json.brandStates.benton.leadType ?? "") as
+          | LEAD_TYPE
+          | "",
+        lead_type_95rm: (json.brandStates["95rm"].leadType ?? "") as
+          | LEAD_TYPE
+          | "",
+      });
+    } catch (err) {
+      showErrorToast(err);
+    }
+  };
+
+  const handleLogResult = async (rowId: string) => {
+    const row = rows.find((r) => r.id === rowId);
+    if (!row) return;
+
+    if (!row.lead) {
+      showErrorToast({ message: "Pick a lead before logging the result." });
+      return;
+    }
+    const brand = brandCodeFor(row.campaign);
+    if (!brand) {
+      showErrorToast({ message: "Pick a campaign before logging the result." });
+      return;
+    }
+    if (!row.level_2_result_update) {
+      showErrorToast({ message: "Pick a Level 2 result before logging." });
+      return;
+    }
+
+    try {
+      await logResult.mutateAsync({
+        leadId: row.lead,
+        brand,
+        level2AgentName: row.level_2_agent || null,
+        resultUpdate: row.level_2_result_update,
+        updatedNotes: row.updated_notes,
+        callBackDate: row.call_back_date,
+      });
+      showSuccessToast("Level 2 result logged.");
+      patchRow(rowId, { logged_at: new Date().toISOString() });
+    } catch (err) {
+      showErrorToast(err);
+    }
   };
 
   const isEditingRow = (rowId: string) => editingRowId === rowId;
@@ -242,13 +294,21 @@ export function Level2Update() {
       render: (row) =>
         isEditingRow(row.id) ? (
           <div onClick={(event) => event.stopPropagation()}>
-            <LeadEditor
+            <Select
               value={row.lead}
-              onChange={(value) => updateRow(row.id, "lead", value)}
+              options={leadOptions}
+              placeholder={leadsLoading ? "Loading leads..." : "Select lead"}
+              searchable
+              searchPlaceholder="Search lead"
+              onChange={(nextValue) =>
+                handleLeadChange(row.id, String(nextValue))
+              }
+              className={leadSelectClass}
+              optionsClassName={leadSelectOptionsClass}
             />
           </div>
         ) : (
-          <ReadText value={row.lead} />
+          <ReadText value={row.lead_label} />
         ),
     },
     {
@@ -257,9 +317,17 @@ export function Level2Update() {
       render: (row) =>
         isEditingRow(row.id) ? (
           <div onClick={(event) => event.stopPropagation()}>
-            <CampaignEditor
+            <Select
               value={row.campaign}
-              onChange={(value) => updateRow(row.id, "campaign", value)}
+              options={level2UpdateCampaignOptions}
+              placeholder="Select campaign"
+              searchable
+              searchPlaceholder="Search campaign"
+              onChange={(nextValue) =>
+                handleCampaignChange(row.id, String(nextValue) as BRAND | "")
+              }
+              className={cellSelectClass}
+              optionsClassName={cellSelectOptionsClass}
             />
           </div>
         ) : (
@@ -269,17 +337,34 @@ export function Level2Update() {
     {
       title: "level 2 agent",
       key: "level_2_agent",
-      render: (row) =>
-        isEditingRow(row.id) ? (
+      render: (row) => {
+        if (!isEditingRow(row.id)) {
+          return <ReadText value={row.level_2_agent} />;
+        }
+        const agentOptions = getAgentOptions(row.campaign);
+        const placeholder = !row.campaign
+          ? "Pick a campaign first"
+          : isAgentsLoadingFor(row.campaign)
+            ? "Loading agents..."
+            : "Select agent";
+        return (
           <div onClick={(event) => event.stopPropagation()}>
-            <AgentEditor
+            <Select
               value={row.level_2_agent}
-              onChange={(value) => updateRow(row.id, "level_2_agent", value)}
+              options={agentOptions}
+              placeholder={placeholder}
+              searchable
+              searchPlaceholder="Search agent"
+              disabled={!row.campaign}
+              onChange={(nextValue) =>
+                updateRow(row.id, "level_2_agent", String(nextValue))
+              }
+              className={cellSelectClass}
+              optionsClassName={cellSelectOptionsClass}
             />
           </div>
-        ) : (
-          <ReadText value={row.level_2_agent} />
-        ),
+        );
+      },
     },
     {
       title: "Level 2 result update",
@@ -287,11 +372,17 @@ export function Level2Update() {
       render: (row) =>
         isEditingRow(row.id) ? (
           <div onClick={(event) => event.stopPropagation()}>
-            <ResultEditor
+            <Select
               value={row.level_2_result_update}
-              onChange={(value) =>
-                updateRow(row.id, "level_2_result_update", value)
+              options={level2ResultUpdateOptions}
+              placeholder="Select result"
+              searchable
+              searchPlaceholder="Search result"
+              onChange={(nextValue) =>
+                updateRow(row.id, "level_2_result_update", String(nextValue))
               }
+              className={cellSelectClass}
+              optionsClassName={cellSelectOptionsClass}
             />
           </div>
         ) : (
@@ -339,64 +430,22 @@ export function Level2Update() {
       title: "Created date",
       key: "created_date",
       type: "date",
-      render: (row) =>
-        isEditingRow(row.id) ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <DatePickerField
-              value={row.created_date}
-              onChange={(value) => updateRow(row.id, "created_date", value)}
-              className={cellInputClass}
-              placeholder="Pick a date"
-            />
-          </div>
-        ) : (
-          <ReadText value={row.created_date} />
-        ),
+      render: (row) => <ReadText value={row.created_date} />,
     },
     {
       title: "Lead Type Sidago",
       key: "lead_type_sidago",
-      render: (row) =>
-        isEditingRow(row.id) ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <LeadTypeEditor
-              value={row.lead_type_sidago}
-              onChange={(value) => updateRow(row.id, "lead_type_sidago", value)}
-            />
-          </div>
-        ) : (
-          <TypeBadge value={row.lead_type_sidago} kind="lead" />
-        ),
+      render: (row) => <TypeBadge value={row.lead_type_sidago} kind="lead" />,
     },
     {
       title: "Lead Type Benton",
       key: "lead_type_benton",
-      render: (row) =>
-        isEditingRow(row.id) ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <LeadTypeEditor
-              value={row.lead_type_benton}
-              onChange={(value) => updateRow(row.id, "lead_type_benton", value)}
-            />
-          </div>
-        ) : (
-          <TypeBadge value={row.lead_type_benton} kind="lead" />
-        ),
+      render: (row) => <TypeBadge value={row.lead_type_benton} kind="lead" />,
     },
     {
       title: "Lead Type 95 RM",
       key: "lead_type_95rm",
-      render: (row) =>
-        isEditingRow(row.id) ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <LeadTypeEditor
-              value={row.lead_type_95rm}
-              onChange={(value) => updateRow(row.id, "lead_type_95rm", value)}
-            />
-          </div>
-        ) : (
-          <TypeBadge value={row.lead_type_95rm} kind="lead" />
-        ),
+      render: (row) => <TypeBadge value={row.lead_type_95rm} kind="lead" />,
     },
     {
       title: "Log Result",
@@ -404,6 +453,7 @@ export function Level2Update() {
       render: (row) => (
         <button
           type="button"
+          disabled={logResult.isPending}
           onClick={(event) => {
             event.stopPropagation();
             handleLogResult(row.id);
@@ -411,10 +461,11 @@ export function Level2Update() {
           className={clsx(
             actionButtonClass,
             "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+            logResult.isPending && "opacity-50 cursor-not-allowed",
           )}
         >
           <FileText size={16} />
-          Log Result
+          {row.logged_at ? "Logged" : "Log Result"}
         </button>
       ),
     },
@@ -432,7 +483,7 @@ export function Level2Update() {
             actionButtonClass,
             "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
           )}
-          aria-label={`Delete ${row.lead || "row"}`}
+          aria-label={`Delete ${row.lead_label || "row"}`}
         >
           <Trash2 size={16} />
           Delete
@@ -468,6 +519,7 @@ export function Level2Update() {
         title="Level 2 Update"
         description="Update level 2 results, notes, callbacks, and lead types inline."
         showToolbarTitle={false}
+        emptyText="Click Add Lead to start a new Level 2 update."
         onRowClick={(row) => setEditingRowId(row.id)}
       />
     </div>
