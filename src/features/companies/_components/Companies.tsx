@@ -2,20 +2,24 @@
 
 import { CompanySymbolBadge, Table, TimezoneBadge } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
-import { showSuccessToast } from "@/lib/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
 import { companyValidationSchema } from "@/lib/validation/company";
-import { COUNTRY_OPTIONS } from "@/types/country.types";
-import { COMPANY_VALUES, type COMPANY } from "@/types/company.types";
-import { TIMEZONE_OPTIONS } from "@/types/timezone.types";
+import { COUNTRY_OPTIONS, type COUNTRY } from "@/types/country.types";
+import { type COMPANY } from "@/types/company.types";
+import { TIMEZONE_OPTIONS, type TIMEZONE } from "@/types/timezone.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { CompanyDrawer } from "./CompanyDrawer";
-import { getStoredCompanies, saveStoredCompanies } from "../_lib/storage";
-import { getStoredLeads, saveStoredLeads } from "@/features/leads/_lib/storage";
+import {
+  useCompanyOptions,
+  useUpdateCompany,
+  type CompanyRow,
+} from "../_lib/hooks";
 
 type DrawerState = {
   isOpen: boolean;
+  originalCompanyId: string | null;
   originalSymbol: string | null;
   initialCompany: COMPANY;
   draft: COMPANY;
@@ -42,42 +46,80 @@ function normalizeCompany(company: COMPANY): COMPANY {
   };
 }
 
-function getFallbackCompany() {
-  return COMPANY_VALUES[0];
+// Map the DB row → the COMPANY shape the existing drawer was built around so
+// we don't have to rewrite the drawer's field layout. Numeric marketcap from
+// Postgres comes through as a string already (drizzle's `numeric` mode).
+//
+// `timezone` and `country` are declared as narrow string unions on COMPANY
+// even though the DB stores plain varchar — we cast at this boundary so
+// existing typed consumers (Select options, etc.) keep their inference.
+// Anything in the DB that isn't a known union member flows through as text
+// and the dropdowns simply show no current selection until the user picks
+// one of the canonical values.
+function dbRowToCompany(row: CompanyRow): COMPANY {
+  return {
+    symbol: row.symbol ?? "",
+    name: row.name ?? "",
+    timezone: (row.timezone ?? "") as TIMEZONE,
+    country: (row.country ?? "") as COUNTRY,
+    description: row.description ?? "",
+    estimatedMarketCap: row.estimatedMarketcap ?? "",
+    primaryVenue: "",
+    city: row.city ?? "",
+    state: row.state ?? "",
+    website: row.website ?? "",
+    twitterHandle: row.twitter ?? "",
+    zip: row.zip ?? "",
+  };
 }
+
+const EMPTY_COMPANY: COMPANY = {
+  symbol: "",
+  name: "",
+  timezone: "" as TIMEZONE,
+  country: "" as COUNTRY,
+  description: "",
+  estimatedMarketCap: "",
+  primaryVenue: "",
+  city: "",
+  state: "",
+  website: "",
+  twitterHandle: "",
+  zip: "",
+};
 
 export function Companies() {
   const [searchParams] = useSearchParams();
-  const [companies, setCompanies] = useState<COMPANY[]>(() =>
-    getStoredCompanies(),
-  );
-  const [drawerState, setDrawerState] = useState<DrawerState>(() => ({
-    isOpen: false,
-    originalSymbol: null,
-    initialCompany: getFallbackCompany(),
-    draft: getFallbackCompany(),
-    errors: {},
-  }));
+  const { data: rows, isLoading } = useCompanyOptions();
+  const updateCompany = useUpdateCompany();
 
+  const [drawerState, setDrawerState] = useState<DrawerState>({
+    isOpen: false,
+    originalCompanyId: null,
+    originalSymbol: null,
+    initialCompany: EMPTY_COMPANY,
+    draft: EMPTY_COMPANY,
+    errors: {},
+  });
+
+  const companies = useMemo(() => rows ?? [], [rows]);
+
+  // ?company=<symbol> deep-link opens that company's drawer once data lands.
   useEffect(() => {
     const companyParam = searchParams.get("company");
+    if (!companyParam) return;
 
-    if (!companyParam) {
-      return;
-    }
-
-    const company = companies.find(
-      (item) => item.symbol.toLowerCase() === companyParam.toLowerCase(),
+    const match = companies.find(
+      (row) => (row.symbol ?? "").toLowerCase() === companyParam.toLowerCase(),
     );
+    if (!match) return;
 
-    if (!company) {
-      return;
-    }
-
+    const company = dbRowToCompany(match);
     const timer = window.setTimeout(() => {
       setDrawerState({
         isOpen: true,
-        originalSymbol: company.symbol,
+        originalCompanyId: match.id,
+        originalSymbol: match.symbol,
         initialCompany: { ...company },
         draft: { ...company },
         errors: {},
@@ -87,17 +129,15 @@ export function Companies() {
     return () => window.clearTimeout(timer);
   }, [companies, searchParams]);
 
-  const columns = useMemo<Column<COMPANY>[]>(
+  const columns = useMemo<Column<CompanyRow>[]>(
     () => [
       {
         title: "Company Symbol",
         key: "symbol",
         render: (row) => (
           <CompanySymbolBadge
-            symbol={row.symbol}
-            index={companies.findIndex(
-              (company) => company.symbol === row.symbol,
-            )}
+            symbol={row.symbol ?? ""}
+            index={companies.findIndex((company) => company.id === row.id)}
           />
         ),
       },
@@ -109,10 +149,8 @@ export function Companies() {
         options: TIMEZONE_OPTIONS,
         render: (row) => (
           <TimezoneBadge
-            timezone={row.timezone}
-            index={companies.findIndex(
-              (company) => company.symbol === row.symbol,
-            )}
+            timezone={row.timezone ?? ""}
+            index={companies.findIndex((company) => company.id === row.id)}
           />
         ),
       },
@@ -123,8 +161,7 @@ export function Companies() {
         options: COUNTRY_OPTIONS,
       },
       { title: "Description", key: "description" },
-      { title: "Estimated Market Cap", key: "estimatedMarketCap" },
-      { title: "Primary Venue", key: "primaryVenue" },
+      { title: "Estimated Market Cap", key: "estimatedMarketcap" },
       { title: "City", key: "city" },
       { title: "State", key: "state" },
       {
@@ -145,28 +182,28 @@ export function Companies() {
             ""
           ),
       },
-      { title: "X (Twitter handle)", key: "twitterHandle" },
+      { title: "X (Twitter handle)", key: "twitter" },
       { title: "Zip", key: "zip" },
     ],
     [companies],
   );
 
-  const openEditDrawer = (company: COMPANY) => {
-    const nextCompany = { ...company };
-
+  const openEditDrawer = (row: CompanyRow) => {
+    const company = dbRowToCompany(row);
     setDrawerState({
       isOpen: true,
-      originalSymbol: company.symbol,
-      initialCompany: nextCompany,
-      draft: nextCompany,
+      originalCompanyId: row.id,
+      originalSymbol: row.symbol,
+      initialCompany: company,
+      draft: company,
       errors: {},
     });
   };
 
   const openEditDrawerAtIndex = (index: number) => {
-    const company = companies[index];
-    if (!company) return;
-    openEditDrawer(company);
+    const row = companies[index];
+    if (!row) return;
+    openEditDrawer(row);
   };
 
   const closeDrawer = () => {
@@ -195,15 +232,19 @@ export function Companies() {
     }));
   };
 
-  const saveCompany = () => {
+  const saveCompany = async () => {
+    if (!drawerState.originalCompanyId) return;
+
     const nextCompany = normalizeCompany(drawerState.draft);
     const errors = validateForm(nextCompany, companyValidationSchema);
-    const duplicateSymbol = companies.some(
-      (company) =>
-        company.symbol === nextCompany.symbol &&
-        company.symbol !== drawerState.originalSymbol,
-    );
 
+    // Guard duplicate-symbol case client-side so the user gets immediate
+    // feedback. The backend re-checks too (it's the authoritative guard).
+    const duplicateSymbol = companies.some(
+      (row) =>
+        row.id !== drawerState.originalCompanyId &&
+        (row.symbol ?? "").toUpperCase() === nextCompany.symbol,
+    );
     if (duplicateSymbol) {
       errors.symbol = "A company with this symbol already exists.";
     }
@@ -213,36 +254,42 @@ export function Companies() {
       return;
     }
 
-    setCompanies((current) => {
-      const nextCompanies = current.map((company) =>
-        company.symbol === drawerState.originalSymbol ? nextCompany : company,
-      );
-      saveStoredCompanies(nextCompanies);
-      return nextCompanies;
-    });
-    if (drawerState.initialCompany.name !== nextCompany.name) {
-      const nextTimezone = nextCompany.timezone.replace(/^\d+-/, "");
-      const nextLeads = getStoredLeads().map((lead) =>
-        lead.companyName === drawerState.initialCompany.name
-          ? {
-              ...lead,
-              companyName: nextCompany.name,
-              timezone: nextTimezone,
-            }
-          : lead,
-      );
-      saveStoredLeads(nextLeads);
-    }
+    try {
+      await updateCompany.mutateAsync({
+        companyId: drawerState.originalCompanyId,
+        body: {
+          companySymbol: nextCompany.symbol,
+          companyName: nextCompany.name,
+          timezone: nextCompany.timezone,
+          country: nextCompany.country,
+          description: nextCompany.description,
+          estimatedMarketcap: nextCompany.estimatedMarketCap,
+          city: nextCompany.city,
+          state: nextCompany.state,
+          zip: nextCompany.zip,
+          website: nextCompany.website,
+          twitter: nextCompany.twitterHandle,
+        },
+      });
 
-    showSuccessToast("Company updated successfully.");
-    setDrawerState((current) => ({
-      ...current,
-      originalSymbol: nextCompany.symbol,
-      initialCompany: nextCompany,
-      draft: nextCompany,
-      errors: {},
-    }));
+      showSuccessToast("Company updated.");
+      setDrawerState((current) => ({
+        ...current,
+        originalSymbol: nextCompany.symbol,
+        initialCompany: nextCompany,
+        draft: nextCompany,
+        errors: {},
+      }));
+    } catch (err) {
+      showErrorToast(err);
+    }
   };
+
+  const currentIndex = drawerState.originalCompanyId
+    ? companies.findIndex(
+        (company) => company.id === drawerState.originalCompanyId,
+      )
+    : -1;
 
   return (
     <div className="space-y-4">
@@ -251,6 +298,7 @@ export function Companies() {
         columns={columns}
         title="Companies"
         description="Company market and contact profile"
+        isLoading={isLoading}
         onRowClick={openEditDrawer}
       />
 
@@ -259,11 +307,10 @@ export function Companies() {
         initialCompany={drawerState.initialCompany}
         isOpen={drawerState.isOpen}
         mode="edit"
-        currentIndex={companies.findIndex(
-          (company) => company.symbol === drawerState.originalSymbol,
-        )}
+        currentIndex={currentIndex}
         rowCount={companies.length}
         errors={drawerState.errors}
+        isSaving={updateCompany.isPending}
         onCancel={closeDrawer}
         onChange={updateDraft}
         onNavigate={openEditDrawerAtIndex}

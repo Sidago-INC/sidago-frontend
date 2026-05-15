@@ -2,6 +2,7 @@ import type { Rule } from "./index";
 import { email, maxLength, required } from "./index";
 
 export type LeadCreateFormValues = {
+  companyId: string;
   fullName: string;
   firstName: string;
   lastName: string;
@@ -11,10 +12,14 @@ export type LeadCreateFormValues = {
   role: string;
 };
 
+// Every field is required at the form level except phone extension. The
+// backend ultimately persists the phone extension as nullable text, so an
+// empty value is fine — we just don't block the user on it.
 export const leadCreateValidationSchema: Record<
   keyof LeadCreateFormValues,
   Rule[]
 > = {
+  companyId: [required("Company is required.")],
   fullName: [
     required("Full name is required."),
     maxLength(120, "Full name must be 120 characters or fewer."),

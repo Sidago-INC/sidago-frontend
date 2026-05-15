@@ -33,14 +33,31 @@ async function request(url: string, options: RequestInit = {}, retry = true) {
     return request(url, options, false);
   }
 
-  const data = await res.json();
+  // Some failure modes return empty bodies (Next.js HTML error pages, gateway
+  // timeouts, network resets). Read text first and parse defensively so the
+  // caller gets a real error object instead of a `res.json()` SyntaxError.
+  // The return type is intentionally `any` to match the previous res.json()
+  // contract — callers cast to their own shape via `as`.
+  const text = await res.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
 
   if (!res.ok) {
+    const message =
+      data?.message ??
+      data?.error ??
+      (text && text.length < 200 ? text : null) ??
+      `Request failed with status ${res.status}`;
     throw {
       status: res.status,
-      message: Array.isArray(data?.message)
-        ? data.message
-        : [data?.message || data?.error || "Something went wrong"],
+      message: Array.isArray(message) ? message : [message],
       code: data?.code || "ERROR",
     };
   }

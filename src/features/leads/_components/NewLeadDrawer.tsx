@@ -21,6 +21,7 @@ type NewLeadDrawerProps = {
 };
 
 const blankForm: LeadCreateFormValues = {
+  companyId: "",
   fullName: "",
   firstName: "",
   lastName: "",
@@ -46,6 +47,7 @@ export function NewLeadDrawer({
 
   const normalizedForm = useMemo(
     () => ({
+      companyId: form.companyId,
       fullName: form.fullName.trim(),
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
