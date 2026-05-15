@@ -34,7 +34,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         >
           <Header onMenuClick={() => setIsMobileOpen(true)} />
 
-          <main className="overflow-y-auto text-slate-900 transition-colors dark:text-slate-100">
+          <main className="flex-1 overflow-y-auto text-slate-900 transition-colors dark:text-slate-100">
             {children}
           </main>
         </div>
