@@ -1,19 +1,20 @@
 
 
-import { Card, CardContent, TextInput } from "@/components/ui";
-import { showSuccessToast } from "@/lib/toast";
+import { Card, CardContent, Select, TextInput } from "@/components/ui";
+import { api } from "@/lib/api";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
 import {
   leadCreateValidationSchema,
   type LeadCreateFormValues,
 } from "@/lib/validation/lead-create";
+import { useCompanyOptions } from "@/features/companies/_lib/hooks";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import PhoneInput from "react-phone-input-2";
-import { createLeadDirectoryRow, getLeadId } from "../_lib/data";
-import { getStoredLeads, saveStoredLeads } from "../_lib/storage";
 
 const blankForm: LeadCreateFormValues = {
+  companyId: "",
   fullName: "",
   firstName: "",
   lastName: "",
@@ -25,15 +26,47 @@ const blankForm: LeadCreateFormValues = {
 
 const inputClassName = "h-10 rounded text-sm";
 
+// Wider trigger so labels like "NASDAQ:CHDN - Churchill Downs Incorporated"
+// fit instead of truncating to the exchange. Mirrors the lead picker on the
+// Level 2 Update page.
+const companySelectClass =
+  "h-10 min-w-[18rem] rounded border-slate-200 text-sm dark:border-slate-700";
+
+// The Select panel inherits the trigger width via --button-width. Pin it
+// wider so the dropdown can show the full label even on narrow triggers.
+const companySelectOptionsClass =
+  "z-[300] !w-[26rem] max-w-[90vw] max-h-72 rounded-xl border-slate-200 p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950";
+
+type CreateLeadResponse = {
+  ok: true;
+  id: string;
+  fullName: string;
+  email: string;
+};
+
 export function AddLeadForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState<LeadCreateFormValues>(blankForm);
   const [errors, setErrors] = useState<
     Partial<Record<keyof LeadCreateFormValues, string>>
   >({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  const { data: companiesRaw, isLoading: companiesLoading } =
+    useCompanyOptions();
+
+  const companyOptions = useMemo(
+    () =>
+      (companiesRaw ?? []).map((c) => ({
+        value: c.id,
+        label: c.label || c.name || c.symbol || c.id,
+      })),
+    [companiesRaw],
+  );
 
   const normalizedForm = useMemo(
     () => ({
+      companyId: form.companyId,
       fullName: form.fullName.trim(),
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -55,61 +88,36 @@ export function AddLeadForm() {
     setErrors({});
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const nextErrors = validateForm(normalizedForm, leadCreateValidationSchema);
-    const currentRows = getStoredLeads();
-    const duplicateEmail = currentRows.some(
-      (row) =>
-        row.email.trim().toLowerCase() === normalizedForm.email.toLowerCase(),
-    );
-
-    if (duplicateEmail) {
-      nextErrors.email = "A lead with this email already exists.";
-    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
 
-    const nextRow = createLeadDirectoryRow(
-      {
-        lead: "General",
-        companyName: "Pending Assignment",
+    setIsSaving(true);
+    try {
+      const response = (await api.post("/leads", {
+        companyId: normalizedForm.companyId,
         fullName: normalizedForm.fullName,
-        phone: normalizedForm.phone,
-        role: normalizedForm.role,
-        email: normalizedForm.email,
-        timezone: "",
-        contactType: "Prospecting",
-        svgLeadType: "General",
-        svgToBeCalledBy: "",
-        svgLastCallDate: "",
-        bentonLeadType: "General",
-        bentonToBeCalledBy: "",
-        bentonLastCallDate: "",
-        rm95LeadType: "General",
-        rm95ToBeCalledBy: "",
-        rm95LastCallDate: "",
-        svgDateBecomeHot: "",
-        bentonDateBecomeHot: "",
-        rm95DateBecomeHot: "",
-        lastActionDate: "",
-        lastFixedDate: "",
-        notWorked: false,
-      },
-      {
         firstName: normalizedForm.firstName,
         lastName: normalizedForm.lastName,
+        phone: normalizedForm.phone,
         phoneExtension: normalizedForm.phoneExtension,
-      },
-    );
+        email: normalizedForm.email,
+        role: normalizedForm.role,
+      })) as CreateLeadResponse;
 
-    saveStoredLeads([nextRow, ...currentRows]);
-    setForm(normalizedForm);
-    setErrors({});
-    showSuccessToast("Lead created locally and added to the list.");
-    navigate(`/leads?lead=${encodeURIComponent(getLeadId(nextRow))}`);
+      setForm(blankForm);
+      setErrors({});
+      showSuccessToast(`Lead "${response.fullName}" saved.`);
+      navigate(`/leads?lead=${encodeURIComponent(response.id)}`);
+    } catch (err) {
+      showErrorToast(err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -121,13 +129,33 @@ export function AddLeadForm() {
               Add Lead
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Create a local lead record, then continue managing it from the
-              leads directory.
+              Attach a new contact to a company. Saving writes the lead to the
+              database immediately.
             </p>
           </div>
 
           <div className="grid gap-5 px-5 py-5 sm:px-6 sm:py-6">
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium">
+                  Company
+                </label>
+                <Select
+                  value={form.companyId}
+                  options={companyOptions}
+                  onChange={(value) => updateField("companyId", String(value))}
+                  placeholder={
+                    companiesLoading
+                      ? "Loading companies..."
+                      : "Select a company"
+                  }
+                  searchable
+                  searchPlaceholder="Search company"
+                  className={companySelectClass}
+                  optionsClassName={companySelectOptionsClass}
+                  error={errors.companyId}
+                />
+              </div>
               <TextInput
                 label="Full Name"
                 value={form.fullName}
@@ -155,13 +183,6 @@ export function AddLeadForm() {
                 }
                 error={errors.lastName}
                 className={inputClassName}
-              />
-              <TextInput
-                label="Phone"
-                value=""
-                onChange={() => {}}
-                className="hidden"
-                wrapperClassName="hidden"
               />
               <div className="flex w-full flex-col gap-1">
                 <label className="text-sm font-medium">Phone</label>
@@ -198,7 +219,7 @@ export function AddLeadForm() {
                 ) : null}
               </div>
               <TextInput
-                label="Phone Extension"
+                label="Phone Extension (optional)"
                 value={form.phoneExtension}
                 onChange={(event) =>
                   updateField("phoneExtension", event.target.value)
@@ -228,16 +249,18 @@ export function AddLeadForm() {
             <button
               type="button"
               onClick={handleClear}
-              className="inline-flex h-10 cursor-pointer items-center justify-center rounded border border-slate-200 px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              disabled={isSaving}
+              className="inline-flex h-10 cursor-pointer items-center justify-center rounded border border-slate-200 px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Clear
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+              disabled={isSaving}
+              className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Lead
+              {isSaving ? "Saving..." : "Save Lead"}
             </button>
           </div>
         </CardContent>

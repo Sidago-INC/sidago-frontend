@@ -3,9 +3,12 @@
 import { CampaignBadge, Table, TypeBadge } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
 import { useMemo } from "react";
-import { level2HistoryRows, type Level2HistoryRow } from "../_lib/data";
+import type { Level2HistoryRow } from "../_lib/data";
+import { useLevel2History } from "../_lib/hooks";
 
 export function Level2History() {
+  const { data, isLoading } = useLevel2History();
+
   const columns = useMemo<Column<Level2HistoryRow>[]>(
     () => [
       { title: "Lead", key: "lead" },
@@ -41,8 +44,9 @@ export function Level2History() {
   return (
     <div className="min-h-full">
       <Table
-        data={level2HistoryRows}
+        data={data ?? []}
         columns={columns}
+        isLoading={isLoading}
         title="Level 2 History"
         description="Review historical Level 2 updates and lead type changes"
       />

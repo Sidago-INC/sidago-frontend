@@ -16,6 +16,11 @@ type CountryPickerProps = {
   onChange: (value: string) => void;
 };
 
+// react-select inherits text colour from the parent. Inside the dark-themed
+// app shell the cascading `text-slate-200` rule was making the menu options
+// nearly invisible on the white menu background in light mode. We pin every
+// colour explicitly so the picker reads correctly in both themes regardless
+// of what the surrounding shell sets.
 export function CountryPicker({
   error,
   label = "Country",
@@ -48,16 +53,18 @@ export function CountryPicker({
         placeholder="Search and select a country"
         isSearchable
         className="text-sm"
+        menuPlacement="auto"
         styles={{
           control: (base, state) => ({
             ...base,
             minHeight: 40,
             borderRadius: 6,
+            backgroundColor: "#ffffff",
             borderColor: error
               ? "#ef4444"
               : state.isFocused
                 ? "#6366f1"
-                : base.borderColor,
+                : "#d1d5db",
             boxShadow: "none",
           }),
           valueContainer: (base) => ({
@@ -69,6 +76,43 @@ export function CountryPicker({
             ...base,
             margin: 0,
             padding: 0,
+            color: "#0f172a",
+          }),
+          singleValue: (base) => ({
+            ...base,
+            color: "#0f172a",
+          }),
+          placeholder: (base) => ({
+            ...base,
+            color: "#94a3b8",
+          }),
+          menu: (base) => ({
+            ...base,
+            backgroundColor: "#ffffff",
+            color: "#0f172a",
+            zIndex: 50,
+          }),
+          menuList: (base) => ({
+            ...base,
+            padding: 4,
+          }),
+          option: (base, state) => ({
+            ...base,
+            color: state.isSelected ? "#ffffff" : "#0f172a",
+            backgroundColor: state.isSelected
+              ? "#2563eb"
+              : state.isFocused
+                ? "#eff6ff"
+                : "#ffffff",
+            cursor: "pointer",
+          }),
+          dropdownIndicator: (base) => ({
+            ...base,
+            color: "#64748b",
+          }),
+          indicatorSeparator: (base) => ({
+            ...base,
+            backgroundColor: "#e2e8f0",
           }),
         }}
       />
