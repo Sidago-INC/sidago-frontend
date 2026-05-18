@@ -1,38 +1,69 @@
-import {
-  contactTypeOptions,
-  getLeadId,
-  leadTypeOptions,
-} from "@/features/backoffice-shared/constants";
-import { generateHotLeadRows } from "@/features/backoffice-shared/lead-mapper";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 export type BlockedEmailRow = {
-  id: string;
   leadId: string;
-  leadType: string;
-  contactType: string;
-  email: string;
-  blockedEmail: string;
-  blockedAt: string;
-  reason: string;
+  leadIdExternal: string | null;
+  companySymbol: string | null;
+  companyName: string | null;
+  fullName: string | null;
+  email: string | null;
+  contactType: string | null;
+  leadTypeSvg: string | null;
+  leadType95rm: string | null;
+  leadTypeBenton: string | null;
+  blockedBrands: string[];
 };
 
-const reasons = [
-  "Manual block after repeated bounce",
-  "Marked as do-not-contact",
-  "Spam complaint received",
-  "Invalid mailbox reported",
-  "Suppression list match",
-];
+type BlockedEmailResponse = {
+  ok: true;
+  count: number;
+  data: BlockedEmailRow[];
+};
 
-export const blockedEmailRows: BlockedEmailRow[] = generateHotLeadRows(12).map(
-  (lead, index) => ({
-    id: `blocked-email-${index + 1}`,
-    leadId: getLeadId(lead),
-    leadType: leadTypeOptions[index % leadTypeOptions.length],
-    contactType: contactTypeOptions[index % contactTypeOptions.length],
-    email: lead.email,
-    blockedEmail: lead.email,
-    blockedAt: new Date(Date.now() - index * 86400000).toISOString(),
-    reason: reasons[index % reasons.length],
-  }),
-);
+type UnblockBlockedEmailResponse = {
+  ok: true;
+  updated: number;
+};
+
+export function getBlockedBrandLabel(brand: string): string {
+  switch (brand.toLowerCase()) {
+    case "svg":
+      return "SVG";
+    case "95rm":
+      return "95RM";
+    case "benton":
+      return "Benton";
+    default:
+      return brand;
+  }
+}
+
+export function useBlockedEmails() {
+  return useQuery({
+    queryKey: ["blocked-email"],
+    queryFn: async () => {
+      const json = (await api.get("/blocked-email?limit=500")) as BlockedEmailResponse;
+      return json.data;
+    },
+    staleTime: 60_000,
+  });
+}
+
+async function unblockBlockedEmail(leadId: string) {
+  return (await api.patch(
+    `/blocked-email/lead/${leadId}/unblock`,
+    {},
+  )) as UnblockBlockedEmailResponse;
+}
+
+export function useUnblockBlockedEmail() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (leadId: string) => unblockBlockedEmail(leadId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blocked-email"] });
+    },
+  });
+}

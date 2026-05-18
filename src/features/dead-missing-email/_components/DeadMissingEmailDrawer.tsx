@@ -1,32 +1,28 @@
 
-
 import {
+  Badge,
+  BooleanCheckBadge,
   Drawer,
   DrawerActionHeader,
-  EditableField,
-  Select,
-  TextInput,
-  Textarea,
+  EmailLink,
   TypeBadge,
 } from "@/components/ui";
-import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
-import { Check } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import type { DeadMissingEmailRow } from "../_lib/data";
+import {
+  getDeadEmailBrandLabel,
+  getDeadEmailDisplayLeadId,
+  type DeadMissingEmailRow,
+} from "../_lib/data";
 
 type DeadMissingEmailDrawerProps = {
   row: DeadMissingEmailRow | null;
   currentIndex: number;
   rowCount: number;
   onCancel: () => void;
-  onChange: <Key extends keyof DeadMissingEmailRow>(
-    field: Key,
-    value: DeadMissingEmailRow[Key],
-  ) => void;
+  isClearing: boolean;
   onNavigate: (index: number) => void;
-  onReset: () => void;
-  onSave: () => void;
+  onClear: (row: DeadMissingEmailRow) => void;
 };
 
 function DetailCard({
@@ -67,37 +63,6 @@ function DetailRow({
   );
 }
 
-function ToggleField({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-        {label}
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={
-          checked
-            ? "flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/70"
-            : "flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-slate-100 text-slate-400 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-slate-700"
-        }
-      >
-        <Check size={16} />
-      </button>
-    </div>
-  );
-}
-
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -111,10 +76,9 @@ export function DeadMissingEmailDrawer({
   currentIndex,
   rowCount,
   onCancel,
-  onChange,
+  isClearing,
   onNavigate,
-  onReset,
-  onSave,
+  onClear,
 }: DeadMissingEmailDrawerProps) {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
@@ -124,7 +88,7 @@ export function DeadMissingEmailDrawer({
     if (!row || typeof window === "undefined") return "";
 
     const params = new URLSearchParams(searchParams.toString());
-    params.set("lead", row.leadId);
+    params.set("lead", getDeadEmailDisplayLeadId(row));
 
     return `${window.location.origin}${pathname}?${params.toString()}`;
   }, [pathname, row, searchParams]);
@@ -148,22 +112,27 @@ export function DeadMissingEmailDrawer({
     if (!printWindow) return;
 
     const rows = [
-      ["Lead ID", row.leadId],
+      ["Lead ID", getDeadEmailDisplayLeadId(row)],
+      ["Company", row.companyName ?? ""],
+      ["Contact", row.fullName ?? ""],
       ["Email", row.email || "Missing"],
-      ["Additional Contact Emails", row.additionalContactEmails || "-"],
-      ["Lead Type", row.leadType],
-      ["Lead Type Benton", row.bentonLeadType],
-      ["Lead Type 95RM", row.rm95LeadType],
-      ["Missing/Dead Email", row.missingDeadEmail ? "Yes" : "No"],
-      ["Status", row.status],
+      ["Contact Type", row.contactType ?? ""],
+      ["Lead Type", row.leadTypeSvg ?? ""],
+      ["Lead Type Benton", row.leadTypeBenton ?? ""],
+      ["Lead Type 95RM", row.leadType95rm ?? ""],
+      [
+        "Flagged Brands",
+        row.missingDeadBrands.map(getDeadEmailBrandLabel).join(", "),
+      ],
+      ["Missing/Dead Email", row.missingDeadBrands.length > 0 ? "Yes" : "No"],
     ];
 
     printWindow.document.write(`
       <html>
-        <head><title>${escapeHtml(row.leadId)} | Dead/Missing Email</title></head>
+        <head><title>${escapeHtml(getDeadEmailDisplayLeadId(row))} | Dead/Missing Email</title></head>
         <body style="font-family:Arial,sans-serif;padding:24px;color:#0f172a;">
-          <h1>${escapeHtml(row.leadId)}</h1>
-          <p style="margin-bottom:20px;color:#475569;">${escapeHtml(row.fullName)} | ${escapeHtml(row.companyName)}</p>
+          <h1>${escapeHtml(getDeadEmailDisplayLeadId(row))}</h1>
+          <p style="margin-bottom:20px;color:#475569;">${escapeHtml(row.fullName ?? "-")} | ${escapeHtml(row.companyName ?? "-")}</p>
           <table style="width:100%;border-collapse:collapse;">
             ${rows
               .map(
@@ -192,7 +161,7 @@ export function DeadMissingEmailDrawer({
       size="560px"
       header={
         <DrawerActionHeader
-          title={row?.leadId || ""}
+          title={row ? getDeadEmailDisplayLeadId(row) : ""}
           canGoPrevious={currentIndex > 0}
           canGoNext={currentIndex < rowCount - 1}
           copied={copied}
@@ -206,107 +175,98 @@ export function DeadMissingEmailDrawer({
         <div className="flex flex-col gap-2 bg-white px-5 py-4 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-end">
           <button
             type="button"
-            onClick={onReset}
-            className="cursor-pointer rounded border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800"
-          >
-            Reset
-          </button>
-          <button
-            type="button"
             onClick={onCancel}
             className="cursor-pointer rounded border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800"
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={onSave}
-            className="cursor-pointer rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
-          >
-            Save
-          </button>
+          {row && (
+            <button
+              type="button"
+              onClick={() => onClear(row)}
+              disabled={isClearing}
+              className="cursor-pointer rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+            >
+              {isClearing ? "Clearing..." : "Clear Flag"}
+            </button>
+          )}
         </div>
       }
     >
       {row && (
         <div className="space-y-5">
           <DetailCard label="Lead">
-            <DetailRow label="Lead ID" value={row.leadId} />
-            <DetailRow label="Company" value={row.companyName} />
-            <DetailRow label="Contact" value={row.fullName} />
-            <DetailRow label="Status" value={row.status} />
+            <DetailRow
+              label="Lead ID"
+              value={getDeadEmailDisplayLeadId(row)}
+            />
+            <DetailRow label="Company" value={row.companyName || "-"} />
+            <DetailRow label="Contact" value={row.fullName || "-"} />
+            <DetailRow
+              label="Flagged"
+              value={
+                <BooleanCheckBadge checked={row.missingDeadBrands.length > 0} />
+              }
+            />
           </DetailCard>
 
           <DetailCard label="Email Review">
-            <EditableField label="Email">
-              <TextInput
-                type="email"
-                value={row.email}
-                onChange={(event) => onChange("email", event.target.value)}
-                className="text-xs font-semibold"
-              />
-            </EditableField>
-            <EditableField label="Additional Contact Emails" align="stack">
-              <Textarea
-                value={row.additionalContactEmails}
-                readOnly
-                className="text-xs font-semibold leading-5"
-              />
-            </EditableField>
-            <div className="py-1.5">
-              <ToggleField
-                label="Missing/Dead Email"
-                checked={row.missingDeadEmail}
-                onChange={(checked) => onChange("missingDeadEmail", checked)}
-              />
-            </div>
+            <DetailRow
+              label="Email"
+              value={row.email ? <EmailLink value={row.email} /> : "Missing"}
+            />
+            <DetailRow
+              label="Contact Type"
+              value={
+                row.contactType ? (
+                  <TypeBadge value={row.contactType} kind="contact" />
+                ) : (
+                  "-"
+                )
+              }
+            />
+            <DetailRow
+              label="Flagged Brands"
+              value={
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  {row.missingDeadBrands.map((brand) => (
+                    <Badge key={brand}>{getDeadEmailBrandLabel(brand)}</Badge>
+                  ))}
+                </div>
+              }
+            />
           </DetailCard>
 
           <DetailCard label="Lead Types">
-            <EditableField label="Lead Type">
-              <Select
-                value={row.leadType}
-                onChange={(value) => onChange("leadType", String(value))}
-                options={LEAD_TYPE_OPTIONS}
-                placeholder="Select lead type"
-                className="py-1.5 text-xs"
-                searchable
-              />
-            </EditableField>
-            <EditableField label="Lead Type Benton">
-              <Select
-                value={row.bentonLeadType}
-                onChange={(value) => onChange("bentonLeadType", String(value))}
-                options={LEAD_TYPE_OPTIONS}
-                placeholder="Select Benton lead type"
-                className="py-1.5 text-xs"
-                searchable
-              />
-            </EditableField>
-            <EditableField label="Lead Type 95RM">
-              <Select
-                value={row.rm95LeadType}
-                onChange={(value) => onChange("rm95LeadType", String(value))}
-                options={LEAD_TYPE_OPTIONS}
-                placeholder="Select 95RM lead type"
-                className="py-1.5 text-xs"
-                searchable
-              />
-            </EditableField>
-          </DetailCard>
-
-          <DetailCard label="Associated Types">
             <DetailRow
               label="Lead Type"
-              value={<TypeBadge value={row.leadType} kind="lead" />}
+              value={
+                row.leadTypeSvg ? (
+                  <TypeBadge value={row.leadTypeSvg} kind="lead" />
+                ) : (
+                  "-"
+                )
+              }
             />
             <DetailRow
               label="Benton"
-              value={<TypeBadge value={row.bentonLeadType} kind="lead" />}
+              value={
+                row.leadTypeBenton ? (
+                  <TypeBadge value={row.leadTypeBenton} kind="lead" />
+                ) : (
+                  "-"
+                )
+              }
             />
             <DetailRow
               label="95RM"
-              value={<TypeBadge value={row.rm95LeadType} kind="lead" />}
+              value={
+                row.leadType95rm ? (
+                  <TypeBadge value={row.leadType95rm} kind="lead" />
+                ) : (
+                  "-"
+                )
+              }
             />
           </DetailCard>
         </div>

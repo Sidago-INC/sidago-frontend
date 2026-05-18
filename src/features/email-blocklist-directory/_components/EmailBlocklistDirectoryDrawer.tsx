@@ -1,20 +1,19 @@
 
-
 import {
+  Badge,
   CompanySymbolBadge,
   Drawer,
   DrawerActionHeader,
   EmailLink,
-  TimezoneBadge,
   TypeBadge,
 } from "@/components/ui";
-import {
-  getCompanySymbol,
-  getLeadId,
-} from "@/features/backoffice-shared/constants";
-import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { EmailBlocklistDirectoryRow } from "../_lib/data";
+import {
+  getBrandLabel,
+  getEmailBlacklistDisplayLeadId,
+  type CallHistoryEntry,
+  type EmailBlocklistDirectoryRow,
+} from "../_lib/data";
 
 type EmailBlocklistDirectoryDrawerProps = {
   row: EmailBlocklistDirectoryRow | null;
@@ -22,7 +21,6 @@ type EmailBlocklistDirectoryDrawerProps = {
   rowCount: number;
   onCancel: () => void;
   onNavigate: (index: number) => void;
-  onRemove: (row: EmailBlocklistDirectoryRow) => void;
 };
 
 function escapeHtml(value: string) {
@@ -39,7 +37,6 @@ export function EmailBlocklistDirectoryDrawer({
   rowCount,
   onCancel,
   onNavigate,
-  onRemove,
 }: EmailBlocklistDirectoryDrawerProps) {
   const [copied, setCopied] = useState(false);
 
@@ -53,7 +50,7 @@ export function EmailBlocklistDirectoryDrawer({
     if (!row || typeof window === "undefined") return;
 
     const url = new URL(window.location.href);
-    url.searchParams.set("lead", getLeadId(row));
+    url.searchParams.set("lead", getEmailBlacklistDisplayLeadId(row));
     await navigator.clipboard.writeText(url.toString());
     setCopied(true);
   };
@@ -65,26 +62,21 @@ export function EmailBlocklistDirectoryDrawer({
     if (!printWindow) return;
 
     const rows = [
-      ["Lead ID", getLeadId(row)],
-      ["Company", row.companyName],
-      ["Full Name", row.fullName],
-      ["Role", row.role ?? ""],
-      ["Phone", row.phone],
-      ["Email", row.email],
-      ["Contact Type", row.contactType],
-      ["SVG Lead Type", row.svgLeadType],
-      ["SVG To Be Called By", row.svgToBeCalledBy],
-      ["SVG Last Call Date", row.svgLastCallDate],
-      ["SVG Note", row.historyCallNotesSvg],
-      ["Benton Lead Type", row.bentonLeadType],
-      ["Benton To Be Called By", row.bentonToBeCalledBy],
-      ["Benton Last Call Date", row.bentonLastCallDate],
-      ["Benton Note", row.historyCallNotesBenton],
-      ["Not Work Anymore", row.notWorked ? "Yes" : "No"],
-      ["Reason", row.reason],
-      ["Added By", row.addedBy],
-      ["Last Action Date", row.lastActionDate],
-      ["Last Fixed Date", row.lastFixedDate ?? ""],
+      ["Lead ID", getEmailBlacklistDisplayLeadId(row)],
+      ["Company", row.companyName ?? ""],
+      ["Full Name", row.fullName ?? ""],
+      ["Email", row.email ?? ""],
+      ["Contact Type", row.contactType ?? ""],
+      ["SVG Lead Type", row.leadTypeSvg ?? ""],
+      ["Benton Lead Type", row.leadTypeBenton ?? ""],
+      ["95RM Lead Type", row.leadType95rm ?? ""],
+      [
+        "Blacklisted Brands",
+        row.blacklistedBrands.map(getBrandLabel).join(", "),
+      ],
+      ["SVG History Entries", String(row.callHistory.svg.length)],
+      ["Benton History Entries", String(row.callHistory.benton.length)],
+      ["95RM History Entries", String(row.callHistory["95rm"].length)],
     ]
       .map(
         ([label, value]) => `
@@ -103,12 +95,12 @@ export function EmailBlocklistDirectoryDrawer({
     printWindow.document.write(`
       <html>
         <head>
-          <title>${escapeHtml(getLeadId(row))} | Email Blocklist Directory</title>
+          <title>${escapeHtml(getEmailBlacklistDisplayLeadId(row))} | Email Blocklist Directory</title>
         </head>
         <body style="font-family:Arial,sans-serif;padding:24px;color:#0f172a;">
           <h1>Email Blocklist Directory</h1>
           <p style="margin-bottom:20px;color:#475569;">
-            ${escapeHtml(getLeadId(row))} | ${escapeHtml(row.email)}
+            ${escapeHtml(getEmailBlacklistDisplayLeadId(row))} | ${escapeHtml(row.email ?? "-")}
           </p>
           <table style="width:100%;border-collapse:collapse;">
             ${rows}
@@ -129,7 +121,7 @@ export function EmailBlocklistDirectoryDrawer({
       size="560px"
       header={
         <DrawerActionHeader
-          title={row ? getLeadId(row) : "Blocklist entry"}
+          title={row ? getEmailBlacklistDisplayLeadId(row) : "Blocklist entry"}
           copied={copied}
           canGoPrevious={currentIndex > 0}
           canGoNext={currentIndex >= 0 && currentIndex < rowCount - 1}
@@ -141,15 +133,6 @@ export function EmailBlocklistDirectoryDrawer({
       }
       footer={
         <div className="flex flex-col gap-2 bg-white px-5 py-4 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-end">
-          {row && (
-            <button
-              type="button"
-              onClick={() => onRemove(row)}
-              className="cursor-pointer rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
-            >
-              Remove From Blocklist
-            </button>
-          )}
           <button
             type="button"
             onClick={onCancel}
@@ -166,7 +149,7 @@ export function EmailBlocklistDirectoryDrawer({
             <div className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <CompanySymbolBadge
-                  symbol={getCompanySymbol(row.companyName)}
+                  symbol={row.companySymbol ?? "-"}
                   index={currentIndex >= 0 ? currentIndex : 0}
                   className="rounded"
                 />
@@ -176,57 +159,75 @@ export function EmailBlocklistDirectoryDrawer({
                   </p>
                 </div>
               </div>
-              <TimezoneBadge
-                timezone={row.timezone}
-                index={currentIndex >= 0 ? currentIndex : 0}
-              />
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {row.blacklistedBrands.map((brand) => (
+                  <Badge key={brand}>{getBrandLabel(brand)}</Badge>
+                ))}
+              </div>
             </div>
           </DetailCard>
 
           <DetailCard label="Personal Information">
             <AssociationDetail label="Full Name" value={row.fullName || "-"} />
-            <AssociationDetail label="Phone" value={row.phone || "-"} />
             <AssociationDetail
               label="Email"
-              value={<EmailLink value={row.email} />}
+              value={row.email ? <EmailLink value={row.email} /> : "-"}
             />
           </DetailCard>
 
           <DetailCard label="Lead Details">
             <AssociationDetail
               label="Contact Type"
-              value={<TypeBadge value={row.contactType} kind="contact" />}
+              value={
+                row.contactType ? (
+                  <TypeBadge value={row.contactType} kind="contact" />
+                ) : (
+                  "-"
+                )
+              }
+            />
+            <AssociationDetail
+              label="SVG Lead Type"
+              value={
+                row.leadTypeSvg ? (
+                  <TypeBadge value={row.leadTypeSvg} kind="lead" />
+                ) : (
+                  "-"
+                )
+              }
             />
             <AssociationDetail
               label="Lead Type Benton"
-              value={<TypeBadge value={row.bentonLeadType} kind="lead" />}
+              value={
+                row.leadTypeBenton ? (
+                  <TypeBadge value={row.leadTypeBenton} kind="lead" />
+                ) : (
+                  "-"
+                )
+              }
             />
             <AssociationDetail
-              label="Not Work Anymore"
-              value={<CheckmarkStatus checked={row.notWorked ?? false} />}
+              label="Lead Type 95RM"
+              value={
+                row.leadType95rm ? (
+                  <TypeBadge value={row.leadType95rm} kind="lead" />
+                ) : (
+                  "-"
+                )
+              }
             />
           </DetailCard>
 
           <DetailCard label="SVG Details">
-            <AssociationDetail
-              label="History Calls"
-              value={<NotesText value={row.historyCallNotesSvg} />}
-            />
-            <AssociationDetail
-              label="History Notes"
-              value={<NotesText value={row.historyCallNotesSvg} />}
-            />
+            <CallHistoryList entries={row.callHistory.svg} />
           </DetailCard>
 
           <DetailCard label="Benton Details">
-            <AssociationDetail
-              label="History Calls"
-              value={<NotesText value={row.historyCallNotesBenton} />}
-            />
-            <AssociationDetail
-              label="History Notes"
-              value={<NotesText value={row.historyCallNotesBenton} />}
-            />
+            <CallHistoryList entries={row.callHistory.benton} />
+          </DetailCard>
+
+          <DetailCard label="95RM Details">
+            <CallHistoryList entries={row.callHistory["95rm"]} />
           </DetailCard>
         </div>
       )}
@@ -274,24 +275,34 @@ function AssociationDetail({
   );
 }
 
-function NotesText({ value }: { value: string }) {
-  return (
-    <span className="block whitespace-pre-line text-left text-xs font-semibold text-slate-600 dark:text-slate-200">
-      {value || "-"}
-    </span>
-  );
-}
+function CallHistoryList({ entries }: { entries: CallHistoryEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <span className="block whitespace-pre-line text-left text-xs font-semibold text-slate-600 dark:text-slate-200">
+        No call history found.
+      </span>
+    );
+  }
 
-function CheckmarkStatus({ checked }: { checked: boolean }) {
   return (
-    <span
-      className={
-        checked
-          ? "flex h-8 w-8 items-center justify-center rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-          : "flex h-8 w-8 items-center justify-center rounded bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
-      }
-    >
-      <Check size={16} />
-    </span>
+    <div className="space-y-3">
+      {entries.map((entry) => (
+        <div
+          key={entry.id}
+          className="rounded border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+        >
+          <div className="font-semibold text-slate-800 dark:text-slate-100">
+            {new Date(entry.calledAt).toLocaleString()}
+          </div>
+          <div className="mt-1 text-slate-600 dark:text-slate-300">
+            {entry.userName || "Unknown agent"}
+            {entry.resultCode ? ` | ${entry.resultCode}` : ""}
+          </div>
+          <div className="mt-1 whitespace-pre-line text-slate-500 dark:text-slate-400">
+            {entry.notes || "No notes"}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

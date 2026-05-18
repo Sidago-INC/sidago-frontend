@@ -1,41 +1,75 @@
-import type { HotLeadRow } from "@/features/backoffice-shared/types";
-import { generateRandomLeads } from "@/lib/mocks/leads";
-import type { LEAD } from "@/types/lead.types";
-import { leadToHotLeadRow } from "@/features/backoffice-shared/lead-mapper";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
-export type EmailBlocklistDirectoryRow = HotLeadRow & {
+export type CallHistoryEntry = {
   id: string;
-  historyCallNotesSvg: string;
-  historyCallNotesBenton: string;
-  reason: string;
-  addedBy: string;
+  calledAt: string;
+  userId: string | null;
+  userName: string | null;
+  resultCode: string | null;
+  durationSeconds: number | null;
+  notes: string | null;
 };
 
-const reasons = [
-  "Bounce pattern confirmed across multiple sends",
-  "Manual blacklist after spam complaint",
-  "Compliance request from lead",
-  "Mailbox disabled and verified invalid",
-  "Suppression sync from external source",
-] as const;
+export type CallHistoryByBrand = {
+  svg: CallHistoryEntry[];
+  "95rm": CallHistoryEntry[];
+  benton: CallHistoryEntry[];
+};
 
-function leadToEmailBlocklistDirectoryRow(
-  lead: LEAD,
-  index: number,
-): EmailBlocklistDirectoryRow {
-  return {
-    ...leadToHotLeadRow(lead),
-    id: String(lead.id ?? lead.record_id ?? `email-blocklist-${index + 1}`),
-    historyCallNotesSvg:
-      lead.history_call_notes_sidago ?? lead.history_calls_sidago ?? "",
-    historyCallNotesBenton:
-      lead.history_call_notes_benton ?? lead.history_calls_benton ?? "",
-    reason: reasons[index % reasons.length],
-    addedBy: lead.created_by ?? "System",
-  };
+export type EmailBlocklistDirectoryRow = {
+  leadId: string;
+  leadIdExternal: string | null;
+  companySymbol: string | null;
+  companyName: string | null;
+  fullName: string | null;
+  email: string | null;
+  contactType: string | null;
+  leadTypeSvg: string | null;
+  leadType95rm: string | null;
+  leadTypeBenton: string | null;
+  blacklistedBrands: string[];
+  callHistory: CallHistoryByBrand;
+};
+
+type EmailBlacklistResponse = {
+  ok: true;
+  count: number;
+  data: EmailBlocklistDirectoryRow[];
+};
+
+export function getEmailBlacklistDisplayLeadId(
+  row: EmailBlocklistDirectoryRow,
+): string {
+  if (row.leadIdExternal && row.companySymbol) {
+    return `${row.companySymbol}-${row.leadIdExternal}`;
+  }
+
+  return row.leadIdExternal || row.leadId;
 }
 
-export const emailBlocklistDirectoryRows: EmailBlocklistDirectoryRow[] =
-  generateRandomLeads(18)
-    .filter((lead, index) => lead.blocked_email || index % 3 === 0)
-    .map(leadToEmailBlocklistDirectoryRow);
+export function getBrandLabel(brand: string): string {
+  switch (brand.toLowerCase()) {
+    case "svg":
+      return "SVG";
+    case "95rm":
+      return "95RM";
+    case "benton":
+      return "Benton";
+    default:
+      return brand;
+  }
+}
+
+export function useEmailBlacklistDirectory() {
+  return useQuery({
+    queryKey: ["email-blacklist-directory"],
+    queryFn: async () => {
+      const json = (await api.get(
+        "/email-blacklist?limit=500",
+      )) as EmailBlacklistResponse;
+      return json.data;
+    },
+    staleTime: 60_000,
+  });
+}

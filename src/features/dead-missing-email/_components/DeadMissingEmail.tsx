@@ -1,69 +1,64 @@
 
-
 import {
+  Badge,
   BooleanCheckBadge,
   EmailLink,
+  ErrorState,
   Table,
   TypeBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import { showSuccessToast } from "@/lib/toast";
+import {
+  showErrorToast,
+  showInfoToast,
+  showSuccessToast,
+} from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
-import { deadMissingEmailRows, type DeadMissingEmailRow } from "../_lib/data";
+import { useEffect, useMemo, useState } from "react";
+import {
+  getDeadEmailBrandLabel,
+  getDeadEmailDisplayLeadId,
+  type DeadMissingEmailRow,
+  useClearDeadMissingEmail,
+  useDeadMissingEmails,
+} from "../_lib/data";
 import { DeadMissingEmailDrawer } from "./DeadMissingEmailDrawer";
-
-type DrawerState = {
-  originalId: string | null;
-  initialRow: DeadMissingEmailRow | null;
-  draft: DeadMissingEmailRow | null;
-};
-
-function normalizeRow(row: DeadMissingEmailRow): DeadMissingEmailRow {
-  return {
-    ...row,
-    email: row.email.trim(),
-    leadType: row.leadType.trim(),
-    bentonLeadType: row.bentonLeadType.trim(),
-    rm95LeadType: row.rm95LeadType.trim(),
-    status: row.missingDeadEmail || !row.email.trim() ? row.status : "Updated",
-  };
-}
 
 export function DeadMissingEmail() {
   const [searchParams] = useSearchParams();
-  const [rows, setRows] = useState<DeadMissingEmailRow[]>(deadMissingEmailRows);
-  const [drawerState, setDrawerState] = useState<DrawerState>(() => {
+  const { data = [], isLoading, isError, error, refetch } =
+    useDeadMissingEmails();
+  const clearMutation = useClearDeadMissingEmail();
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+
+  useEffect(() => {
     const leadParam = searchParams.get("lead");
-    const row = deadMissingEmailRows.find(
-      (item) => item.leadId.toLowerCase() === leadParam?.toLowerCase(),
+    if (!leadParam) return;
+    const row = data.find(
+      (item) =>
+        getDeadEmailDisplayLeadId(item).toLowerCase() === leadParam.toLowerCase(),
     );
+    setSelectedLeadId(row?.leadId ?? null);
+  }, [data, searchParams]);
 
-    return {
-      originalId: row?.id ?? null,
-      initialRow: row ? { ...row } : null,
-      draft: row ? { ...row } : null,
-    };
-  });
-
-  const activeRows = useMemo(
-    () =>
-      rows.filter(
-        (row) =>
-          row.missingDeadEmail ||
-          !row.email.trim() ||
-          row.status === "Unresolvable",
-      ),
-    [rows],
+  const selectedRow = useMemo(
+    () => data.find((row) => row.leadId === selectedLeadId) ?? null,
+    [data, selectedLeadId],
   );
 
-  const currentIndex = drawerState.originalId
-    ? activeRows.findIndex((row) => row.id === drawerState.originalId)
+  const currentIndex = selectedRow
+    ? data.findIndex((row) => row.leadId === selectedRow.leadId)
     : -1;
 
   const columns = useMemo<Column<DeadMissingEmailRow>[]>(
     () => [
-      { title: "Lead ID", key: "leadId" },
+      {
+        title: "Lead ID",
+        key: "leadIdExternal",
+        getValue: getDeadEmailDisplayLeadId,
+      },
+      { title: "Company", key: "companyName" },
+      { title: "Full Name", key: "fullName" },
       {
         title: "Email",
         key: "email",
@@ -71,117 +66,131 @@ export function DeadMissingEmail() {
           row.email ? (
             <EmailLink value={row.email} />
           ) : (
-            <span className="text-slate-400"></span>
+            <span className="text-slate-400">Missing</span>
           ),
       },
-      { title: "Additional Contact Emails", key: "additionalContactEmails" },
+      {
+        title: "Contact Type",
+        key: "contactType",
+        render: (row) =>
+          row.contactType ? (
+            <TypeBadge value={row.contactType} kind="contact" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
+      },
       {
         title: "Lead Type",
-        key: "leadType",
-        render: (row) => <TypeBadge value={row.leadType} kind="lead" />,
+        key: "leadTypeSvg",
+        render: (row) =>
+          row.leadTypeSvg ? (
+            <TypeBadge value={row.leadTypeSvg} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Lead Type Benton",
-        key: "bentonLeadType",
-        render: (row) => <TypeBadge value={row.bentonLeadType} kind="lead" />,
+        key: "leadTypeBenton",
+        render: (row) =>
+          row.leadTypeBenton ? (
+            <TypeBadge value={row.leadTypeBenton} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Lead Type 95RM",
-        key: "rm95LeadType",
-        render: (row) => <TypeBadge value={row.rm95LeadType} kind="lead" />,
+        key: "leadType95rm",
+        render: (row) =>
+          row.leadType95rm ? (
+            <TypeBadge value={row.leadType95rm} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Missing/Dead Email",
-        key: "missingDeadEmail",
-        getValue: (row) => (row.missingDeadEmail ? "Yes" : "No"),
-        render: (row) => <BooleanCheckBadge checked={row.missingDeadEmail} />,
+        key: "missingDeadBrands",
+        getValue: (row) =>
+          row.missingDeadBrands.length > 0 ? "Yes" : "No",
+        render: (row) => (
+          <BooleanCheckBadge checked={row.missingDeadBrands.length > 0} />
+        ),
+      },
+      {
+        title: "Flagged Brands",
+        key: "flaggedBrands",
+        getValue: (row) =>
+          row.missingDeadBrands.map(getDeadEmailBrandLabel).join(", "),
+        render: (row) => (
+          <div className="flex flex-wrap gap-1.5">
+            {row.missingDeadBrands.map((brand) => (
+              <Badge key={brand}>{getDeadEmailBrandLabel(brand)}</Badge>
+            ))}
+          </div>
+        ),
       },
     ],
     [],
   );
 
-  const openDrawer = (row: DeadMissingEmailRow) => {
-    setDrawerState({
-      originalId: row.id,
-      initialRow: { ...row },
-      draft: { ...row },
-    });
+  const clearRow = async (row: DeadMissingEmailRow) => {
+    try {
+      const result = await clearMutation.mutateAsync(row.leadId);
+      setSelectedLeadId(null);
+
+      if (result.updated > 0) {
+        showSuccessToast(
+          `${row.email ?? getDeadEmailDisplayLeadId(row)} has been cleared.`,
+        );
+        return;
+      }
+
+      showInfoToast(
+        `${getDeadEmailDisplayLeadId(row)} was already cleared.`,
+      );
+    } catch (mutationError) {
+      showErrorToast(mutationError);
+    }
   };
 
-  const navigateDrawer = (index: number) => {
-    const row = activeRows[index];
-    if (!row) return;
-    openDrawer(row);
-  };
-
-  const closeDrawer = () => {
-    setDrawerState({ originalId: null, initialRow: null, draft: null });
-  };
-
-  const updateDraft = <Key extends keyof DeadMissingEmailRow>(
-    field: Key,
-    value: DeadMissingEmailRow[Key],
-  ) => {
-    setDrawerState((current) =>
-      current.draft
-        ? {
-            ...current,
-            draft: {
-              ...current.draft,
-              [field]: value,
-              status:
-                field === "missingDeadEmail" || field === "email"
-                  ? "Needs Review"
-                  : current.draft.status,
-            },
-          }
-        : current,
+  if (isError) {
+    return (
+      <ErrorState
+        error={error}
+        title="Failed to load dead/missing emails"
+        onRetry={() => {
+          void refetch();
+        }}
+      />
     );
-  };
-
-  const resetDraft = () => {
-    setDrawerState((current) => ({
-      ...current,
-      draft: current.initialRow ? { ...current.initialRow } : null,
-    }));
-  };
-
-  const saveDraft = () => {
-    if (!drawerState.draft) return;
-
-    const nextRow = normalizeRow(drawerState.draft);
-
-    setRows((current) =>
-      current.map((row) => (row.id === nextRow.id ? nextRow : row)),
-    );
-    setDrawerState({
-      originalId: nextRow.id,
-      initialRow: nextRow,
-      draft: nextRow,
-    });
-    showSuccessToast("Lead email review updated successfully.");
-  };
+  }
 
   return (
     <div className="min-h-full">
       <Table
-        data={activeRows}
+        data={data}
         columns={columns}
+        isLoading={isLoading}
         title="Dead/Missing Email"
-        description="Review leads with dead or missing primary emails"
+        description="Review leads flagged with missing or dead emails across all brands"
         emptyText="No leads with dead or missing emails found."
-        onRowClick={openDrawer}
+        onRowClick={(row) => setSelectedLeadId(row.leadId)}
       />
 
       <DeadMissingEmailDrawer
-        row={drawerState.draft}
+        row={selectedRow}
         currentIndex={currentIndex}
-        rowCount={activeRows.length}
-        onCancel={closeDrawer}
-        onChange={updateDraft}
-        onNavigate={navigateDrawer}
-        onReset={resetDraft}
-        onSave={saveDraft}
+        rowCount={data.length}
+        isClearing={clearMutation.isPending}
+        onCancel={() => setSelectedLeadId(null)}
+        onNavigate={(index) => {
+          const row = data[index];
+          if (!row) return;
+          setSelectedLeadId(row.leadId);
+        }}
+        onClear={clearRow}
       />
     </div>
   );

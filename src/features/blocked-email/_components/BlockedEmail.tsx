@@ -1,113 +1,168 @@
 
-
-import { EmailLink, Table, TypeBadge } from "@/components/ui";
+import {
+  Badge,
+  CompanySymbolBadge,
+  EmailLink,
+  ErrorState,
+  Table,
+  TypeBadge,
+} from "@/components/ui";
 import { Column } from "@/components/ui/Table";
-import { showSuccessToast } from "@/lib/toast";
-import { Check } from "lucide-react";
+import {
+  showErrorToast,
+  showInfoToast,
+  showSuccessToast,
+} from "@/lib/toast";
 import { useMemo, useState } from "react";
 import { BlockedEmailDrawer } from "./BlockedEmailDrawer";
-import { blockedEmailRows, BlockedEmailRow } from "../_lib/data";
+import {
+  BlockedEmailRow,
+  getBlockedBrandLabel,
+  useBlockedEmails,
+  useUnblockBlockedEmail,
+} from "../_lib/data";
 
 export function BlockedEmail() {
-  const [rows, setRows] = useState<BlockedEmailRow[]>(blockedEmailRows);
-  const [drawerState, setDrawerState] = useState<{
-    original: BlockedEmailRow | null;
-    draft: BlockedEmailRow | null;
-  }>({
-    original: null,
-    draft: null,
-  });
+  const { data = [], isLoading, isError, error, refetch } = useBlockedEmails();
+  const unblockMutation = useUnblockBlockedEmail();
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
-  const unblockRow = (row: BlockedEmailRow) => {
-    setRows((current) => current.filter((item) => item.id !== row.id));
-    setDrawerState({ original: null, draft: null });
-    showSuccessToast(`${row.blockedEmail} has been unblocked.`);
-  };
+  const selectedRow = useMemo(
+    () => data.find((row) => row.leadId === selectedLeadId) ?? null,
+    [data, selectedLeadId],
+  );
 
-  const saveDraft = () => {
-    if (!drawerState.draft) return;
+  const unblockRow = async (row: BlockedEmailRow) => {
+    try {
+      const result = await unblockMutation.mutateAsync(row.leadId);
+      setSelectedLeadId(null);
 
-    const nextRow = {
-      ...drawerState.draft,
-      email: drawerState.draft.email.trim(),
-      blockedEmail: drawerState.draft.blockedEmail.trim(),
-      reason: drawerState.draft.reason.trim(),
-    };
+      if (result.updated > 0) {
+        showSuccessToast(
+          `${row.email ?? row.leadId} has been unblocked.`,
+        );
+        return;
+      }
 
-    setRows((current) =>
-      current.map((row) => (row.id === nextRow.id ? nextRow : row)),
-    );
-    showSuccessToast("Blocked email entry updated successfully.");
-    setDrawerState({ original: nextRow, draft: nextRow });
+      showInfoToast(
+        `${row.leadId} was already unblocked.`,
+      );
+    } catch (mutationError) {
+      showErrorToast(mutationError);
+    }
   };
 
   const columns = useMemo<Column<BlockedEmailRow>[]>(
     () => [
-      { title: "Lead ID", key: "leadId" },
       {
-        title: "Lead Type",
-        key: "leadType",
-        render: (row) => <TypeBadge value={row.leadType} kind="lead" />,
+        title: "Lead ID",
+        key: "leadId",
       },
+      {
+        title: "Company Symbol",
+        key: "companySymbol",
+        render: (row) =>
+          row.companySymbol ? (
+            <CompanySymbolBadge symbol={row.companySymbol} index={0} />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
+      },
+      { title: "Company Name", key: "companyName" },
+      { title: "Full Name", key: "fullName" },
       {
         title: "Contact Type",
         key: "contactType",
-        render: (row) => <TypeBadge value={row.contactType} kind="contact" />,
+        render: (row) =>
+          row.contactType ? (
+            <TypeBadge value={row.contactType} kind="contact" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Email",
         key: "email",
-        render: (row) => <EmailLink value={row.email} />,
+        render: (row) =>
+          row.email ? (
+            <EmailLink value={row.email} />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
-        title: "Blocked Email",
-        key: "blockedEmail",
-        render: () => (
-          <span
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-            aria-label="Blocked"
-            title="Blocked"
-          >
-            <Check size={16} />
-          </span>
+        title: "SVG Lead Type",
+        key: "leadTypeSvg",
+        render: (row) =>
+          row.leadTypeSvg ? (
+            <TypeBadge value={row.leadTypeSvg} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
+      },
+      {
+        title: "Benton Lead Type",
+        key: "leadTypeBenton",
+        render: (row) =>
+          row.leadTypeBenton ? (
+            <TypeBadge value={row.leadTypeBenton} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
+      },
+      {
+        title: "95RM Lead Type",
+        key: "leadType95rm",
+        render: (row) =>
+          row.leadType95rm ? (
+            <TypeBadge value={row.leadType95rm} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
+      },
+      {
+        title: "Blocked Brands",
+        key: "blockedBrands",
+        getValue: (row) => row.blockedBrands.map(getBlockedBrandLabel).join(", "),
+        render: (row) => (
+          <div className="flex flex-wrap gap-1.5">
+            {row.blockedBrands.map((brand) => (
+              <Badge key={brand}>{getBlockedBrandLabel(brand)}</Badge>
+            ))}
+          </div>
         ),
       },
     ],
     [],
   );
 
+  if (isError) {
+    return (
+      <ErrorState
+        error={error}
+        title="Failed to load blocked emails"
+        onRetry={() => {
+          void refetch();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-full">
       <Table
-        data={rows}
+        data={data}
         columns={columns}
+        isLoading={isLoading}
         title="Blocked Email"
-        description="Review and manage blocked email addresses across the system"
+        description="Review blocked email leads across all brands and unblock them when needed"
         emptyText="No blocked emails found."
-        onRowClick={(row) =>
-          setDrawerState({ original: { ...row }, draft: { ...row } })
-        }
+        onRowClick={(row) => setSelectedLeadId(row.leadId)}
       />
       <BlockedEmailDrawer
-        row={drawerState.draft}
-        onCancel={() => setDrawerState({ original: null, draft: null })}
-        onChange={(field, value) =>
-          setDrawerState((current) =>
-            current.draft
-              ? {
-                  ...current,
-                  draft: { ...current.draft, [field]: value },
-                }
-              : current,
-          )
-        }
-        onReset={() =>
-          setDrawerState((current) => ({
-            ...current,
-            draft: current.original ? { ...current.original } : null,
-          }))
-        }
-        onSave={saveDraft}
+        row={selectedRow}
+        isUnblocking={unblockMutation.isPending}
+        onCancel={() => setSelectedLeadId(null)}
         onUnblock={unblockRow}
       />
     </div>

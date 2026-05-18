@@ -23,21 +23,23 @@ const LEAD_TYPE_STYLES: Record<string, string> = {
 };
 
 const CONTACT_TYPE_STYLES: Record<string, string> = {
-  Prospecting:
+  prospecting:
     "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
-  Interested:
+  validated:
     "border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
-  "Not Interested":
+  interested:
+    "border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  "not interested":
     "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  "No Answer":
+  "no answer":
     "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  "Left Message":
+  "left message":
     "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
-  "Call Lead Back":
+  "call lead back":
     "border-purple-300 bg-purple-100 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300",
-  "Bad Number":
+  "bad number":
     "border-orange-300 bg-orange-100 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
-  DNC: "border-red-300 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300",
+  dnc: "border-red-300 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300",
 };
 
 const CAMPAIGN_TYPE_STYLES: Record<string, string> = {
@@ -87,6 +89,10 @@ function getTimezoneStyle(label: string) {
 
 function badgeClassName(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
+}
+
+function normalizeBadgeValue(value: string) {
+  return value.trim().toLowerCase();
 }
 
 export const StatusBadge = ({ status }: { status: string }) => {
@@ -145,12 +151,13 @@ export const TypeBadge = ({
   className?: string;
 }) => {
   const styles = kind === "lead" ? LEAD_TYPE_STYLES : CONTACT_TYPE_STYLES;
+  const styleKey = kind === "lead" ? value : normalizeBadgeValue(value);
 
   return (
     <span
       className={badgeClassName(
         "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
-        styles[value] ??
+        styles[styleKey] ??
           "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
         className,
       )}

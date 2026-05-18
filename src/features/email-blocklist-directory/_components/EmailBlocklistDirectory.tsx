@@ -1,29 +1,27 @@
 
-
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
-import { EmailLink, Table, TypeBadge } from "@/components/ui";
+import { Badge, EmailLink, ErrorState, Table, TypeBadge } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import type { Column } from "@/components/ui/Table";
-import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
-import { showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { getLeadId } from "@/features/backoffice-shared/constants";
 import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 import {
-  emailBlocklistDirectoryRows,
+  getBrandLabel,
+  getEmailBlacklistDisplayLeadId,
   type EmailBlocklistDirectoryRow,
+  useEmailBlacklistDirectory,
 } from "../_lib/data";
 import { EmailBlocklistDirectoryDrawer } from "./EmailBlocklistDirectoryDrawer";
 
-function HistoryCell({ value }: { value: string }) {
+function HistoryCell({ count }: { count: number }) {
   return (
     <span
       className="block max-w-72 truncate text-sm text-slate-700 dark:text-slate-200"
-      title={value}
+      title={`${count} call history entr${count === 1 ? "y" : "ies"}`}
     >
-      {value || "-"}
+      {count > 0 ? `${count} entr${count === 1 ? "y" : "ies"}` : "-"}
     </span>
   );
 }
@@ -31,54 +29,56 @@ function HistoryCell({ value }: { value: string }) {
 export function EmailBlocklistDirectory() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
-  const [rows, setRows] = useState<EmailBlocklistDirectoryRow[]>(
-    emailBlocklistDirectoryRows,
-  );
+  const { data = [], isLoading, isError, error, refetch } =
+    useEmailBlacklistDirectory();
   const [filters, setFilters] = useState({
     svgLeadType: "",
     bentonLeadType: "",
     rm95LeadType: "",
   });
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
-    findDrawerRouteIndex(emailBlocklistDirectoryRows, selectedLead),
-  );
 
   const filteredRows = useMemo(
     () =>
-      rows.filter((row) => {
-        if (filters.svgLeadType && row.svgLeadType !== filters.svgLeadType) {
+      data.filter((row) => {
+        if (filters.svgLeadType && row.leadTypeSvg !== filters.svgLeadType) {
           return false;
         }
 
         if (
           filters.bentonLeadType &&
-          row.bentonLeadType !== filters.bentonLeadType
+          row.leadTypeBenton !== filters.bentonLeadType
         ) {
           return false;
         }
 
-        if (filters.rm95LeadType && row.rm95LeadType !== filters.rm95LeadType) {
+        if (filters.rm95LeadType && row.leadType95rm !== filters.rm95LeadType) {
           return false;
         }
 
         return true;
       }),
-    [filters, rows],
+    [data, filters],
+  );
+
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const selectedRow = useMemo(
+    () => filteredRows.find((row) => row.leadId === selectedLeadId) ?? null,
+    [filteredRows, selectedLeadId],
   );
 
   useEffect(() => {
-    setSelectedIndex(findDrawerRouteIndex(filteredRows, selectedLead));
+    if (!selectedLead) return;
+    const row = filteredRows.find(
+      (item) =>
+        getEmailBlacklistDisplayLeadId(item).toLowerCase() ===
+        selectedLead.toLowerCase(),
+    );
+    setSelectedLeadId(row?.leadId ?? null);
   }, [filteredRows, selectedLead]);
 
-  const removeFromBlocklist = (row: EmailBlocklistDirectoryRow) => {
-    setRows((current) => current.filter((item) => item.id !== row.id));
-    setSelectedIndex(null);
-    showSuccessToast(`${row.email} removed from blocklist.`);
-  };
-
-  const selectedRow =
-    selectedIndex === null ? null : (filteredRows[selectedIndex] ?? null);
-  const currentIndex = selectedIndex ?? -1;
+  const currentIndex = selectedRow
+    ? filteredRows.findIndex((row) => row.leadId === selectedRow.leadId)
+    : -1;
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const leadTypeSelectOptions = useMemo(
     () => [{ label: "All", value: "" }, ...LEAD_TYPE_OPTIONS],
@@ -89,54 +89,111 @@ export function EmailBlocklistDirectory() {
     () => [
       {
         title: "Lead ID",
-        key: "lead",
-        getValue: (row) => getLeadId(row),
+        key: "leadIdExternal",
+        getValue: getEmailBlacklistDisplayLeadId,
       },
       { title: "Company", key: "companyName" },
       { title: "Full Name", key: "fullName" },
       {
         title: "Email",
         key: "email",
-        render: (row) => <EmailLink value={row.email} />,
+        render: (row) =>
+          row.email ? <EmailLink value={row.email} /> : <span>-</span>,
+      },
+      {
+        title: "Contact Type",
+        key: "contactType",
+        render: (row) =>
+          row.contactType ? (
+            <TypeBadge value={row.contactType} kind="contact" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Lead Type",
         key: "svgLeadType",
-        render: (row) => <TypeBadge value={row.svgLeadType} kind="lead" />,
+        render: (row) =>
+          row.leadTypeSvg ? (
+            <TypeBadge value={row.leadTypeSvg} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Lead Type Benton",
         key: "bentonLeadType",
-        render: (row) => <TypeBadge value={row.bentonLeadType} kind="lead" />,
+        render: (row) =>
+          row.leadTypeBenton ? (
+            <TypeBadge value={row.leadTypeBenton} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
         title: "Lead Type 95RM",
         key: "rm95LeadType",
-        render: (row) => <TypeBadge value={row.rm95LeadType} kind="lead" />,
+        render: (row) =>
+          row.leadType95rm ? (
+            <TypeBadge value={row.leadType95rm} kind="lead" />
+          ) : (
+            <span className="text-slate-400">-</span>
+          ),
       },
       {
-        title: "History Call Notes SVG",
-        key: "historyCallNotesSvg",
-        render: (row) => <HistoryCell value={row.historyCallNotesSvg} />,
+        title: "Blacklisted Brands",
+        key: "blacklistedBrands",
+        getValue: (row) => row.blacklistedBrands.map(getBrandLabel).join(", "),
+        render: (row) => (
+          <div className="flex flex-wrap gap-1.5">
+            {row.blacklistedBrands.map((brand) => (
+              <Badge key={brand}>{getBrandLabel(brand)}</Badge>
+            ))}
+          </div>
+        ),
       },
       {
-        title: "History Call Notes Benton",
-        key: "historyCallNotesBenton",
-        render: (row) => <HistoryCell value={row.historyCallNotesBenton} />,
+        title: "SVG History",
+        key: "svgHistory",
+        getValue: (row) => String(row.callHistory.svg.length),
+        render: (row) => <HistoryCell count={row.callHistory.svg.length} />,
       },
-      { title: "Reason", key: "reason" },
-      { title: "Added By", key: "addedBy" },
+      {
+        title: "Benton History",
+        key: "bentonHistory",
+        getValue: (row) => String(row.callHistory.benton.length),
+        render: (row) => <HistoryCell count={row.callHistory.benton.length} />,
+      },
+      {
+        title: "95RM History",
+        key: "rm95History",
+        getValue: (row) => String(row.callHistory["95rm"].length),
+        render: (row) => <HistoryCell count={row.callHistory["95rm"].length} />,
+      },
     ],
     [],
   );
 
+  if (isError) {
+    return (
+      <ErrorState
+        error={error}
+        title="Failed to load email blocklist directory"
+        onRetry={() => {
+          void refetch();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-full">
       <Table
+        isLoading={isLoading}
         data={filteredRows}
         columns={columns}
         title="Email Blocklist Directory"
-        description="View and manage blocked or blacklisted emails across the system"
+        description="Review leads blacklisted by terminal lead type across all brands"
         emptyText={
           activeFilterCount > 0
             ? "No blocklisted emails match the current filters."
@@ -283,8 +340,7 @@ export function EmailBlocklistDirectory() {
           </>
         }
         onRowClick={(row) => {
-          const index = filteredRows.findIndex((item) => item.id === row.id);
-          setSelectedIndex(index >= 0 ? index : null);
+          setSelectedLeadId(row.leadId);
         }}
       />
 
@@ -292,12 +348,12 @@ export function EmailBlocklistDirectory() {
         row={selectedRow}
         currentIndex={currentIndex}
         rowCount={filteredRows.length}
-        onCancel={() => setSelectedIndex(null)}
+        onCancel={() => setSelectedLeadId(null)}
         onNavigate={(index) => {
-          if (!filteredRows[index]) return;
-          setSelectedIndex(index);
+          const row = filteredRows[index];
+          if (!row) return;
+          setSelectedLeadId(row.leadId);
         }}
-        onRemove={removeFromBlocklist}
       />
     </div>
   );
