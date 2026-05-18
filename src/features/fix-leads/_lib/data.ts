@@ -77,11 +77,13 @@ type FixQueueResponse = { ok: true; count: number; data: FixQueueRow[] };
 type FullLeadResponse = { ok: true; lead: FullLead; brandStates: BrandStates };
 type RelatedResponse = { ok: true; count: number; data: RelatedLead[] };
 
-export function useFixQueue() {
+export function useFixQueue(limit: number) {
   return useQuery({
-    queryKey: ["fix-queue"],
+    queryKey: ["fix-queue", limit],
     queryFn: async () => {
-      const json = (await api.get("/leads/fix-queue?limit=500")) as FixQueueResponse;
+      const json = (await api.get(
+        `/leads/fix-queue?limit=${limit}`,
+      )) as FixQueueResponse;
       return json.data;
     },
     staleTime: 60_000,

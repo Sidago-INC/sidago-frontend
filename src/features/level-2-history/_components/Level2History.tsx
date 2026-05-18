@@ -2,12 +2,15 @@
 
 import { CampaignBadge, Table, TypeBadge } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Level2HistoryRow } from "../_lib/data";
 import { useLevel2History } from "../_lib/hooks";
 
+const DEFAULT_ROWS_PER_PAGE = 10;
+
 export function Level2History() {
-  const { data, isLoading } = useLevel2History();
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+  const { data, isLoading } = useLevel2History(rowsPerPage);
 
   const columns = useMemo<Column<Level2HistoryRow>[]>(
     () => [
@@ -47,6 +50,8 @@ export function Level2History() {
         data={data ?? []}
         columns={columns}
         isLoading={isLoading}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
         title="Level 2 History"
         description="Review historical Level 2 updates and lead type changes"
       />

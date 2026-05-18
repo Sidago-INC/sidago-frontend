@@ -22,8 +22,12 @@ import {
   useUnblockBlockedEmail,
 } from "../_lib/data";
 
+const DEFAULT_ROWS_PER_PAGE = 10;
+
 export function BlockedEmail() {
-  const { data = [], isLoading, isError, error, refetch } = useBlockedEmails();
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+  const { data = [], isLoading, isError, error, refetch } =
+    useBlockedEmails(rowsPerPage);
   const unblockMutation = useUnblockBlockedEmail();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
@@ -154,6 +158,8 @@ export function BlockedEmail() {
         data={data}
         columns={columns}
         isLoading={isLoading}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
         title="Blocked Email"
         description="Review blocked email leads across all brands and unblock them when needed"
         emptyText="No blocked emails found."

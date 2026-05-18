@@ -20,6 +20,8 @@ import {
 type FixLeadsTableProps = {
   data: FixQueueRow[];
   title: string;
+  rowsPerPage: number;
+  onRowsPerPageChange: (rowsPerPage: number) => void;
 };
 
 // "Fix" is a brand-scoped lead_type — covered by the existing LEAD_TYPE
@@ -40,7 +42,12 @@ function displaySymbol(row: FixQueueRow): string {
   return row.companySymbol ?? "";
 }
 
-export function FixLeadsTable({ data, title }: FixLeadsTableProps) {
+export function FixLeadsTable({
+  data,
+  title,
+  rowsPerPage,
+  onRowsPerPageChange,
+}: FixLeadsTableProps) {
   const navigate = useNavigate();
   const [contactsModalRow, setContactsModalRow] = useState<FixQueueRow | null>(
     null,
@@ -165,6 +172,8 @@ export function FixLeadsTable({ data, title }: FixLeadsTableProps) {
       <Table
         data={data}
         columns={columns}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={onRowsPerPageChange}
         title={title}
         showToolbarTitle={false}
         description=""

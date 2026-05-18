@@ -15,6 +15,8 @@ import {
 } from "../_lib/data";
 import { EmailBlocklistDirectoryDrawer } from "./EmailBlocklistDirectoryDrawer";
 
+const DEFAULT_ROWS_PER_PAGE = 10;
+
 function HistoryCell({ count }: { count: number }) {
   return (
     <span
@@ -29,8 +31,9 @@ function HistoryCell({ count }: { count: number }) {
 export function EmailBlocklistDirectory() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
   const { data = [], isLoading, isError, error, refetch } =
-    useEmailBlacklistDirectory();
+    useEmailBlacklistDirectory(rowsPerPage);
   const [filters, setFilters] = useState({
     svgLeadType: "",
     bentonLeadType: "",
@@ -192,6 +195,8 @@ export function EmailBlocklistDirectory() {
         isLoading={isLoading}
         data={filteredRows}
         columns={columns}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
         title="Email Blocklist Directory"
         description="Review leads blacklisted by terminal lead type across all brands"
         emptyText={

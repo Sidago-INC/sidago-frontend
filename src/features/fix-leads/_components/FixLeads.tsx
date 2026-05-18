@@ -1,9 +1,13 @@
 import { Wave } from "@/components/ui";
+import { useState } from "react";
 import { useFixQueue } from "../_lib/data";
 import { FixLeadsTable } from "./FixLeadsTable";
 
+const DEFAULT_ROWS_PER_PAGE = 10;
+
 export function FixLeads() {
-  const { data, isLoading, isError, error } = useFixQueue();
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+  const { data, isLoading, isError, error } = useFixQueue(rowsPerPage);
 
   return (
     <div className="space-y-4">
@@ -24,7 +28,12 @@ export function FixLeads() {
             "Unknown error"}
         </div>
       ) : (
-        <FixLeadsTable data={data ?? []} title="Fix Queue" />
+        <FixLeadsTable
+          data={data ?? []}
+          title="Fix Queue"
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={setRowsPerPage}
+        />
       )}
     </div>
   );

@@ -24,10 +24,13 @@ import {
 } from "../_lib/data";
 import { DeadMissingEmailDrawer } from "./DeadMissingEmailDrawer";
 
+const DEFAULT_ROWS_PER_PAGE = 10;
+
 export function DeadMissingEmail() {
   const [searchParams] = useSearchParams();
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
   const { data = [], isLoading, isError, error, refetch } =
-    useDeadMissingEmails();
+    useDeadMissingEmails(rowsPerPage);
   const clearMutation = useClearDeadMissingEmail();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
@@ -173,6 +176,8 @@ export function DeadMissingEmail() {
         data={data}
         columns={columns}
         isLoading={isLoading}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
         title="Dead/Missing Email"
         description="Review leads flagged with missing or dead emails across all brands"
         emptyText="No leads with dead or missing emails found."

@@ -31,12 +31,12 @@ type CompaniesResponse = { ok: true; count: number; data: CompanyRow[] };
 // Companies list for picker dropdowns + the Companies directory. 5-min stale
 // time matches the lead picker — the company roster doesn't churn during a
 // working session.
-export function useCompanyOptions() {
+export function useCompanyOptions(limit = 2000) {
   return useQuery({
-    queryKey: ["companies", "picker"],
+    queryKey: ["companies", "picker", limit],
     queryFn: async () => {
       const json = (await api.get(
-        "/companies?limit=2000",
+        `/companies?limit=${limit}`,
       )) as CompaniesResponse;
       return json.data;
     },

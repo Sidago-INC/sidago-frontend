@@ -1,8 +1,7 @@
 
-
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { Ellipsis, FileDown, Printer, Search, X } from "lucide-react";
-import React from "react";
+import React, { useEffect } from "react";
 import { FilterPanel } from "./table/FilterPanel";
 import { GroupPanel } from "./table/GroupPanel";
 import { SortPanel } from "./table/SortPanel";
@@ -17,6 +16,8 @@ type Props<T> = {
   data: T[];
   columns: import("./table/types").Column<T>[];
   isLoading?: boolean;
+  rowsPerPage?: number;
+  onRowsPerPageChange?: (rowsPerPage: number) => void;
   emptyText?: string;
   emptyState?: React.ReactNode;
   showTableWhenEmpty?: boolean;
@@ -37,6 +38,8 @@ export function Table<T>({
   data,
   columns,
   isLoading,
+  rowsPerPage: initialRowsPerPage,
+  onRowsPerPageChange,
   title,
   description,
   emptyText = "No data found",
@@ -46,7 +49,12 @@ export function Table<T>({
   headerContent,
   onRowClick,
 }: Props<T>) {
-  const state = useTableState({ data, columns, title });
+  const state = useTableState({
+    data,
+    columns,
+    title,
+    initialRowsPerPage,
+  });
 
   const {
     scrollContainerRef,
@@ -88,6 +96,10 @@ export function Table<T>({
     setPageState,
     appendFilterItemToGroup,
   } = state;
+
+  useEffect(() => {
+    onRowsPerPageChange?.(rowsPerPage);
+  }, [onRowsPerPageChange, rowsPerPage]);
 
   const handleTableScrollKeys = (
     event: React.KeyboardEvent<HTMLDivElement>,

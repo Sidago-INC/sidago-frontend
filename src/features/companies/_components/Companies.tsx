@@ -17,6 +17,8 @@ import {
   type CompanyRow,
 } from "../_lib/hooks";
 
+const DEFAULT_ROWS_PER_PAGE = 10;
+
 type DrawerState = {
   isOpen: boolean;
   originalCompanyId: string | null;
@@ -90,7 +92,8 @@ const EMPTY_COMPANY: COMPANY = {
 
 export function Companies() {
   const [searchParams] = useSearchParams();
-  const { data: rows, isLoading } = useCompanyOptions();
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+  const { data: rows, isLoading } = useCompanyOptions(rowsPerPage);
   const updateCompany = useUpdateCompany();
 
   const [drawerState, setDrawerState] = useState<DrawerState>({
@@ -296,6 +299,8 @@ export function Companies() {
       <Table
         data={companies}
         columns={columns}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={setRowsPerPage}
         title="Companies"
         description="Company market and contact profile"
         isLoading={isLoading}

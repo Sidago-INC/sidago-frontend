@@ -61,12 +61,12 @@ export function getBrandLabel(brand: string): string {
   }
 }
 
-export function useEmailBlacklistDirectory() {
+export function useEmailBlacklistDirectory(limit: number) {
   return useQuery({
-    queryKey: ["email-blacklist-directory"],
+    queryKey: ["email-blacklist-directory", limit],
     queryFn: async () => {
       const json = (await api.get(
-        "/email-blacklist?limit=500",
+        `/email-blacklist?limit=${limit}`,
       )) as EmailBlacklistResponse;
       return json.data;
     },

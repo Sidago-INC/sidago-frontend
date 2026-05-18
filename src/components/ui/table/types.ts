@@ -13,6 +13,8 @@ export type TableProps<T> = {
   data: T[];
   columns: Column<T>[];
   isLoading?: boolean;
+  rowsPerPage?: number;
+  onRowsPerPageChange?: (rowsPerPage: number) => void;
   emptyText?: string;
   emptyState?: React.ReactNode;
   showTableWhenEmpty?: boolean;

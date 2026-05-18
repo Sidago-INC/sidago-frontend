@@ -1,6 +1,6 @@
 
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Column,
   FilterCondition,
@@ -27,6 +27,7 @@ interface UseTableStateOptions<T> {
   data: T[];
   columns: Column<T>[];
   title: string;
+  initialRowsPerPage?: number;
 }
 
 export interface UseTableStateReturn<T> {
@@ -76,6 +77,7 @@ export function useTableState<T>({
   data,
   columns,
   title,
+  initialRowsPerPage = 10,
 }: UseTableStateOptions<T>): UseTableStateReturn<T> {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableElementRef = useRef<HTMLTableElement | null>(null);
@@ -90,11 +92,15 @@ export function useTableState<T>({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rootFilterGate, setRootFilterGate] = useState<FilterGate>("AND");
   const [filterItems, setFilterItems] = useState<FilterItem[]>([]);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
   const [pageState, setPageState] = useState<PageState>({
     page: 1,
     contextKey: "",
   });
+
+  useEffect(() => {
+    setRowsPerPage(initialRowsPerPage);
+  }, [initialRowsPerPage]);
 
   const selectableColumns = useMemo(
     () =>

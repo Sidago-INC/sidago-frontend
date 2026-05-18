@@ -39,11 +39,13 @@ export function getBlockedBrandLabel(brand: string): string {
   }
 }
 
-export function useBlockedEmails() {
+export function useBlockedEmails(limit: number) {
   return useQuery({
-    queryKey: ["blocked-email"],
+    queryKey: ["blocked-email", limit],
     queryFn: async () => {
-      const json = (await api.get("/blocked-email?limit=500")) as BlockedEmailResponse;
+      const json = (await api.get(
+        `/blocked-email?limit=${limit}`,
+      )) as BlockedEmailResponse;
       return json.data;
     },
     staleTime: 60_000,

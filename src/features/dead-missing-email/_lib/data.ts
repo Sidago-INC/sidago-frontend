@@ -47,11 +47,13 @@ export function getDeadEmailBrandLabel(brand: string): string {
   }
 }
 
-export function useDeadMissingEmails() {
+export function useDeadMissingEmails(limit: number) {
   return useQuery({
-    queryKey: ["dead-missing-email"],
+    queryKey: ["dead-missing-email", limit],
     queryFn: async () => {
-      const json = (await api.get("/dead-email?limit=500")) as DeadEmailResponse;
+      const json = (await api.get(
+        `/dead-email?limit=${limit}`,
+      )) as DeadEmailResponse;
       return json.data;
     },
     staleTime: 60_000,
