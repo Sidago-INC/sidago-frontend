@@ -57,8 +57,7 @@ export function DeadMissingEmail() {
     () => [
       {
         title: "Lead ID",
-        key: "leadIdExternal",
-        getValue: getDeadEmailDisplayLeadId,
+        key: "leadId",
       },
       { title: "Company", key: "companyName" },
       { title: "Full Name", key: "fullName" },
