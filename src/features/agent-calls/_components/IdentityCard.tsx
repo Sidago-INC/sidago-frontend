@@ -52,6 +52,7 @@ export function IdentityCard({
             options={leadTypeSelectOptions}
             placeholder="Select lead type"
             onChange={(value) => onChange({ leadType: value as string })}
+            disabled
             className="w-full rounded-lg border-slate-300 bg-slate-50 text-sm text-slate-700 ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           />
         </div>
@@ -68,6 +69,7 @@ export function IdentityCard({
               type="email"
               value={form.email}
               onChange={(event) => onChange({ email: event.target.value })}
+              readOnly
               placeholder="No email on record"
               className="w-full rounded-lg border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500"
             />
@@ -83,6 +85,7 @@ export function IdentityCard({
             options={contactTypeSelectOptions}
             placeholder="Select contact type"
             onChange={(value) => onChange({ contactType: value as string })}
+            disabled
             className="w-full rounded-lg border-slate-300 bg-slate-50 text-sm text-slate-700 ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
           />
         </div>
