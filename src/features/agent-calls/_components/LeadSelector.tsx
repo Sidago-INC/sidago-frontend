@@ -1,8 +1,8 @@
 import { Select } from "@/components/ui/Select";
-import type { Lead } from "../_lib/data";
+import type { QueueLead } from "../_lib/apiTypes";
 
 type Props = {
-  leads: Lead[];
+  leads: QueueLead[];
   currentIndex: number;
   onSelect: (index: number) => void;
 };
@@ -10,7 +10,7 @@ type Props = {
 export function LeadSelector({ leads, currentIndex, onSelect }: Props) {
   const options = leads.map((lead, index) => ({
     value: index,
-    label: lead.lead_id || lead.full_name,
+    label: lead.leadIdExternal || lead.fullName,
   }));
 
   return (
@@ -22,6 +22,8 @@ export function LeadSelector({ leads, currentIndex, onSelect }: Props) {
         value={currentIndex}
         options={options}
         placeholder="Select lead"
+        searchable
+        searchPlaceholder="Search leads..."
         onChange={(value) => onSelect(Number(value))}
         className="max-w-55 cursor-pointer truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 transition focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
       />

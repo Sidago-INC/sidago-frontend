@@ -1,20 +1,21 @@
 
 
 import { Button } from "@/components/ui";
-import type { Lead } from "../_lib/data";
 import { CircleMinus, PlayCircle } from "lucide-react";
 import { PingDot } from "./PingDot";
 
 type AutoCallingBannerProps = {
   isAutoCalling: boolean;
-  currentLead: Lead;
+  testMode: boolean;
+  currentLeadName: string;
   onStart: () => void;
   onStop: () => void;
 };
 
 export function AutoCallingBanner({
   isAutoCalling,
-  currentLead,
+  testMode,
+  currentLeadName,
   onStart,
   onStop,
 }: AutoCallingBannerProps) {
@@ -36,9 +37,14 @@ export function AutoCallingBanner({
           >
             {isAutoCalling ? "Auto Calling in progress..." : "Auto Calling"}
           </span>
+          {isAutoCalling && testMode && (
+            <span className="rounded bg-amber-400 px-1.5 py-0.5 text-xs font-bold text-amber-900">
+              TEST
+            </span>
+          )}
           {isAutoCalling && (
             <span className="hidden text-xs font-medium text-emerald-100 sm:block">
-              Calling: {currentLead.full_name}
+              Calling: {currentLeadName}
             </span>
           )}
         </div>
