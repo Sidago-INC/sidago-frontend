@@ -91,8 +91,8 @@ function badgeClassName(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
-function normalizeBadgeValue(value: string) {
-  return value.trim().toLowerCase();
+function normalizeBadgeValue(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
 }
 
 export const StatusBadge = ({ status }: { status: string }) => {
@@ -146,7 +146,7 @@ export const TypeBadge = ({
   kind,
   className,
 }: {
-  value: string;
+  value: string | null | undefined;
   kind: "lead" | "contact";
   className?: string;
 }) => {

@@ -10,7 +10,7 @@ type Props = {
 export function LeadSelector({ leads, currentIndex, onSelect }: Props) {
   const options = leads.map((lead, index) => ({
     value: index,
-    label: lead.leadIdExternal || lead.fullName,
+    label: [lead.companySymbol, lead.fullName].filter(Boolean).join(" - "),
   }));
 
   return (

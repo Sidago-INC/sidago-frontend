@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Info } from "lucide-react";
 import { CardShell, EmptyState, Modal } from "@/components/ui";
 import { AutoCallingBanner } from "./_components/AutoCallingBanner";
@@ -15,7 +16,6 @@ import type { CallsFormState, CallsModalState } from "@/types";
 import { getAgentKeyFromCookie } from "./_lib/utils";
 import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
-import { contactTypeOptions, leadTypeOptions } from "./_lib/data";
 import { MessageSquare, NotebookText, Users } from "lucide-react";
 
 const QUEUE_REFETCH_MS = 90_000;
@@ -42,34 +42,24 @@ function formFromDetail(d: LeadDetailResponse): CallsFormState {
   };
 }
 
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
 function formatNotesHistory(history: LeadDetailResponse["history"]): string {
   return history
     .filter((h) => h.notes)
-    .map((h) => {
-      const date = new Date(h.calledAt).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      return `${date}: ${h.notes}`;
-    })
+    .map((h) => [formatDate(h.calledAt), h.agentName, h.notes].filter(Boolean).join(" - "))
     .join("\n");
 }
 
 function formatCallsHistory(history: LeadDetailResponse["history"]): string {
   return history
-    .map((h) => {
-      const date = new Date(h.calledAt).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      const dur =
-        h.durationSeconds != null
-          ? h.durationSeconds >= 60
-            ? `${Math.round(h.durationSeconds / 60)} min`
-            : `${h.durationSeconds}s`
-          : null;
-      return [date, dur, h.resultCode].filter(Boolean).join(" - ");
-    })
+    .map((h) => [formatDate(h.calledAt), h.agentName, h.resultCode].filter(Boolean).join(" - "))
     .join("\n");
 }
 
@@ -98,7 +88,8 @@ function errMessage(err: unknown): string {
 }
 
 export function AgentCalls() {
-  const [agentSlug] = useState(() => resolveAgentSlug(getAgentKeyFromCookie()));
+  const [searchParams] = useSearchParams();
+  const agentSlug = searchParams.get("agent") ?? resolveAgentSlug(getAgentKeyFromCookie());
   const [leads, setLeads] = useState<QueueLead[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [detail, setDetail] = useState<LeadDetailResponse | null>(null);
@@ -109,6 +100,7 @@ export function AgentCalls() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
+  const stopAutoCallRef = useRef(false);
 
   // Queue: load on mount + refetch every 90s
   useEffect(() => {
@@ -223,25 +215,41 @@ export function AgentCalls() {
   };
 
   const handleDial = async () => {
-    if (!currentLead) return;
-    try {
-      const res = await agentCallsApi.dial(agentSlug, currentLead.leadId);
-      setIsAutoCalling(true);
-      setTestMode(res.testMode);
-    } catch (err) {
-      const status = (err as { status?: number })?.status;
-      const dialErrors: Record<number, string> = {
-        404: "Lead not found",
-        412: "Dialer not configured for this agent",
-        422: "No phone number on file",
-        502: "Dialer unavailable, try again",
-      };
-      setModal({
-        title: "Dial Error",
-        message: (status && dialErrors[status]) ?? "Failed to place call",
-        direction: "top",
-      });
+    if (leads.length === 0) return;
+    stopAutoCallRef.current = false;
+    setIsAutoCalling(true);
+
+    const snapshot = leads;
+    for (let i = currentIndex; i < snapshot.length; i++) {
+      if (stopAutoCallRef.current) break;
+      setCurrentIndex(i);
+      try {
+        const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
+        setTestMode(res.testMode);
+      } catch (err) {
+        const status = (err as { status?: number })?.status;
+        const dialErrors: Record<number, string> = {
+          404: "Lead not found",
+          412: "Dialer not configured for this agent",
+          422: "No phone number on file",
+          502: "Dialer unavailable, try again",
+        };
+        setModal({
+          title: "Dial Error",
+          message: (status && dialErrors[status]) ?? "Failed to place call",
+          direction: "top",
+        });
+        break;
+      }
     }
+
+    stopAutoCallRef.current = false;
+    setIsAutoCalling(false);
+  };
+
+  const handleStopAutoCalling = () => {
+    stopAutoCallRef.current = true;
+    setIsAutoCalling(false);
   };
 
   if (queueLoading) {
@@ -272,7 +280,7 @@ export function AgentCalls() {
         testMode={testMode}
         currentLeadName={currentLead.fullName}
         onStart={handleDial}
-        onStop={() => setIsAutoCalling(false)}
+        onStop={handleStopAutoCalling}
       />
 
       <main className="mx-auto space-y-4 px-4 py-6">
@@ -288,8 +296,6 @@ export function AgentCalls() {
                 onChange={(patch) =>
                   setForm((prev) => ({ ...prev, ...patch }))
                 }
-                leadTypeOptions={leadTypeOptions}
-                contactTypeOptions={contactTypeOptions}
               />
               <WorkToggleRow
                 value={form.notWorkAnymore}
