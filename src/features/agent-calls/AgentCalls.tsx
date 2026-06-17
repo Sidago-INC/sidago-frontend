@@ -180,9 +180,9 @@ export function AgentCalls() {
         followUpDate: form.callBackDate || undefined,
         source: "manual",
       });
-      const queueRes = await agentCallsApi.queue(agentSlug);
-      setLeads(queueRes.data);
-      setCurrentIndex(0);
+      const newLeads = leads.filter((_, i) => i !== currentIndex);
+      setLeads(newLeads);
+      setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
     } catch (err) {
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
     } finally {
