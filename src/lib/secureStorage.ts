@@ -20,7 +20,9 @@ async function getKey() {
   }
 
   const enc = new TextEncoder();
-  return subtle.importKey("raw", enc.encode(SECRET_KEY), "AES-GCM", false, [
+  // Derive a 256-bit key via SHA-256 so any-length secret is valid
+  const keyMaterial = await subtle.digest("SHA-256", enc.encode(SECRET_KEY));
+  return subtle.importKey("raw", keyMaterial, "AES-GCM", false, [
     "encrypt",
     "decrypt",
   ]);
