@@ -184,6 +184,9 @@ export const CampaignBadge = ({
   value: string;
   className?: string;
 }) => {
+  if (!value.trim()) {
+    return null;
+  }
   return (
     <span
       className={badgeClassName(

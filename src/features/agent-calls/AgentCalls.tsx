@@ -226,7 +226,7 @@ export function AgentCalls() {
     const snapshot = leads;
     for (let i = currentIndex; i < snapshot.length; i++) {
       if (stopAutoCallRef.current) break;
-      setCurrentIndex(i);
+      // setCurrentIndex(i);
       try {
         const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
         setTestMode(res.testMode);

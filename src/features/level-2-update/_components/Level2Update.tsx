@@ -12,7 +12,7 @@ import {
 import { type Column } from "@/components/ui/Table";
 import clsx from "clsx";
 import { FileText, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
 import { api } from "@/lib/api";
@@ -132,9 +132,26 @@ function brandCodeFor(brand: BRAND | ""): "svg" | "95rm" | "benton" | null {
   return null;
 }
 
+const DRAFT_KEY = "level2_update_draft_rows";
+
 export function Level2Update() {
-  const [rows, setRows] = useState<Level2UpdateRow[]>([]);
+  const [rows, setRows] = useState<Level2UpdateRow[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(DRAFT_KEY);
+      return saved ? (JSON.parse(saved) as Level2UpdateRow[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(rows));
+    } catch {
+      // ignore quota/private-mode errors
+    }
+  }, [rows]);
 
   const { data: leadOptionsRaw, isLoading: leadsLoading } = useLeadOptions();
   // One agents query per brand — each result is cached for 5 minutes, so even
