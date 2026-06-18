@@ -1,7 +1,7 @@
 
 
 import { Card, CardContent, Select, TextInput } from "@/components/ui";
-import { api } from "@/lib/api";
+import { createLead } from "../_lib/hooks";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
 import {
@@ -36,13 +36,6 @@ const companySelectClass =
 // wider so the dropdown can show the full label even on narrow triggers.
 const companySelectOptionsClass =
   "z-[300] !w-[26rem] max-w-[90vw] max-h-72 rounded-xl border-slate-200 p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950";
-
-type CreateLeadResponse = {
-  ok: true;
-  id: string;
-  fullName: string;
-  email: string;
-};
 
 export function AddLeadForm() {
   const navigate = useNavigate();
@@ -98,7 +91,7 @@ export function AddLeadForm() {
 
     setIsSaving(true);
     try {
-      const response = (await api.post("/leads", {
+      const response = await createLead({
         companyId: normalizedForm.companyId,
         fullName: normalizedForm.fullName,
         firstName: normalizedForm.firstName,
@@ -107,7 +100,7 @@ export function AddLeadForm() {
         phoneExtension: normalizedForm.phoneExtension,
         email: normalizedForm.email,
         role: normalizedForm.role,
-      })) as CreateLeadResponse;
+      });
 
       setForm(blankForm);
       setErrors({});

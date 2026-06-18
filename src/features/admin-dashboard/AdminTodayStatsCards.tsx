@@ -3,8 +3,8 @@
 import { CompanySymbolBadge, StatusCard } from "@/components/ui";
 import { WinnerBadge } from "@/features/agent-dashboard/_components/WinnerBadge";
 import { agentDashboardData } from "@/features/agent-dashboard/_lib/data";
-import { backofficeLeaderboardAgents } from "@/features/backoffice-dashboard/_lib/data";
 import clsx from "clsx";
+import { useAdminTodayAgentCards } from "./_lib/hooks";
 
 const CARD_TONES = [
   "bg-indigo-50 dark:bg-indigo-950/30",
@@ -13,36 +13,21 @@ const CARD_TONES = [
   "bg-rose-50 dark:bg-rose-950/30",
 ];
 
-function getDateSeed(date?: Date) {
-  if (!date) {
-    return 0;
-  }
-
-  return (
-    date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
-  );
-}
-
 export function AdminTodayStatsCards({
-  selectedDate,
+  selectedDate: _selectedDate,
 }: {
   selectedDate?: Date;
 }) {
-  const dateSeed = getDateSeed(selectedDate);
+  const { cards, isLoading } = useAdminTodayAgentCards(agentDashboardData);
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2 xxl:grid-cols-3">
-      {agentDashboardData.map((agent, index) => {
+      {cards.map((agent, index) => {
         const tone = CARD_TONES[index % CARD_TONES.length];
-        const shift = (dateSeed + index) % 4;
-        const currentHotLeads =
-          (backofficeLeaderboardAgents[index]?.currentHotLeads ?? 0) + shift;
-        const callsToday = Math.max(0, agent.today_calls_made - 3 + shift * 2);
-        const hotLeadsToday = Math.max(0, agent.hot_leads_today - 1 + shift);
 
         return (
           <StatusCard
-            key={`${agent.recordId}-today`}
+            key={agent.id}
             className="border-slate-200 dark:border-slate-800 dark:bg-slate-900"
             header={
               <div className="flex items-center gap-3">
@@ -61,13 +46,13 @@ export function AdminTodayStatsCards({
               </div>
             }
             aside={
-              agent.winner ? <WinnerBadge label="Today Winner" /> : undefined
+              agent.isWinner ? <WinnerBadge label="Today Winner" /> : undefined
             }
             metrics={[
               {
                 id: "calls-today",
                 label: "Calls Today",
-                value: callsToday,
+                value: isLoading ? "—" : agent.callsToday,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
                   "text-xl font-bold text-slate-900 dark:text-slate-100",
@@ -75,7 +60,7 @@ export function AdminTodayStatsCards({
               {
                 id: "hot-leads-today",
                 label: "Hot Leads Today",
-                value: hotLeadsToday,
+                value: isLoading ? "—" : agent.hotLeadsToday,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
                   "text-xl font-bold text-slate-900 dark:text-slate-100",
@@ -83,7 +68,7 @@ export function AdminTodayStatsCards({
               {
                 id: "current-hot-leads",
                 label: "Current Hot Leads",
-                value: currentHotLeads,
+                value: isLoading ? "—" : agent.currentHotLeads,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
                   "text-xl font-bold text-slate-900 dark:text-slate-100",

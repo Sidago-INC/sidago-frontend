@@ -2,9 +2,9 @@
 
 import { CompanySymbolBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import { showSuccessToast } from "@/lib/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AgentSmsEditableTrigger,
   AgentSmsInlineTextCell,
@@ -16,9 +16,15 @@ import { AgentSmsStatusBadge } from "./AgentSmsStatusBadge";
 import { SmsLogButton } from "./SmsLogButton";
 import {
   type AgentSmsRow,
-  getSmsRowsForAgent,
+  mapSmsQueueItem,
+  smsAgentProfiles,
   smsStatusOptions,
 } from "../_lib/data";
+import {
+  useSmsHistory,
+  useSmsQueue,
+  useUpdateSmsState,
+} from "../_lib/hooks";
 
 type AgentSmsProps = {
   agentName: string;
@@ -29,6 +35,36 @@ type DrawerState = {
   original: AgentSmsRow | null;
   draft: AgentSmsRow | null;
 };
+
+function formatHistoryDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatSmsHistory(
+  history: Array<{
+    sentAt: string;
+    userName: string | null;
+    status: string | null;
+    body: string | null;
+  }>,
+) {
+  return history
+    .map((entry) =>
+      [formatHistoryDate(entry.sentAt), entry.userName, entry.status, entry.body]
+        .filter(Boolean)
+        .join(" - "),
+    )
+    .join("\n");
+}
 
 function LeadButton({
   leadId,
@@ -53,24 +89,98 @@ function LeadButton({
 
 export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
   const [searchParams] = useSearchParams();
-  const [rows, setRows] = useState<AgentSmsRow[]>(() =>
-    getSmsRowsForAgent(agentSlug),
+  const profile = smsAgentProfiles[agentSlug] ?? {
+    agentName: agentSlug,
+    brand: "Sidago" as const,
+  };
+  const { data: queueData, isLoading } = useSmsQueue(agentSlug);
+  const updateSmsState = useUpdateSmsState();
+  const apiRows = useMemo(
+    () =>
+      (queueData?.data ?? []).map((item) =>
+        mapSmsQueueItem(item, queueData?.brandCode ?? "svg", profile.brand),
+      ),
+    [queueData, profile.brand],
   );
+  const [rows, setRows] = useState<AgentSmsRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
-  const [drawerState, setDrawerState] = useState<DrawerState>(() => {
-    const initialRows = getSmsRowsForAgent(agentSlug);
+  const [drawerState, setDrawerState] = useState<DrawerState>({
+    original: null,
+    draft: null,
+  });
+  const activeHistoryRow = drawerState.draft ?? drawerState.original;
+  const { data: smsHistory = [] } = useSmsHistory(
+    activeHistoryRow?.leadId,
+    activeHistoryRow?.brandCode,
+  );
+
+  useEffect(() => {
+    setRows(apiRows);
+  }, [apiRows]);
+
+  useEffect(() => {
     const leadParam = searchParams.get("lead");
-    const row = initialRows.find(
+    if (!leadParam || apiRows.length === 0) {
+      return;
+    }
+
+    const row = apiRows.find(
       (item) =>
         item.leadId === leadParam ||
         item.email === leadParam ||
         item.id === leadParam,
     );
 
-    return row
-      ? { original: { ...row }, draft: { ...row } }
-      : { original: null, draft: null };
-  });
+    if (row) {
+      setDrawerState({ original: { ...row }, draft: { ...row } });
+    }
+  }, [apiRows, searchParams]);
+
+  useEffect(() => {
+    if (!activeHistoryRow || smsHistory.length === 0) {
+      return;
+    }
+
+    const formattedHistory = formatSmsHistory(smsHistory);
+    if (!formattedHistory.trim()) {
+      return;
+    }
+
+    setRows((currentRows) =>
+      currentRows.map((row) =>
+        row.id === activeHistoryRow.id && row.smsLog !== formattedHistory
+          ? { ...row, smsLog: formattedHistory }
+          : row,
+      ),
+    );
+
+    setDrawerState((current) => {
+      if (!current.draft || current.draft.id !== activeHistoryRow.id) {
+        return current;
+      }
+
+      const nextOriginal = current.original
+        ? { ...current.original, smsLog: formattedHistory }
+        : current.original;
+
+      const nextDraft =
+        current.draft.smsLog.trim().length === 0
+          ? { ...current.draft, smsLog: formattedHistory }
+          : current.draft;
+
+      if (
+        nextOriginal?.smsLog === current.original?.smsLog &&
+        nextDraft.smsLog === current.draft.smsLog
+      ) {
+        return current;
+      }
+
+      return {
+        original: nextOriginal,
+        draft: nextDraft,
+      };
+    });
+  }, [activeHistoryRow, smsHistory]);
 
   const updateRow = (
     rowId: string,
@@ -79,6 +189,28 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     setRows((currentRows) =>
       currentRows.map((row) => (row.id === rowId ? updater(row) : row)),
     );
+  };
+
+  const toggleSmsLogged = async (row: AgentSmsRow) => {
+    const nextValue = !row.smsLogged;
+    updateRow(row.id, (currentRow) => ({
+      ...currentRow,
+      smsLogged: nextValue,
+    }));
+
+    try {
+      await updateSmsState.mutateAsync({
+        leadId: row.leadId,
+        brandCode: row.brandCode,
+        body: { isSmsLogged: nextValue },
+      });
+    } catch (error) {
+      updateRow(row.id, (currentRow) => ({
+        ...currentRow,
+        smsLogged: row.smsLogged,
+      }));
+      showErrorToast(error);
+    }
   };
 
   const openDrawer = (row: AgentSmsRow) => {
@@ -202,12 +334,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         render: (row) => (
           <SmsLogButton
             checked={row.smsLogged}
-            onToggle={() =>
-              updateRow(row.id, (currentRow) => ({
-                ...currentRow,
-                smsLogged: !currentRow.smsLogged,
-              }))
-            }
+            onToggle={() => toggleSmsLogged(row)}
           />
         ),
       },
@@ -226,7 +353,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     }));
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     if (!drawerState.draft) {
       return;
     }
@@ -243,14 +370,24 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
       smsLogged: drawerState.draft.smsLogged,
     };
 
-    setRows((current) =>
-      current.map((row) => (row.id === nextRow.id ? nextRow : row)),
-    );
-    showSuccessToast("SMS activity updated successfully.");
-    setDrawerState({
-      original: nextRow,
-      draft: nextRow,
-    });
+    try {
+      await updateSmsState.mutateAsync({
+        leadId: nextRow.leadId,
+        brandCode: nextRow.brandCode,
+        body: { isSmsLogged: nextRow.smsLogged },
+      });
+
+      setRows((current) =>
+        current.map((row) => (row.id === nextRow.id ? nextRow : row)),
+      );
+      showSuccessToast("SMS activity updated successfully.");
+      setDrawerState({
+        original: nextRow,
+        draft: nextRow,
+      });
+    } catch (error) {
+      showErrorToast(error);
+    }
   };
 
   return (
@@ -258,6 +395,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
       <Table
         data={rows}
         columns={columns}
+        isLoading={isLoading}
         title={`SMS - ${agentName}`}
         description="SMS activity and logs tied to assigned leads"
         emptyText="No SMS activity found for this agent."

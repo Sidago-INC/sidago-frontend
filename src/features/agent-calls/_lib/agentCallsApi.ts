@@ -32,8 +32,8 @@ export const agentCallsApi = {
   followUp: (agentSlug: string, leadId: string, followUpDate: string) =>
     api.patch("/agent-calls/follow-up", { agentSlug, leadId, followUpDate }),
 
-  markVoid: (agentSlug: string, leadId: string) =>
-    api.post("/agent-calls/mark-void", { agentSlug, leadId }),
+  markVoid: (agentSlug: string, leadId: string, notWorkAnymore = false) =>
+    api.post("/agent-calls/mark-void", { agentSlug, leadId, notWorkAnymore }),
 
   logResult: (body: LogResultBody) =>
     api.post("/agent-calls/log-result", body),

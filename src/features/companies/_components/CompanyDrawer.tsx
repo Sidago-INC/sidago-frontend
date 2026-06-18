@@ -11,12 +11,15 @@ import {
 import { COMPANY } from "@/types/company.types";
 import { TIMEZONE_OPTIONS } from "@/types/timezone.types";
 import { useEffect, useMemo, useState } from "react";
+import { useCompanyRevisionHistory } from "@/features/backoffice-shared/use-revision-history";
+import type { Activity } from "@/components/ui/ActivityTimeline";
 import { CountryPicker } from "./CountryPicker";
 
 type CompanyDrawerMode = "create" | "edit";
 
 type CompanyDrawerProps = {
   company: COMPANY;
+  companyId: string | null;
   initialCompany: COMPANY;
   isOpen: boolean;
   mode: CompanyDrawerMode;
@@ -37,6 +40,27 @@ const defaultHistoryLogs = `04/28/2026 - COMPANY PROFILE REVIEWED
 04/25/2026 - PRIMARY MARKET DETAILS VERIFIED
 04/18/2026 - COUNTRY AND REGIONAL DATA CONFIRMED`;
 
+function formatCompanyHistory(activity: Activity[]) {
+  return activity
+    .map((entry) => {
+      const changes = (entry.sections ?? [])
+        .flatMap((section) =>
+          section.items.map((item) =>
+            item.type === "badge"
+              ? `${section.title ?? "Changes"}: ${item.label}`
+              : null,
+          ),
+        )
+        .filter(Boolean)
+        .join(" | ");
+
+      return [entry.time.toUpperCase(), entry.actor.name, entry.action, changes]
+        .filter(Boolean)
+        .join(" - ");
+    })
+    .join("\n");
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -47,6 +71,7 @@ function escapeHtml(value: string) {
 
 export function CompanyDrawer({
   company,
+  companyId,
   initialCompany,
   isOpen,
   mode,
@@ -61,6 +86,7 @@ export function CompanyDrawer({
   onSave,
 }: CompanyDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const { data: revisionHistory = [] } = useCompanyRevisionHistory(companyId);
   const title = mode === "create" ? "Create Company" : "Edit Company";
   const subtitle =
     mode === "create"
@@ -68,13 +94,16 @@ export function CompanyDrawer({
       : `${initialCompany.name} (${initialCompany.symbol})`;
   const canNavigate = mode === "edit" && currentIndex >= 0 && rowCount > 0;
   const historyLogs = useMemo(() => {
+    const apiHistory = revisionHistory.length
+      ? formatCompanyHistory(revisionHistory)
+      : defaultHistoryLogs;
     const pendingCountryLog =
       company.country !== initialCompany.country
         ? `PENDING UPDATE - Country will change from ${initialCompany.country} to ${company.country} on save`
         : "";
 
-    return [defaultHistoryLogs, pendingCountryLog].filter(Boolean).join("\n");
-  }, [company.country, initialCompany.country]);
+    return [apiHistory, pendingCountryLog].filter(Boolean).join("\n");
+  }, [company.country, initialCompany.country, revisionHistory]);
 
   useEffect(() => {
     if (!copied) return;

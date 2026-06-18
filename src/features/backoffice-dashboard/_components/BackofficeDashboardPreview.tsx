@@ -4,6 +4,11 @@ import { Button, CompanySymbolBadge, StatusCard } from "@/components/ui";
 import { WinnerBadge } from "@/features/agent-dashboard/_components/WinnerBadge";
 import clsx from "clsx";
 import { ArrowRight } from "lucide-react";
+import {
+  flattenTodayWinnerStandings,
+  getPrimaryTodayWinner,
+  useTodayWinner,
+} from "@/features/leads-stats/_lib/hooks";
 import { backofficeLeaderboardAgents, todayWinner } from "../_lib/data";
 import { BackofficeAgentCard } from "./BackofficeAgentCard";
 
@@ -16,6 +21,32 @@ type BackofficeDashboardPreviewProps = {
 export function BackofficeDashboardPreview({
   onOpenMonthlyStats,
 }: BackofficeDashboardPreviewProps) {
+  const { data: winnerData } = useTodayWinner();
+  const primaryWinner = getPrimaryTodayWinner(winnerData);
+  const apiStandings = flattenTodayWinnerStandings(winnerData);
+
+  const displayWinner = primaryWinner
+    ? {
+        name: primaryWinner.fullName.split(" ")[0] ?? primaryWinner.fullName,
+        team: primaryWinner.brand.toUpperCase(),
+        callsToday: primaryWinner.callsMade,
+        hotLeadsToday: primaryWinner.hotLeads,
+        currentHotLeads: primaryWinner.hotLeads,
+      }
+    : todayWinner;
+
+  const agentCards =
+    apiStandings.length > 0
+      ? apiStandings.map((agent) => ({
+          id: agent.userId,
+          name: agent.fullName.split(" ")[0] ?? agent.fullName,
+          team: agent.brand.toUpperCase(),
+          callsToday: agent.callsMade,
+          hotLeadsToday: agent.hotLeads,
+          currentHotLeads: agent.hotLeads,
+        }))
+      : backofficeLeaderboardAgents;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
@@ -37,17 +68,17 @@ export function BackofficeDashboardPreview({
                 Today Winner
               </p>
               <div className="pt-1">
-                <CompanySymbolBadge symbol={todayWinner.team} index={0} />
+                <CompanySymbolBadge symbol={displayWinner.team} index={0} />
               </div>
             </div>
           </div>
         }
-        aside={<WinnerBadge label={todayWinner.name} />}
+        aside={<WinnerBadge label={displayWinner.name} />}
         metrics={[
           {
             id: "calls-today",
             label: "Calls Today",
-            value: todayWinner.callsToday,
+            value: displayWinner.callsToday,
             className: clsx("rounded-xl px-4 py-3", WINNER_CARD_TONE),
             valueClassName:
               "text-xl font-bold text-slate-900 dark:text-slate-100",
@@ -55,7 +86,7 @@ export function BackofficeDashboardPreview({
           {
             id: "hot-leads-today",
             label: "Hot Leads Today",
-            value: todayWinner.hotLeadsToday,
+            value: displayWinner.hotLeadsToday,
             className: clsx("rounded-xl px-4 py-3", WINNER_CARD_TONE),
             valueClassName:
               "text-xl font-bold text-slate-900 dark:text-slate-100",
@@ -63,7 +94,7 @@ export function BackofficeDashboardPreview({
           {
             id: "current-hot-leads",
             label: "Current Hot Leads",
-            value: todayWinner.currentHotLeads,
+            value: displayWinner.currentHotLeads,
             className: clsx("rounded-xl px-4 py-3", WINNER_CARD_TONE),
             valueClassName:
               "text-xl font-bold text-slate-900 dark:text-slate-100",
@@ -71,7 +102,7 @@ export function BackofficeDashboardPreview({
         ]}
       />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2 xxl:grid-cols-3">
-        {backofficeLeaderboardAgents.map((agent, index) => (
+        {agentCards.map((agent, index) => (
           <BackofficeAgentCard key={agent.id} agent={agent} index={index} />
         ))}
       </div>

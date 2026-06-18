@@ -3,58 +3,67 @@
 import { DateRangePicker, SimpleStatusCard } from "@/components/ui";
 import { Ban, CircleOff, Target, RefreshCcw, Wrench } from "lucide-react";
 import { type DateRange } from "react-day-picker";
-import { useState } from "react";
-
-const leadStats = [
-  {
-    id: "leads-fixed",
-    label: "Leads fixed",
-    value: 128,
-    icon: <Wrench size={18} />,
-    titleClassName: "text-emerald-700 dark:text-emerald-300",
-  },
-  {
-    id: "leads-sent-to-fix",
-    label: "Leads sent to fix",
-    value: 46,
-    icon: <RefreshCcw size={18} />,
-    titleClassName: "text-sky-700 dark:text-sky-300",
-  },
-  {
-    id: "leads-sent-to-cant-locate",
-    label: "Leads sent to can't locate",
-    value: 19,
-    icon: <Target size={18} />,
-    titleClassName: "text-amber-700 dark:text-amber-300",
-  },
-  {
-    id: "new-leads-created",
-    label: "New leads created",
-    value: 73,
-    icon: <Wrench size={18} />,
-    titleClassName: "text-violet-700 dark:text-violet-300",
-  },
-  {
-    id: "leads-sent-to-void",
-    label: "Leads sent to VOID",
-    value: 11,
-    icon: <Ban size={18} />,
-    titleClassName: "text-rose-700 dark:text-rose-300",
-  },
-  {
-    id: "leads-sent-to-dnc",
-    label: "Leads sent to DNC",
-    value: 8,
-    icon: <CircleOff size={18} />,
-    titleClassName: "text-slate-600 dark:text-slate-300",
-  },
-];
+import { useMemo, useState } from "react";
+import { useLeadStatsSummary } from "../_lib/hooks";
 
 export function LeadsStats() {
   const today = new Date();
   const [selectedRange, setSelectedRange] = useState<DateRange | undefined>({
     from: today,
+    to: today,
   });
+
+  const fromDate = selectedRange?.from ?? today;
+  const toDate = selectedRange?.to ?? selectedRange?.from ?? today;
+  const { data: stats, isLoading } = useLeadStatsSummary(fromDate, toDate);
+
+  const leadStats = useMemo(
+    () => [
+      {
+        id: "leads-fixed",
+        label: "Leads fixed",
+        value: stats?.leadsFixed ?? 0,
+        icon: <Wrench size={18} />,
+        titleClassName: "text-emerald-700 dark:text-emerald-300",
+      },
+      {
+        id: "leads-sent-to-fix",
+        label: "Leads sent to fix",
+        value: stats?.leadsSentToFix ?? 0,
+        icon: <RefreshCcw size={18} />,
+        titleClassName: "text-sky-700 dark:text-sky-300",
+      },
+      {
+        id: "leads-sent-to-cant-locate",
+        label: "Leads sent to can't locate",
+        value: stats?.leadsSentToCantLocate ?? 0,
+        icon: <Target size={18} />,
+        titleClassName: "text-amber-700 dark:text-amber-300",
+      },
+      {
+        id: "new-leads-created",
+        label: "New leads created",
+        value: stats?.newLeadsCreated ?? 0,
+        icon: <Wrench size={18} />,
+        titleClassName: "text-violet-700 dark:text-violet-300",
+      },
+      {
+        id: "leads-sent-to-void",
+        label: "Leads sent to VOID",
+        value: stats?.leadsSentToVoid ?? 0,
+        icon: <Ban size={18} />,
+        titleClassName: "text-rose-700 dark:text-rose-300",
+      },
+      {
+        id: "leads-sent-to-dnc",
+        label: "Leads sent to DNC",
+        value: stats?.leadsSentToDnc ?? 0,
+        icon: <CircleOff size={18} />,
+        titleClassName: "text-slate-600 dark:text-slate-300",
+      },
+    ],
+    [stats],
+  );
 
   return (
     <div className="mx-auto flex w-full flex-col gap-6 px-4 py-6 lg:px-6">
@@ -73,6 +82,7 @@ export function LeadsStats() {
                 setSelectedRange(
                   value ?? {
                     from: today,
+                    to: today,
                   },
                 )
               }
@@ -93,7 +103,7 @@ export function LeadsStats() {
                 <span>{item.label}</span>
               </span>
             }
-            value={item.value}
+            value={isLoading ? "—" : item.value}
             className="border-slate-200 dark:border-slate-800 dark:bg-slate-900"
             valueClassName="text-xl font-bold text-slate-900 dark:text-slate-100"
           />

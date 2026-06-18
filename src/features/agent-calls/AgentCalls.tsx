@@ -194,7 +194,11 @@ export function AgentCalls() {
     setForm((prev) => ({ ...prev, notWorkAnymore: value }));
     if (!value || !currentLead) return;
     try {
-      await agentCallsApi.markVoid(agentSlug, currentLead.leadId);
+      await agentCallsApi.markVoid(
+        agentSlug,
+        currentLead.leadId,
+        form.notWorkAnymore,
+      );
       const newLeads = leads.filter((_, i) => i !== currentIndex);
       setLeads(newLeads);
       setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
@@ -236,7 +240,9 @@ export function AgentCalls() {
         };
         setModal({
           title: "Dial Error",
-          message: (status && dialErrors[status]) ?? "Failed to place call",
+          message:
+            (status !== undefined ? dialErrors[status] : undefined) ??
+            "Failed to place call",
           direction: "top",
         });
         break;
