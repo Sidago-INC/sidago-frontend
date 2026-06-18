@@ -1,92 +1,275 @@
-
-
-import { useMemo, useState } from "react";
-import type { Lead } from "./_lib/data";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Info } from "lucide-react";
-import { CardShell, Modal } from "@/components/ui";
+import { CardShell, EmptyState, Modal } from "@/components/ui";
 import { AutoCallingBanner } from "./_components/AutoCallingBanner";
 import { CallNotesCard } from "./_components/CallNotesCard";
 import { CallOutcomeCard } from "./_components/CallOutcomeCard";
 import { CallsHeader } from "./_components/CallsHeader";
-import { contactTypeOptions, leadsByAgent, leadTypeOptions } from "./_lib/data";
 import { DatesCard } from "./_components/DatesCard";
 import { HistoryCard } from "./_components/HistoryCard";
 import { IdentityCard } from "./_components/IdentityCard";
 import { HeroCard } from "./_components/HeroCard";
 import { PhoneCard } from "./_components/PhoneCard";
-import { CallsModalState, createFormStateFromLead } from "@/types";
-import { getAgentKeyFromCookie } from "./_lib/utils";
-import { MessageSquare, NotebookText, Users } from "lucide-react";
 import { WorkToggleRow } from "./_components/WorkToggleRow";
-import { EmptyState } from "@/components/ui";
+import type { CallsFormState, CallsModalState } from "@/types";
+import { getAgentKeyFromCookie } from "./_lib/utils";
+import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
+import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
+import { MessageSquare, NotebookText, Users } from "lucide-react";
+
+const QUEUE_REFETCH_MS = 90_000;
+
+function emptyForm(): CallsFormState {
+  return {
+    email: "",
+    notes: "",
+    callBackDate: "",
+    leadType: "",
+    contactType: "",
+    notWorkAnymore: false,
+  };
+}
+
+function formFromDetail(d: LeadDetailResponse): CallsFormState {
+  return {
+    email: d.lead.email,
+    notes: d.history[0]?.notes ?? "",
+    callBackDate: d.brandState.followUpDate ?? "",
+    leadType: d.brandState.leadType,
+    contactType: d.lead.contactType,
+    notWorkAnymore: d.lead.notWorkAnymore,
+  };
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatNotesHistory(history: LeadDetailResponse["history"]): string {
+  return history
+    .filter((h) => h.notes)
+    .map((h) => [formatDate(h.calledAt), h.agentName, h.notes].filter(Boolean).join(" - "))
+    .join("\n");
+}
+
+function formatCallsHistory(history: LeadDetailResponse["history"]): string {
+  return history
+    .map((h) => [formatDate(h.calledAt), h.agentName, h.resultCode].filter(Boolean).join(" - "))
+    .join("\n");
+}
+
+function formatRelatedContacts(
+  contacts: LeadDetailResponse["relatedContacts"],
+): string {
+  return contacts
+    .map((c) => {
+      return [
+        c.role ? `${c.role}: ${c.fullName}` : c.fullName,
+        c.phone,
+        c.email,
+      ]
+        .filter(Boolean)
+        .join(", ");
+    })
+    .join("\n");
+}
+
+function errMessage(err: unknown): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const m = (err as { message: string | string[] }).message;
+    return Array.isArray(m) ? m.join(", ") : m;
+  }
+  return "An unexpected error occurred.";
+}
 
 export function AgentCalls() {
-  const [agentKey] = useState(() => getAgentKeyFromCookie());
-  const leads = useMemo<Lead[]>(
-    () => leadsByAgent[agentKey] ?? leadsByAgent.mariz,
-    [agentKey],
-  );
+  const [searchParams] = useSearchParams();
+  const agentSlug = searchParams.get("agent") ?? resolveAgentSlug(getAgentKeyFromCookie());
+  const [leads, setLeads] = useState<QueueLead[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [detail, setDetail] = useState<LeadDetailResponse | null>(null);
+  const [form, setForm] = useState<CallsFormState>(emptyForm());
   const [isAutoCalling, setIsAutoCalling] = useState(false);
+  const [testMode, setTestMode] = useState(false);
   const [modal, setModal] = useState<CallsModalState | null>(null);
-  const [form, setForm] = useState(() => createFormStateFromLead(leads[0]));
+  const [queueLoading, setQueueLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [outcomeLoading, setOutcomeLoading] = useState(false);
+  const stopAutoCallRef = useRef(false);
 
-  const currentLead = leads[currentIndex] ?? null;
-
-  const syncFormToLead = (index: number) => {
-    const lead = leads[index];
-    if (!lead) {
-      return;
-    }
-
-    setCurrentIndex(index);
-    setForm(createFormStateFromLead(lead));
-  };
-
-  const showModal = (
-    title: string,
-    message: string,
-    direction: CallsModalState["direction"] = "center",
-  ) => setModal({ title, message, direction });
-
-  const handleSkip = () => {
-    if (currentIndex < leads.length - 1) {
-      syncFormToLead(currentIndex + 1);
-      return;
-    }
-
-    showModal(
-      "End of List",
-      "You have reached the last lead in the list.",
-      "right",
-    );
-  };
-
-  const handleSave = () => {
-    showModal(
-      "Saved (POC)",
-      `Changes for "${currentLead?.full_name}" have been noted locally. No data was sent anywhere.`,
-      "bottom",
-    );
-  };
-
-  const handleOutcome = (action: string) => {
-    const messages: Record<string, string> = {
-      "No Answer": `Logged "No Answer" for ${currentLead?.full_name}.`,
-      Interested: `Logged "Interested" for ${currentLead?.full_name}.`,
-      "Bad Number": `Logged "Bad Number" for ${currentLead?.full_name}.`,
-      "Not Interested": `Logged "Not Interested" for ${currentLead?.full_name}.`,
-      "Left Message": `Logged "Left Message" for ${currentLead?.full_name}.`,
-      "Call Lead Back": `Logged "Call Lead Back" for ${currentLead?.full_name}.`,
-      "Interested Again": `Logged "Interested Again" for ${currentLead?.full_name}.`,
-      DNC: `Logged "Do Not Call" for ${currentLead?.full_name}.`,
+  // Queue: load on mount + refetch every 90s
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await agentCallsApi.queue(agentSlug);
+        if (cancelled) return;
+        setLeads(res.data);
+        setCurrentIndex((prev) =>
+          Math.min(prev, Math.max(res.data.length - 1, 0)),
+        );
+      } catch {
+        // Keep existing leads on refetch failure
+      } finally {
+        if (!cancelled) setQueueLoading(false);
+      }
     };
+    load();
+    const id = setInterval(load, QUEUE_REFETCH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [agentSlug]);
 
-    showModal(action, messages[action] ?? `Action "${action}" logged.`, "top");
+  const currentLead: QueueLead | null = leads[currentIndex] ?? null;
+
+  // Detail: load whenever the selected lead changes
+  useEffect(() => {
+    const leadId = currentLead?.leadId;
+    if (!leadId) return;
+    let cancelled = false;
+    setDetailLoading(true);
+    agentCallsApi
+      .detail(leadId, agentSlug)
+      .then((res) => {
+        if (cancelled) return;
+        setDetail(res);
+        setForm(formFromDetail(res));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setModal({ title: "Error", message: errMessage(err) });
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentLead?.leadId, agentSlug]);
+
+  const handleSelectLead = (index: number) => setCurrentIndex(index);
+
+  const handleSkip = async () => {
+    if (!currentLead) return;
+    try {
+      await agentCallsApi.skip(agentSlug, currentLead.leadId);
+      const newLeads = leads.filter((_, i) => i !== currentIndex);
+      setLeads(newLeads);
+      setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
+    } catch (err) {
+      setModal({ title: "Skip Failed", message: errMessage(err), direction: "right" });
+    }
   };
+
+  const handleOutcome = async (resultCode: string) => {
+    if (!currentLead || outcomeLoading) return;
+    setOutcomeLoading(true);
+    try {
+      await agentCallsApi.logResult({
+        agentSlug,
+        leadId: currentLead.leadId,
+        resultCode,
+        notes: form.notes || undefined,
+        followUpDate: form.callBackDate || undefined,
+        source: "manual",
+      });
+      const newLeads = leads.filter((_, i) => i !== currentIndex);
+      setLeads(newLeads);
+      setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
+    } catch (err) {
+      setModal({ title: "Error", message: errMessage(err), direction: "top" });
+    } finally {
+      setOutcomeLoading(false);
+    }
+  };
+
+  const handleMarkVoid = async (value: boolean) => {
+    setForm((prev) => ({ ...prev, notWorkAnymore: value }));
+    if (!value || !currentLead) return;
+    try {
+      await agentCallsApi.markVoid(
+        agentSlug,
+        currentLead.leadId,
+        form.notWorkAnymore,
+      );
+      const newLeads = leads.filter((_, i) => i !== currentIndex);
+      setLeads(newLeads);
+      setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
+    } catch (err) {
+      setForm((prev) => ({ ...prev, notWorkAnymore: false }));
+      setModal({ title: "Error", message: errMessage(err), direction: "bottom" });
+    }
+  };
+
+  const handleFollowUpDate = async (date: string) => {
+    setForm((prev) => ({ ...prev, callBackDate: date }));
+    if (!currentLead || !date) return;
+    try {
+      await agentCallsApi.followUp(agentSlug, currentLead.leadId, date);
+    } catch {
+      // Optimistic update — next detail fetch will resync
+    }
+  };
+
+  const handleDial = async () => {
+    if (leads.length === 0) return;
+    stopAutoCallRef.current = false;
+    setIsAutoCalling(true);
+
+    const snapshot = leads;
+    for (let i = currentIndex; i < snapshot.length; i++) {
+      if (stopAutoCallRef.current) break;
+      setCurrentIndex(i);
+      try {
+        const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
+        setTestMode(res.testMode);
+      } catch (err) {
+        const status = (err as { status?: number })?.status;
+        const dialErrors: Record<number, string> = {
+          404: "Lead not found",
+          412: "Dialer not configured for this agent",
+          422: "No phone number on file",
+          502: "Dialer unavailable, try again",
+        };
+        setModal({
+          title: "Dial Error",
+          message:
+            (status !== undefined ? dialErrors[status] : undefined) ??
+            "Failed to place call",
+          direction: "top",
+        });
+        break;
+      }
+    }
+
+    stopAutoCallRef.current = false;
+    setIsAutoCalling(false);
+  };
+
+  const handleStopAutoCalling = () => {
+    stopAutoCallRef.current = true;
+    setIsAutoCalling(false);
+  };
+
+  if (queueLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-slate-500 dark:text-gray-400">
+          Loading queue…
+        </p>
+      </div>
+    );
+  }
 
   if (!currentLead) {
-    return <EmptyState message="No leads found in this view." />;
+    return <EmptyState message="No leads in the queue right now." />;
   }
 
   return (
@@ -94,15 +277,16 @@ export function AgentCalls() {
       <CallsHeader
         leads={leads}
         currentIndex={currentIndex}
-        onSelectLead={syncFormToLead}
+        onSelectLead={handleSelectLead}
         onSkip={handleSkip}
       />
 
       <AutoCallingBanner
         isAutoCalling={isAutoCalling}
-        currentLead={currentLead}
-        onStart={() => setIsAutoCalling(true)}
-        onStop={() => setIsAutoCalling(false)}
+        testMode={testMode}
+        currentLeadName={currentLead.fullName}
+        onStart={handleDial}
+        onStop={handleStopAutoCalling}
       />
 
       <main className="mx-auto space-y-4 px-4 py-6">
@@ -110,29 +294,25 @@ export function AgentCalls() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-1">
-            <PhoneCard currentLead={currentLead} />
+            <PhoneCard phone={currentLead.phone} />
             <CardShell>
               <IdentityCard
                 form={form}
-                leadName={currentLead.full_name}
-                onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-                leadTypeOptions={leadTypeOptions}
-                contactTypeOptions={contactTypeOptions}
+                leadName={currentLead.fullName}
+                onChange={(patch) =>
+                  setForm((prev) => ({ ...prev, ...patch }))
+                }
               />
               <WorkToggleRow
                 value={form.notWorkAnymore}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, notWorkAnymore: value }))
-                }
+                onChange={handleMarkVoid}
               />
             </CardShell>
             <DatesCard
               callBackDate={form.callBackDate}
-              lastCalledDate={currentLead.last_called_date_sidago}
-              lastFixedDate={currentLead.last_fixed_date}
-              onChangeCallBackDate={(value) =>
-                setForm((prev) => ({ ...prev, callBackDate: value }))
-              }
+              lastCalledDate={detail?.brandState.lastCalledDate ?? ""}
+              lastFixedDate={detail?.brandState.lastFixedDate ?? ""}
+              onChangeCallBackDate={handleFollowUpDate}
             />
           </div>
 
@@ -142,24 +322,29 @@ export function AgentCalls() {
               onChange={(value) =>
                 setForm((prev) => ({ ...prev, notes: value }))
               }
-              onSave={handleSave}
+              onSave={() => {}}
             />
-            <CallOutcomeCard onSelect={handleOutcome} />
+            <CallOutcomeCard
+              onSelect={handleOutcome}
+              disabled={outcomeLoading || detailLoading}
+            />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <HistoryCard
                 title="Notes History"
-                value={currentLead.history_call_notes_sidago}
+                value={detail ? formatNotesHistory(detail.history) : ""}
                 icon={NotebookText}
               />
               <HistoryCard
                 title="Calls History"
-                value={currentLead.history_calls_sidago}
+                value={detail ? formatCallsHistory(detail.history) : ""}
                 icon={MessageSquare}
               />
               <HistoryCard
                 title="Other Contacts"
-                value={currentLead.other_contacts}
+                value={
+                  detail ? formatRelatedContacts(detail.relatedContacts) : ""
+                }
                 icon={Users}
                 className="sm:col-span-2"
               />

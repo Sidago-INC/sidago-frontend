@@ -14,18 +14,15 @@ import {
   getCompanySymbolOptions,
   getLeadId,
   getLeadIdOptions,
-  leadsData,
   type LeadDirectoryRow,
 } from "../_lib/data";
-import { getStoredLeads } from "../_lib/storage";
+import { useLeadsDirectory } from "../_lib/hooks";
 
 export function Leads() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
-  const [rows] = useState<LeadDirectoryRow[]>(() => getStoredLeads());
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
-    findDrawerRouteIndex(leadsData, selectedLead),
-  );
+  const { data: rows = [], isLoading } = useLeadsDirectory();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setSelectedIndex(findDrawerRouteIndex(rows, selectedLead));
@@ -121,6 +118,7 @@ export function Leads() {
       <Table
         data={rows}
         columns={columns}
+        isLoading={isLoading}
         title="Leads"
         description="All lead records across SVG, Benton, and 95RM"
         onRowClick={(row) => {

@@ -12,8 +12,12 @@ import {
   TypeBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import { showSuccessToast } from "@/lib/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import Revisions from "@/features/backoffice-shared/Revisions";
+import {
+  useUpdateLead,
+  type LeadPatchBody,
+} from "@/features/backoffice-shared/use-update-lead";
 import { AGENT_VALUES } from "@/types/agent.types";
 import { COMPANY_VALUES } from "@/types/company.types";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
@@ -161,6 +165,7 @@ export function LeadsDrawer({
     key: string;
     value: EditableDrawerState;
   } | null>(null);
+  const updateLead = useUpdateLead();
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.email ?? "";
@@ -257,9 +262,79 @@ export function LeadsDrawer({
   };
 
   const handleReset = () => setFormState(null);
-  const handleSave = () => {
-    showSuccessToast("Lead changes saved successfully.");
-    setEditModeKey(null);
+  const handleSave = async () => {
+    if (!row || !form || !initialForm) return;
+
+    if (!row.leadId) {
+      showErrorToast(new Error("Cannot save: this row has no leadId."));
+      return;
+    }
+
+    const body: LeadPatchBody = {};
+    const leadDiff: NonNullable<LeadPatchBody["lead"]> = {};
+
+    if (form.fullName !== initialForm.fullName) leadDiff.full_name = form.fullName;
+    if (form.email !== initialForm.email) leadDiff.email = form.email;
+    if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
+    if (form.role !== initialForm.role) leadDiff.role = form.role;
+    if (form.contactType !== initialForm.contactType) {
+      leadDiff.contact_type = form.contactType;
+    }
+    if (form.notWorked !== initialForm.notWorked) {
+      leadDiff.not_work_anymore = form.notWorked;
+    }
+    if (form.companyName !== initialForm.companyName) {
+      leadDiff.company_name = form.companyName;
+    }
+
+    if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
+
+    const brandStates: NonNullable<LeadPatchBody["brandStates"]> = {};
+
+    if (form.svgLeadType !== initialForm.svgLeadType) {
+      brandStates.svg = { lead_type: form.svgLeadType };
+    }
+    if (form.bentonLeadType !== initialForm.bentonLeadType) {
+      brandStates.benton = { lead_type: form.bentonLeadType };
+    }
+    if (form.rm95LeadType !== initialForm.rm95LeadType) {
+      brandStates["95rm"] = { lead_type: form.rm95LeadType };
+    }
+    if (form.svgToBeCalledBy !== initialForm.svgToBeCalledBy) {
+      brandStates.svg = {
+        ...brandStates.svg,
+        to_be_called_by: form.svgToBeCalledBy || null,
+      };
+    }
+    if (form.bentonToBeCalledBy !== initialForm.bentonToBeCalledBy) {
+      brandStates.benton = {
+        ...brandStates.benton,
+        to_be_called_by: form.bentonToBeCalledBy || null,
+      };
+    }
+    if (form.rm95ToBeCalledBy !== initialForm.rm95ToBeCalledBy) {
+      brandStates["95rm"] = {
+        ...brandStates["95rm"],
+        to_be_called_by: form.rm95ToBeCalledBy || null,
+      };
+    }
+
+    if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
+
+    if (!body.lead && !body.brandStates) {
+      showSuccessToast("No changes to save.");
+      setEditModeKey(null);
+      return;
+    }
+
+    try {
+      await updateLead.mutateAsync({ leadId: row.leadId, body });
+      showSuccessToast("Lead changes saved successfully.");
+      setEditModeKey(null);
+      setFormState(null);
+    } catch (error) {
+      showErrorToast(error);
+    }
   };
   const handleCopyUrl = async () => {
     if (!drawerUrl) return;
@@ -378,7 +453,7 @@ export function LeadsDrawer({
             onSave={handleSave}
           />
         ) : (
-          <Revisions />
+          <Revisions leadId={row.leadId} />
         )
       }
     >

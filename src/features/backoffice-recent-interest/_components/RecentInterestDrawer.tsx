@@ -321,7 +321,7 @@ export function RecentInterestDrawer({
             onSave={handleSave}
           />
         ) : (
-          <Revisions />
+          <Revisions leadId={row?.leadId} />
         )
       }
     >

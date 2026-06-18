@@ -12,11 +12,13 @@ import {
   Textarea,
 } from "@/components/ui";
 import { useAuth } from "@/providers/AuthProvider";
-import { showSuccessToast } from "@/lib/toast";
-import { getStoredLeads } from "@/features/leads/_lib/storage";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
-import { users } from "@/lib/mocks/users";
-import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
+import { useLeadOptions, useAllAgents } from "@/features/level-2-update/_lib/hooks";
+import {
+  campaignLabelToBrandCode,
+  useCreateManualUpdate,
+} from "./_lib/hooks";
 
 type FormValues = {
   lead: string;
@@ -52,21 +54,14 @@ function createInitialValues(agentName: string): FormValues {
   };
 }
 
-function getLeadLabel(row: LeadDirectoryRow) {
-  const companyName = row.companyName || "Unknown Company";
-  const fullName = row.fullName || "Unnamed Lead";
-  const leadId = row.leadId || row.lead || row.email || "No ID";
-
-  return `${fullName} • ${companyName} • ${leadId}`;
-}
-
 export function LeadManualUpdateForm() {
   const { user } = useAuth();
+  const createManualUpdate = useCreateManualUpdate();
+  const { data: leadRows = [], isLoading: leadsLoading } = useLeadOptions();
+  const { data: agents = [], isLoading: agentsLoading } = useAllAgents();
 
   const isAdmin = user?.role === "admin";
   const currentAgentName = user?.name?.trim() || "Current Agent";
-
-  const leadRows = useMemo<LeadDirectoryRow[]>(() => getStoredLeads(), []);
 
   const [form, setForm] = useState<FormValues>(() => createInitialValues(""));
 
@@ -76,9 +71,9 @@ export function LeadManualUpdateForm() {
 
   const leadOptions = useMemo(
     () =>
-      leadRows.map((row, index) => ({
-        label: getLeadLabel(row),
-        value: row.leadId || row.lead || row.email || String(index),
+      leadRows.map((row) => ({
+        label: row.label || row.fullName || row.id,
+        value: row.id,
       })),
     [leadRows],
   );
@@ -93,13 +88,11 @@ export function LeadManualUpdateForm() {
   );
 
   const agentOptions = useMemo(() => {
-    return users
-      .filter((candidate) => candidate.role === "agent")
-      .map((agent) => ({
-        label: `${agent.name} ${agent.surname ?? ""}`.trim(),
-        value: `${agent.name} ${agent.surname ?? ""}`.trim(),
-      }));
-  }, []);
+    return agents.map((agent) => ({
+      label: agent.name,
+      value: agent.name,
+    }));
+  }, [agents]);
 
   const updateField = <K extends keyof FormValues>(
     field: K,
@@ -112,12 +105,38 @@ export function LeadManualUpdateForm() {
     setForm(createInitialValues(isAdmin ? currentAgentName : ""));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    showSuccessToast(
-      "Lead manual update submitted locally. This is a dummy action.",
+    if (!form.lead || !form.resultUpdate) {
+      showErrorToast(new Error("Lead and result update are required."));
+      return;
+    }
+
+    const selectedAgent = agents.find(
+      (agent) => agent.name === (isAdmin ? form.agent : currentAgentName),
     );
+    const agentId = selectedAgent?.id ?? user?.id;
+
+    if (!agentId) {
+      showErrorToast(new Error("Unable to resolve agent for this update."));
+      return;
+    }
+
+    try {
+      await createManualUpdate.mutateAsync({
+        leadId: form.lead,
+        agentId,
+        brandCode: campaignLabelToBrandCode(campaignTypeValue),
+        resultCode: form.resultUpdate,
+        notes: form.notes.trim() || undefined,
+        followUpDate: form.toBeCalledOn || undefined,
+      });
+      showSuccessToast("Lead manual update submitted successfully.");
+      setForm(createInitialValues(isAdmin ? currentAgentName : ""));
+    } catch (error) {
+      showErrorToast(error);
+    }
   };
 
   return (
@@ -143,11 +162,12 @@ export function LeadManualUpdateForm() {
                 label="Lead"
                 value={form.lead}
                 options={leadOptions}
-                placeholder="Select lead"
+                placeholder={leadsLoading ? "Loading leads..." : "Select lead"}
                 searchable
                 searchPlaceholder="Search lead"
                 onChange={(value) => updateField("lead", String(value))}
                 className={selectClassName}
+                disabled={leadsLoading || createManualUpdate.isPending}
               />
               <Select
                 label="Result Update"
@@ -171,9 +191,10 @@ export function LeadManualUpdateForm() {
                   label="Agent"
                   value={agentFieldValue}
                   options={agentOptions}
-                  placeholder="Select agent"
+                  placeholder={agentsLoading ? "Loading agents..." : "Select agent"}
                   onChange={(value) => updateField("agent", String(value))}
                   className={selectClassName}
+                  disabled={agentsLoading || createManualUpdate.isPending}
                 />
               ) : (
                 <TextInput
@@ -231,9 +252,10 @@ export function LeadManualUpdateForm() {
               </Button>
               <Button
                 type="submit"
+                disabled={createManualUpdate.isPending}
                 className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
               >
-                Save
+                {createManualUpdate.isPending ? "Saving..." : "Save"}
               </Button>
             </div>
           </form>

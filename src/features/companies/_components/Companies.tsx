@@ -309,6 +309,7 @@ export function Companies() {
 
       <CompanyDrawer
         company={drawerState.draft}
+        companyId={drawerState.originalCompanyId}
         initialCompany={drawerState.initialCompany}
         isOpen={drawerState.isOpen}
         mode="edit"

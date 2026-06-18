@@ -2,9 +2,9 @@
 
 import { EmailPriorityBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import { showSuccessToast } from "@/lib/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AgentEmailDrawer } from "./AgentEmailDrawer";
 import {
   AgentEmailBooleanEditor,
@@ -17,8 +17,13 @@ import {
 import {
   type AgentEmailRow,
   emailPriorityOptions,
-  getEmailRowsForAgent,
+  mapEmailQueueItem,
 } from "../_lib/data";
+import {
+  useEmailHistory,
+  useEmailQueue,
+  useUpdateEmailState,
+} from "../_lib/hooks";
 
 type AgentEmailProps = {
   agentName: string;
@@ -29,6 +34,42 @@ type DrawerState = {
   original: AgentEmailRow | null;
   draft: AgentEmailRow | null;
 };
+
+function formatHistoryDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatEmailHistory(
+  history: Array<{
+    sentAt: string;
+    userName: string | null;
+    status: string | null;
+    subject: string | null;
+    body: string | null;
+  }>,
+) {
+  return history
+    .map((entry) =>
+      [
+        formatHistoryDate(entry.sentAt),
+        entry.userName,
+        entry.status,
+        entry.subject || entry.body,
+      ]
+        .filter(Boolean)
+        .join(" - "),
+    )
+    .join("\n");
+}
 
 function LeadButton({
   leadId,
@@ -53,27 +94,94 @@ function LeadButton({
 
 export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
   const [searchParams] = useSearchParams();
-  const [rows, setRows] = useState<AgentEmailRow[]>(() =>
-    getEmailRowsForAgent(agentSlug),
+  const { data: queueData, isLoading } = useEmailQueue(agentSlug);
+  const updateEmailState = useUpdateEmailState();
+  const apiRows = useMemo(
+    () =>
+      (queueData?.data ?? []).map((item) =>
+        mapEmailQueueItem(item, queueData?.brandCode ?? "svg"),
+      ),
+    [queueData],
   );
+  const [rows, setRows] = useState<AgentEmailRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
-  const [drawerState, setDrawerState] = useState<DrawerState>(() => {
-    const initialRows = getEmailRowsForAgent(agentSlug);
+  const [drawerState, setDrawerState] = useState<DrawerState>({
+    original: null,
+    draft: null,
+  });
+  const activeHistoryRow = drawerState.draft ?? drawerState.original;
+  const { data: emailHistory = [] } = useEmailHistory(
+    activeHistoryRow?.leadId,
+    activeHistoryRow?.brandCode,
+  );
+
+  useEffect(() => {
+    setRows(apiRows);
+  }, [apiRows]);
+
+  useEffect(() => {
     const leadParam = searchParams.get("lead");
-    const row = initialRows.find(
+    if (!leadParam || apiRows.length === 0) {
+      return;
+    }
+
+    const row = apiRows.find(
       (item) =>
         item.leadId === leadParam ||
         item.email === leadParam ||
         item.id === leadParam,
     );
 
-    return row
-      ? { original: { ...row }, draft: { ...row } }
-      : {
-          original: null,
-          draft: null,
-        };
-  });
+    if (row) {
+      setDrawerState({ original: { ...row }, draft: { ...row } });
+    }
+  }, [apiRows, searchParams]);
+
+  useEffect(() => {
+    if (!activeHistoryRow || emailHistory.length === 0) {
+      return;
+    }
+
+    const formattedHistory = formatEmailHistory(emailHistory);
+    if (!formattedHistory.trim()) {
+      return;
+    }
+
+    setRows((currentRows) =>
+      currentRows.map((row) =>
+        row.id === activeHistoryRow.id && row.history !== formattedHistory
+          ? { ...row, history: formattedHistory }
+          : row,
+      ),
+    );
+
+    setDrawerState((current) => {
+      if (!current.draft || current.draft.id !== activeHistoryRow.id) {
+        return current;
+      }
+
+      const nextOriginal = current.original
+        ? { ...current.original, history: formattedHistory }
+        : current.original;
+
+      const nextDraft =
+        current.draft.history.trim().length === 0
+          ? { ...current.draft, history: formattedHistory }
+          : current.draft;
+
+      if (
+        nextOriginal?.history === current.original?.history &&
+        nextDraft.history === current.draft.history
+      ) {
+        return current;
+      }
+
+      return {
+        original: nextOriginal,
+        draft: nextDraft,
+      };
+    });
+  }, [activeHistoryRow, emailHistory]);
 
   const updateRow = (
     rowId: string,
@@ -262,7 +370,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     }));
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     if (!drawerState.draft) {
       return;
     }
@@ -279,14 +387,27 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       selectedOutcome: drawerState.draft.selectedOutcome.trim(),
     };
 
-    setRows((current) =>
-      current.map((row) => (row.id === nextRow.id ? nextRow : row)),
-    );
-    showSuccessToast("Email queue entry updated successfully.");
-    setDrawerState({
-      original: nextRow,
-      draft: nextRow,
-    });
+    try {
+      await updateEmailState.mutateAsync({
+        leadId: nextRow.leadId,
+        brandCode: nextRow.brandCode,
+        body: {
+          isEmailLogged: nextRow.checkToLog,
+          isMissingDeadEmail: nextRow.missingDeadEmail,
+        },
+      });
+
+      setRows((current) =>
+        current.map((row) => (row.id === nextRow.id ? nextRow : row)),
+      );
+      showSuccessToast("Email queue entry updated successfully.");
+      setDrawerState({
+        original: nextRow,
+        draft: nextRow,
+      });
+    } catch (error) {
+      showErrorToast(error);
+    }
   };
 
   return (
@@ -294,6 +415,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       <Table
         data={rows}
         columns={columns}
+        isLoading={isLoading}
         title={`Email - ${agentName}`}
         description="Prioritized emails to be sent by agent"
         emptyText="No emails are queued for this agent."

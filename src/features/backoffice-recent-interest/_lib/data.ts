@@ -1,6 +1,7 @@
 import { generateRecentInterestRows } from "@/features/backoffice-shared/lead-mapper";
 
 export type RecentInterestRow = {
+  leadId?: string;
   followUpDate: string;
   followUpDateCleaned: string;
   lead: string;

@@ -1,16 +1,16 @@
-import type { Lead } from "../_lib/data";
+import type { QueueLead } from "../_lib/apiTypes";
 import { TypeBadge, TimezoneBadge } from "@/components/ui";
 import { Building2, BriefcaseBusiness, Phone } from "lucide-react";
 import { LeadStatBox } from "./LeadStatBox";
 
-export function HeroCard({ currentLead }: { currentLead: Lead }) {
+export function HeroCard({ currentLead }: { currentLead: QueueLead }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white/60 dark:bg-white/10 dark:border-gray-700">
       <div className="flex flex-col gap-4 p-5 sm:p-6">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3 sm:items-center">
             <h1 className="min-w-0 text-2xl font-bold leading-tight text-slate-800 dark:text-gray-100">
-              {currentLead.lead_id}
+              {currentLead.leadIdExternal}
             </h1>
 
             <a
@@ -23,7 +23,7 @@ export function HeroCard({ currentLead }: { currentLead: Lead }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <TypeBadge value={currentLead.contact_type} kind="contact" />
+            <TypeBadge value={currentLead.contactType} kind="contact" />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -34,7 +34,7 @@ export function HeroCard({ currentLead }: { currentLead: Lead }) {
             <LeadStatBox
               icon={Building2}
               label="Company"
-              value={currentLead.company_name}
+              value={currentLead.companyName}
             />
             <LeadStatBox
               icon={BriefcaseBusiness}

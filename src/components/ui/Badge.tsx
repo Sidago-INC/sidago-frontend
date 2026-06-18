@@ -91,8 +91,8 @@ function badgeClassName(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
-function normalizeBadgeValue(value: string) {
-  return value.trim().toLowerCase();
+function normalizeBadgeValue(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
 }
 
 export const StatusBadge = ({ status }: { status: string }) => {
@@ -146,23 +146,33 @@ export const TypeBadge = ({
   kind,
   className,
 }: {
-  value: string;
+  value: string | null | undefined;
   kind: "lead" | "contact";
   className?: string;
 }) => {
+  const trimmedValue = value?.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
   const styles = kind === "lead" ? LEAD_TYPE_STYLES : CONTACT_TYPE_STYLES;
-  const styleKey = kind === "lead" ? value : normalizeBadgeValue(value);
+  const styleKey =
+    kind === "lead" ? trimmedValue : normalizeBadgeValue(trimmedValue);
+  const tone =
+    styleKey != null
+      ? styles[styleKey as keyof typeof styles]
+      : undefined;
 
   return (
     <span
       className={badgeClassName(
         "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
-        styles[styleKey] ??
+        tone ??
           "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
-        className,
-      )}
+      className,
+    )}
     >
-      {value}
+      {trimmedValue}
     </span>
   );
 };
@@ -197,7 +207,12 @@ export const TimezoneBadge = ({
   index?: number;
   className?: string;
 }) => {
-  const normalizedTimezone = timezone.toUpperCase();
+  const trimmedTimezone = timezone.trim();
+  if (!trimmedTimezone) {
+    return null;
+  }
+
+  const normalizedTimezone = trimmedTimezone.toUpperCase();
   const label =
     typeof index === "number"
       ? `${index + 1}-${normalizedTimezone}`

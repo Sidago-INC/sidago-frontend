@@ -1,9 +1,5 @@
-import {
-  getCompanySymbol,
-  getLeadId,
-} from "@/features/backoffice-shared/constants";
-import { generateHotLeadRows } from "@/features/backoffice-shared/lead-mapper";
-import type { HotLeadRow } from "@/features/backoffice-shared/types";
+import { getCompanySymbol } from "@/features/backoffice-shared/constants";
+import type { EmailQueueItem } from "./apiTypes";
 
 export const EMAIL_PRIORITY_VALUES = [
   "1st",
@@ -38,55 +34,50 @@ export type AgentEmailRow = {
   checkToLog: boolean;
   missingDeadEmail: boolean;
   additionalEmails: string;
+  brandCode: string;
 };
 
-const histories = [
-  "Intro email queued after recent interest.",
-  "Follow-up email drafted after call attempt.",
-  "Reactivation email scheduled for this week.",
-  "Manual review requested before sending.",
-  "Previous email opened, no reply yet.",
-];
-
-function buildAdditionalEmails(email: string, index: number) {
-  const [name, domain] = email.split("@");
-  return `${name}+alt${index + 1}@${domain}`;
+function toEmailPriority(value: string | null): EmailPriority {
+  const normalized = (value ?? "1st").trim();
+  if (EMAIL_PRIORITY_VALUES.includes(normalized as EmailPriority)) {
+    return normalized as EmailPriority;
+  }
+  return "1st";
 }
 
-function getCallbackDate(lead: HotLeadRow) {
-  return (
-    lead.svgLastCallDate ||
-    lead.bentonLastCallDate ||
-    lead.rm95LastCallDate ||
-    ""
-  );
-}
+export function mapEmailQueueItem(
+  item: EmailQueueItem,
+  brandCode: string,
+): AgentEmailRow {
+  const companySymbol =
+    item.companySymbol ?? getCompanySymbol(item.companyName ?? "");
+  const displayLeadId = item.leadIdExternal ?? item.leadId;
 
-export function getEmailRowsForAgent(agentSlug: string): AgentEmailRow[] {
-  return generateHotLeadRows(12).map((lead, index) => ({
-    id: `${agentSlug}-email-${index + 1}`,
-    lead: lead.lead,
-    leadId: getLeadId(lead),
-    companyName: lead.companyName,
-    companySymbol: getCompanySymbol(lead.companyName),
-    fullName: lead.fullName,
-    phone: lead.phone,
-    email: lead.email,
-    timezone: lead.timezone,
-    contactType: lead.contactType,
-    bentonLeadType: lead.bentonLeadType,
-    callBackDate: getCallbackDate(lead),
-    lastActionDate: lead.lastActionDate,
+  return {
+    id: item.id,
+    lead: displayLeadId,
+    leadId: item.leadId,
+    companyName: item.companyName ?? "",
+    companySymbol,
+    fullName: item.fullName ?? "",
+    phone: item.phone ?? "",
+    email: item.email ?? "",
+    timezone: item.timezone ?? "",
+    contactType: item.contactType ?? "",
+    bentonLeadType: item.leadType ?? "",
+    callBackDate: item.callBackDate ?? "",
+    lastActionDate: item.lastCalledDate ?? "",
     notes: "",
-    additionalContacts: buildAdditionalEmails(lead.email, index),
+    additionalContacts: "",
     selectedOutcome: "",
-    notWorked: Boolean(lead.notWorked),
-    emailToBeSent: EMAIL_PRIORITY_VALUES[index % EMAIL_PRIORITY_VALUES.length],
-    history: histories[index % histories.length],
-    checkToLog: index % 2 === 0,
-    missingDeadEmail: index % 5 === 0,
-    additionalEmails: buildAdditionalEmails(lead.email, index),
-  }));
+    notWorked: item.notWorkAnymore,
+    emailToBeSent: toEmailPriority(item.emailStatus),
+    history: "",
+    checkToLog: item.isEmailLogged,
+    missingDeadEmail: item.isMissingDeadEmail,
+    additionalEmails: "",
+    brandCode,
+  };
 }
 
 export const emailPriorityOptions = EMAIL_PRIORITY_VALUES.map((value) => ({

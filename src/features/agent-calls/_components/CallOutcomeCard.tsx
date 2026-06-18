@@ -1,6 +1,7 @@
 import {
   Ban,
   Clock3,
+  FileCheck2,
   MessageCircleWarning,
   MessageSquareText,
   PhoneCall,
@@ -59,12 +60,20 @@ const outcomes = [
     icon: Ban,
     className: "bg-slate-700 text-white hover:bg-slate-600 cursor-pointer",
   },
+  {
+    label: "Contract Closed",
+    icon: FileCheck2,
+    className:
+      "bg-violet-600 text-white shadow-sm shadow-violet-200 hover:bg-violet-500 dark:shadow-violet-900/40 cursor-pointer",
+  },
 ];
 
 export function CallOutcomeCard({
   onSelect,
+  disabled = false,
 }: {
   onSelect: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <CardShell>
@@ -77,6 +86,7 @@ export function CallOutcomeCard({
             icon={outcome.icon}
             onClick={() => onSelect(outcome.label)}
             className={outcome.className}
+            disabled={disabled}
           />
         ))}
       </div>

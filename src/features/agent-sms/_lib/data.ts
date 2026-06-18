@@ -1,9 +1,5 @@
-import {
-  getCompanySymbol,
-  getLeadId,
-} from "@/features/backoffice-shared/constants";
-import { generateHotLeadRows } from "@/features/backoffice-shared/lead-mapper";
-import type { HotLeadRow } from "@/features/backoffice-shared/types";
+import { getCompanySymbol } from "@/features/backoffice-shared/constants";
+import type { SmsQueueItem } from "./apiTypes";
 
 export type SmsBrand = "Sidago" | "Benton" | "95RM";
 export const SMS_STATUS_VALUES = [
@@ -41,6 +37,7 @@ export type AgentSmsRow = {
   brand: SmsBrand;
   phone: string;
   email: string;
+  brandCode: string;
 };
 
 export const smsAgentProfiles: Record<
@@ -53,51 +50,45 @@ export const smsAgentProfiles: Record<
   "chris-moore": { agentName: "Chris Moore", brand: "95RM" },
 };
 
-function getSmsLog(brand: SmsBrand, index: number) {
-  const label = `${brand} SMS Log`;
-  const day = String(index + 10).padStart(2, "0");
-
-  return `${label}: 04/${day}/2026 - Message ${
-    index % 2 === 0 ? "sent" : "reviewed"
-  } for lead follow-up.`;
+function toSmsStatus(value: string | null): SmsStatus {
+  const normalized = (value ?? "Queued").trim();
+  if (SMS_STATUS_VALUES.includes(normalized as SmsStatus)) {
+    return normalized as SmsStatus;
+  }
+  return "Queued";
 }
 
-function getCallbackDate(lead: HotLeadRow) {
-  return (
-    lead.svgLastCallDate ||
-    lead.bentonLastCallDate ||
-    lead.rm95LastCallDate ||
-    ""
-  );
-}
+export function mapSmsQueueItem(
+  item: SmsQueueItem,
+  brandCode: string,
+  brand: SmsBrand,
+): AgentSmsRow {
+  const companySymbol =
+    item.companySymbol ?? getCompanySymbol(item.companyName ?? "");
+  const displayLeadId = item.leadIdExternal ?? item.leadId;
 
-export function getSmsRowsForAgent(agentSlug: string): AgentSmsRow[] {
-  const profile = smsAgentProfiles[agentSlug] ?? {
-    agentName: agentSlug,
-    brand: "Sidago" as SmsBrand,
-  };
-
-  return generateHotLeadRows(12).map((lead, index) => ({
-    id: `${agentSlug}-sms-${index + 1}`,
-    lead: lead.lead,
-    leadId: getLeadId(lead),
-    companyName: lead.companyName,
-    companySymbol: getCompanySymbol(lead.companyName),
-    fullName: lead.fullName,
-    timezone: lead.timezone,
-    contactType: lead.contactType,
-    bentonLeadType: lead.bentonLeadType,
-    callBackDate: getCallbackDate(lead),
-    lastActionDate: lead.lastActionDate,
+  return {
+    id: item.id,
+    lead: displayLeadId,
+    leadId: item.leadId,
+    companyName: item.companyName ?? "",
+    companySymbol,
+    fullName: item.fullName ?? "",
+    timezone: item.timezone ?? "",
+    contactType: item.contactType ?? "",
+    bentonLeadType: item.leadType ?? "",
+    callBackDate: item.callBackDate ?? "",
+    lastActionDate: item.lastCalledDate ?? "",
     notes: "",
     additionalContacts: "",
     selectedOutcome: "",
-    notWorked: Boolean(lead.notWorked),
-    smsStatus: SMS_STATUS_VALUES[index % SMS_STATUS_VALUES.length],
-    smsLogged: index % 3 !== 0,
-    smsLog: getSmsLog(profile.brand, index),
-    brand: profile.brand,
-    phone: lead.phone,
-    email: lead.email,
-  }));
+    notWorked: item.notWorkAnymore,
+    smsStatus: toSmsStatus(item.smsStatus),
+    smsLogged: item.isSmsLogged,
+    smsLog: "",
+    brand,
+    phone: item.phone ?? "",
+    email: item.email ?? "",
+    brandCode,
+  };
 }

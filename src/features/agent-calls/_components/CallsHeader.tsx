@@ -1,13 +1,13 @@
 
 
 import { Button } from "@/components/ui";
-import type { Lead } from "../_lib/data";
+import type { QueueLead } from "../_lib/apiTypes";
 import { SkipForward } from "lucide-react";
 import { CallsLogo } from "./CallsLogo";
 import { LeadSelector } from "./LeadSelector";
 
 type Props = {
-  leads: Lead[];
+  leads: QueueLead[];
   currentIndex: number;
   onSelectLead: (value: number) => void;
   onSkip: () => void;

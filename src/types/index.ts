@@ -4,4 +4,3 @@
 
 export type { AirtableAgent, Agent } from "./agent.types";
 export type { CallsFormState, CallsModalState } from "./form.types";
-export { createFormStateFromLead } from "./form.types";

@@ -92,8 +92,7 @@ export function EmailBlocklistDirectory() {
     () => [
       {
         title: "Lead ID",
-        key: "leadIdExternal",
-        getValue: getEmailBlacklistDisplayLeadId,
+        key: "leadId",
       },
       { title: "Company", key: "companyName" },
       { title: "Full Name", key: "fullName" },
