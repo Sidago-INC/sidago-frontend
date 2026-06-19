@@ -71,6 +71,7 @@ export function leadToRecentInterestRow(
   lead: LEAD,
   index: number,
 ): {
+  leadId?: string;
   followUpDate: string;
   followUpDateCleaned: string;
   lead: string;
@@ -88,6 +89,7 @@ export function leadToRecentInterestRow(
 } {
   const followUpIso = lead.follow_up_date ?? lead.next_follow_up_date_sidago;
   return {
+    leadId: typeof lead.id === "string" ? lead.id : undefined,
     followUpDate: isoToFollowUpLabel(followUpIso),
     followUpDateCleaned: isoToDate(followUpIso),
     lead: lead.lead_type ?? "",
