@@ -13,6 +13,7 @@ import {
   showInfoToast,
   showSuccessToast,
 } from "@/lib/toast";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -58,6 +59,7 @@ export function DeadMissingEmail() {
       {
         title: "Lead ID",
         key: "leadId",
+        getValue: (row) => getLeadGridLabel(row),
       },
       { title: "Company", key: "companyName" },
       { title: "Full Name", key: "fullName" },

@@ -3,6 +3,7 @@ import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { Badge, EmailLink, ErrorState, Table, TypeBadge } from "@/components/ui";
 import { Select } from "@/components/ui/Select";
 import type { Column } from "@/components/ui/Table";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -93,6 +94,7 @@ export function EmailBlocklistDirectory() {
       {
         title: "Lead ID",
         key: "leadId",
+        getValue: (row) => getLeadGridLabel(row),
       },
       { title: "Company", key: "companyName" },
       { title: "Full Name", key: "fullName" },

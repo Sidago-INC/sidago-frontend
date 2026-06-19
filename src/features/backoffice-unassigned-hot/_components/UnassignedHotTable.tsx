@@ -9,6 +9,7 @@ import {
 import { Table, type Column } from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import React, { useEffect, useMemo, useState } from "react";
 import { UnassignedHotDrawer } from "./UnassignedHotDrawer";
 import {
@@ -16,8 +17,6 @@ import {
   contactTypeOptions,
   getCompanySymbol,
   getCompanySymbolOptions,
-  getLeadId,
-  getLeadIdOptions,
   leadTypeOptions,
   timezoneOptions,
   UnassignedHotLeadRow,
@@ -50,9 +49,9 @@ export function UnassignedHotTable({
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) => getLeadId(row),
+        getValue: (row) => getLeadGridLabel(row),
         type: "select",
-        options: getLeadIdOptions(data).map((value) => ({
+        options: data.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
         })),

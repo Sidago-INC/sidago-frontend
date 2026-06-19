@@ -62,6 +62,30 @@ export function getLeadId(row: { companyName: string; lead: string }): string {
   return `${companySymbol}-${row.lead}`;
 }
 
+export function getLeadDrawerTitle(row: {
+  companySymbol?: string | null;
+  companyName?: string | null;
+  fullName?: string | null;
+}): string {
+  const companySymbol =
+    row.companySymbol?.trim() || getCompanySymbol(row.companyName ?? "");
+  const fullName = row.fullName?.trim() ?? "";
+
+  if (companySymbol && fullName) {
+    return `${companySymbol} - ${fullName}`;
+  }
+
+  return companySymbol || fullName || "Lead";
+}
+
+export function getLeadGridLabel(row: {
+  companySymbol?: string | null;
+  companyName?: string | null;
+  fullName?: string | null;
+}): string {
+  return getLeadDrawerTitle(row);
+}
+
 export function getCompanySymbolOptions(
   rows: { companyName: string }[],
 ): string[] {

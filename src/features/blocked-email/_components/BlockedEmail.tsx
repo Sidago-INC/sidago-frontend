@@ -13,6 +13,7 @@ import {
   showInfoToast,
   showSuccessToast,
 } from "@/lib/toast";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useMemo, useState } from "react";
 import { BlockedEmailDrawer } from "./BlockedEmailDrawer";
 import {
@@ -61,6 +62,7 @@ export function BlockedEmail() {
       {
         title: "Lead ID",
         key: "leadId",
+        getValue: (row) => getLeadGridLabel(row),
       },
       {
         title: "Company Symbol",

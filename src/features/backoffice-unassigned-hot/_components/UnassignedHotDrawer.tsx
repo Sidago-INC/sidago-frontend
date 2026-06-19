@@ -19,6 +19,7 @@ import {
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import { AGENT_VALUES } from "@/types/agent.types";
 import { COMPANY_VALUES } from "@/types/company.types";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
@@ -403,7 +404,10 @@ export function UnassignedHotDrawer({
 
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {row.lead}
+                {getLeadDrawerTitle({
+                  companyName: row.companyName,
+                  fullName: row.fullName,
+                })}
               </p>
             </div>
           </div>

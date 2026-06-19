@@ -3,14 +3,13 @@
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import React, { useEffect, useMemo, useState } from "react";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { CurrentlyHotDrawer } from "./CurrentlyHotDrawer";
 import {
   assigneeOptions,
   contactTypeOptions,
   getCompanySymbol,
   getCompanySymbolOptions,
-  getLeadId,
-  getLeadIdOptions,
   LeadRow,
   leadTypeOptions,
   timezoneOptions,
@@ -45,9 +44,9 @@ export function CurrentlyHotTable({
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) => getLeadId(row),
+        getValue: (row) => getLeadGridLabel(row),
         type: "select",
-        options: getLeadIdOptions(data).map((value) => ({
+        options: data.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
         })),

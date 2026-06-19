@@ -2,6 +2,7 @@
 
 import { CompanySymbolBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
@@ -68,10 +69,10 @@ function formatSmsHistory(
 }
 
 function LeadButton({
-  leadId,
+  label,
   onOpen,
 }: {
-  leadId: string;
+  label: string;
   onOpen: () => void;
 }) {
   return (
@@ -83,7 +84,7 @@ function LeadButton({
       }}
       className="cursor-pointer text-left text-sm font-medium text-slate-700 transition hover:text-slate-900 hover:underline dark:text-slate-200 dark:hover:text-white"
     >
-      {leadId}
+      {label}
     </button>
   );
 }
@@ -260,7 +261,10 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         title: "Lead ID",
         key: "leadId",
         render: (row) => (
-          <LeadButton leadId={row.leadId} onOpen={() => openDrawer(row)} />
+          <LeadButton
+            label={getLeadGridLabel(row)}
+            onOpen={() => openDrawer(row)}
+          />
         ),
       },
       {

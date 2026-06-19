@@ -3,6 +3,7 @@
 import { CompanySymbolBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useSearchParams } from "react-router-dom";
@@ -33,9 +34,9 @@ export function Leads() {
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) => getLeadId(row),
+        getValue: (row) => getLeadGridLabel(row),
         type: "select",
-        options: getLeadIdOptions(rows).map((value) => ({
+        options: rows.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
         })),

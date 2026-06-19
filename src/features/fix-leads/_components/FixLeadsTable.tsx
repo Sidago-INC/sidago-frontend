@@ -12,6 +12,7 @@ import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users } from "lucide-react";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import {
   type FixQueueRow,
   useRelatedLeads,
@@ -58,7 +59,7 @@ export function FixLeadsTable({
       {
         title: "Lead ID",
         key: "leadId",
-        getValue: (row) => row.leadId,
+        getValue: (row) => getLeadGridLabel(row),
       },
       { title: "Company Name", key: "companyName" },
       {
