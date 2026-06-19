@@ -3,8 +3,16 @@
 import { DateRangePicker, SimpleStatusCard } from "@/components/ui";
 import { Ban, CircleOff, Target, RefreshCcw, Wrench } from "lucide-react";
 import { type DateRange } from "react-day-picker";
-import { useMemo, useState } from "react";
-import { useLeadStatsSummary } from "../_lib/hooks";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDrawer } from "@/providers/DrawerProvider";
+import {
+  useLeadStatsSummary,
+  useLeadStatsSocket,
+  toYMD,
+  type LeadStatsFlagType,
+  type LeadStatsSummary,
+} from "../_lib/hooks";
+import { LeadStatsDrilldown } from "./LeadStatsDrilldown";
 
 export function LeadsStats() {
   const today = new Date();
@@ -12,57 +20,101 @@ export function LeadsStats() {
     from: today,
     to: today,
   });
+  const [socketStats, setSocketStats] = useState<LeadStatsSummary | null>(null);
+  const { open } = useDrawer();
 
   const fromDate = selectedRange?.from ?? today;
   const toDate = selectedRange?.to ?? selectedRange?.from ?? today;
+  const fromStr = toYMD(fromDate);
+  const toStr = toYMD(toDate);
+
   const { data: stats, isLoading } = useLeadStatsSummary(fromDate, toDate);
+
+  // Socket updates are live "right now" stats — clear the override whenever the
+  // user navigates to a historical range so stale live data doesn't bleed in.
+  useEffect(() => {
+    setSocketStats(null);
+  }, [fromStr, toStr]);
+
+  const handleSocketUpdate = useCallback((update: LeadStatsSummary) => {
+    setSocketStats(update);
+  }, []);
+  useLeadStatsSocket(handleSocketUpdate);
+
+  const effectiveStats = socketStats ?? stats;
+
+  const openDrilldown = (label: string, flagType: LeadStatsFlagType) => {
+    open({
+      direction: "right",
+      size: "480px",
+      header: (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-indigo-500">
+            Lead Details
+          </p>
+          <p className="text-lg font-bold text-slate-900 dark:text-slate-100">
+            {label}
+          </p>
+        </div>
+      ),
+      children: (
+        <LeadStatsDrilldown flagType={flagType} from={fromStr} to={toStr} />
+      ),
+    });
+  };
 
   const leadStats = useMemo(
     () => [
       {
         id: "leads-fixed",
         label: "Leads fixed",
-        value: stats?.leadsFixed ?? 0,
+        value: effectiveStats?.leadsFixed ?? 0,
         icon: <Wrench size={18} />,
         titleClassName: "text-emerald-700 dark:text-emerald-300",
+        flagType: "fixed" as LeadStatsFlagType,
       },
       {
         id: "leads-sent-to-fix",
         label: "Leads sent to fix",
-        value: stats?.leadsSentToFix ?? 0,
+        value: effectiveStats?.leadsSentToFix ?? 0,
         icon: <RefreshCcw size={18} />,
         titleClassName: "text-sky-700 dark:text-sky-300",
+        flagType: "fix" as LeadStatsFlagType,
       },
       {
         id: "leads-sent-to-cant-locate",
         label: "Leads sent to can't locate",
-        value: stats?.leadsSentToCantLocate ?? 0,
+        value: effectiveStats?.leadsSentToCantLocate ?? 0,
         icon: <Target size={18} />,
         titleClassName: "text-amber-700 dark:text-amber-300",
+        flagType: "cant_locate" as LeadStatsFlagType,
       },
       {
         id: "new-leads-created",
         label: "New leads created",
-        value: stats?.newLeadsCreated ?? 0,
+        value: effectiveStats?.newLeadsCreated ?? 0,
         icon: <Wrench size={18} />,
         titleClassName: "text-violet-700 dark:text-violet-300",
+        flagType: "new_lead" as LeadStatsFlagType,
       },
       {
         id: "leads-sent-to-void",
         label: "Leads sent to VOID",
-        value: stats?.leadsSentToVoid ?? 0,
+        value: effectiveStats?.leadsSentToVoid ?? 0,
         icon: <Ban size={18} />,
         titleClassName: "text-rose-700 dark:text-rose-300",
+        flagType: "void" as LeadStatsFlagType,
       },
       {
         id: "leads-sent-to-dnc",
         label: "Leads sent to DNC",
-        value: stats?.leadsSentToDnc ?? 0,
+        value: effectiveStats?.leadsSentToDnc ?? 0,
         icon: <CircleOff size={18} />,
         titleClassName: "text-slate-600 dark:text-slate-300",
+        flagType: null,
       },
     ],
-    [stats],
+    [effectiveStats],
   );
 
   return (
@@ -94,20 +146,42 @@ export function LeadsStats() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {leadStats.map((item) => (
-          <SimpleStatusCard
-            key={item.id}
-            title={
-              <span className="flex items-center gap-2">
-                <span className={item.titleClassName}>{item.icon}</span>
-                <span>{item.label}</span>
-              </span>
-            }
-            value={isLoading ? "—" : item.value}
-            className="border-slate-200 dark:border-slate-800 dark:bg-slate-900"
-            valueClassName="text-xl font-bold text-slate-900 dark:text-slate-100"
-          />
-        ))}
+        {leadStats.map((item) =>
+          item.flagType ? (
+            <div
+              key={item.id}
+              onClick={() =>
+                openDrilldown(item.label, item.flagType as LeadStatsFlagType)
+              }
+              className="cursor-pointer"
+            >
+              <SimpleStatusCard
+                title={
+                  <span className="flex items-center gap-2">
+                    <span className={item.titleClassName}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </span>
+                }
+                value={isLoading ? "—" : item.value}
+                className="border-slate-200 dark:border-slate-800 dark:bg-slate-900"
+                valueClassName="text-xl font-bold text-slate-900 dark:text-slate-100"
+              />
+            </div>
+          ) : (
+            <SimpleStatusCard
+              key={item.id}
+              title={
+                <span className="flex items-center gap-2">
+                  <span className={item.titleClassName}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </span>
+              }
+              value={isLoading ? "—" : item.value}
+              className="border-slate-200 dark:border-slate-800 dark:bg-slate-900"
+              valueClassName="text-xl font-bold text-slate-900 dark:text-slate-100"
+            />
+          ),
+        )}
       </div>
     </div>
   );
