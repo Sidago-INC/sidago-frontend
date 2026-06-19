@@ -8,6 +8,7 @@ export type RecentInterestRow = {
   campaignType: string;
   contactPerson: string;
   companyName: string;
+  companySymbol: string;
   email: string;
   assignedTo: string;
   callResult: string;

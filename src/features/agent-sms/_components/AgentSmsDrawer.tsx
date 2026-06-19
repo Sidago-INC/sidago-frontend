@@ -16,6 +16,7 @@ import {
   contactTypeOptions,
   leadTypeOptions,
 } from "@/features/backoffice-closed-contacts/_lib/data";
+import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
   Ban,
   Check,
@@ -306,7 +307,7 @@ export function AgentSmsDrawer({
             </button>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {row?.lead ?? row?.leadId ?? "SMS activity"}
+                {row ? getLeadDrawerTitle(row) : "SMS activity"}
               </p>
             </div>
           </div>

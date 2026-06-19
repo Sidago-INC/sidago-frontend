@@ -2,6 +2,7 @@
 
 import { EmailPriorityBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -21,6 +22,7 @@ import {
 } from "../_lib/data";
 import {
   useEmailHistory,
+  useLogEmail,
   useEmailQueue,
   useUpdateEmailState,
 } from "../_lib/hooks";
@@ -73,9 +75,11 @@ function formatEmailHistory(
 
 function LeadButton({
   leadId,
+  label,
   onOpen,
 }: {
   leadId: string;
+  label?: string;
   onOpen: () => void;
 }) {
   return (
@@ -87,7 +91,7 @@ function LeadButton({
       }}
       className="cursor-pointer text-left text-sm font-medium text-slate-700 transition hover:text-slate-900 hover:underline dark:text-slate-200 dark:hover:text-white"
     >
-      {leadId}
+      {label ?? leadId}
     </button>
   );
 }
@@ -96,6 +100,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
   const [searchParams] = useSearchParams();
   const { data: queueData, isLoading } = useEmailQueue(agentSlug);
   const updateEmailState = useUpdateEmailState();
+  const logEmail = useLogEmail();
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
@@ -192,6 +197,37 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     );
   };
 
+  const submitEmailLog = async (row: AgentEmailRow) => {
+    if (row.checkToLog) {
+      return;
+    }
+
+    updateRow(row.id, (currentRow) => ({
+      ...currentRow,
+      checkToLog: true,
+    }));
+
+    try {
+      await logEmail.mutateAsync({
+        leadId: row.leadId,
+        brandCode: row.brandCode,
+        subject: `Email log for ${row.fullName || row.companyName || row.leadId}`,
+        body:
+          row.history.trim() ||
+          row.notes.trim() ||
+          `Email log recorded for ${row.fullName || row.companyName || row.leadId}`,
+        status: row.emailToBeSent,
+      });
+      showSuccessToast("Email log recorded successfully.");
+    } catch (error) {
+      updateRow(row.id, (currentRow) => ({
+        ...currentRow,
+        checkToLog: false,
+      }));
+      showErrorToast(error);
+    }
+  };
+
   const openDrawer = useCallback((row: AgentEmailRow) => {
     setEditingRowId(null);
     setDrawerState({
@@ -206,7 +242,11 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         title: "Lead ID",
         key: "leadId",
         render: (row) => (
-          <LeadButton leadId={row.leadId} onOpen={() => openDrawer(row)} />
+          <LeadButton
+            leadId={row.leadId}
+            label={getLeadGridLabel(row)}
+            onOpen={() => openDrawer(row)}
+          />
         ),
       },
       {
@@ -300,17 +340,22 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         key: "checkToLog",
         render: (row) =>
           editingRowId === row.id ? (
-            <AgentEmailBooleanEditor
-              checked={row.checkToLog}
-              onChange={(checked) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  checkToLog: checked,
-                }))
-              }
-            />
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                void submitEmailLog(row);
+              }}
+              className="inline-flex cursor-pointer items-center"
+            >
+              <AgentEmailBooleanRead checked={row.checkToLog} />
+            </button>
           ) : (
-            <AgentEmailEditableTrigger onClick={() => setEditingRowId(row.id)}>
+            <AgentEmailEditableTrigger
+              onClick={() => {
+                void submitEmailLog(row);
+              }}
+            >
               <AgentEmailBooleanRead checked={row.checkToLog} />
             </AgentEmailEditableTrigger>
           ),

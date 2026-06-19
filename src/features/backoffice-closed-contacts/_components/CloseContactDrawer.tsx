@@ -37,6 +37,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
   useUpdateLead,
   type LeadPatchBody,
@@ -361,7 +362,10 @@ export function ClosedContactDrawer({
             </button>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {row.lead}
+                {getLeadDrawerTitle({
+                  companyName: row.companyName,
+                  fullName: row.fullName,
+                })}
               </p>
             </div>
           </div>

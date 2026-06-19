@@ -5,6 +5,7 @@ export type HotLeadRow = {
   leadId?: string;
   lead: string;
   companyName: string;
+  companySymbol: string;
   fullName: string;
   phone: string;
   role?: string;

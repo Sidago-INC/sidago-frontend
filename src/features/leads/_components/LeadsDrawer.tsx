@@ -25,6 +25,7 @@ import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
   getCompanySymbol,
   getLeadId,
@@ -418,7 +419,10 @@ export function LeadsDrawer({
             </button>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {row.lead}
+                {getLeadDrawerTitle({
+                  companyName: row.companyName,
+                  fullName: row.fullName,
+                })}
               </p>
             </div>
           </div>

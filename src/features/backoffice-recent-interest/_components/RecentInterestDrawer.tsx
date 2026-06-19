@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import {
   getCompanySymbol,
+  getLeadDrawerTitle,
   getLeadId,
 } from "@/features/backoffice-shared/constants";
 import { showSuccessToast } from "@/lib/toast";
@@ -283,7 +284,10 @@ export function RecentInterestDrawer({
             </button>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {row.lead}
+                {getLeadDrawerTitle({
+                  companyName: row.companyName,
+                  fullName: row.contactPerson,
+                })}
               </p>
             </div>
           </div>

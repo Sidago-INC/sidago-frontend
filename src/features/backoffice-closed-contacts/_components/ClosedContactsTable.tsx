@@ -3,14 +3,13 @@
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import React, { useMemo } from "react";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import {
   assigneeOptions,
   ClosedContactRow,
   contactTypeOptions,
   getCompanySymbol,
   getCompanySymbolOptions,
-  getLeadId,
-  getLeadIdOptions,
   leadTypeOptions,
   timezoneOptions,
   type ClosedContactsTabKey,
@@ -46,12 +45,14 @@ export function ClosedContactsTable({
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) => getLeadId(row),
+        getValue: (row) => getLeadGridLabel(row),
         type: "select",
-        options: getLeadIdOptions(data).map((value) => ({
+        options: data.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
         })),
+        render: (row) =>
+          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
       },
       {
         title: "Company Symbol",

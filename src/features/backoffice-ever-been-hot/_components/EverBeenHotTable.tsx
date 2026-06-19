@@ -4,6 +4,7 @@ import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import React, { useEffect, useMemo, useState } from "react";
 import { EverBeenHotDrawer } from "./EverBeenHotDrawer";
 
@@ -13,8 +14,6 @@ import {
   EverBeenHotRow,
   getCompanySymbol,
   getCompanySymbolOptions,
-  getLeadId,
-  getLeadIdOptions,
   leadTypeOptions,
   timezoneOptions,
 } from "../_lib/data";
@@ -46,12 +45,14 @@ export function EverBeenHotTable({
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) => getLeadId(row),
+        getValue: (row) => getLeadGridLabel(row),
         type: "select",
-        options: getLeadIdOptions(data).map((value) => ({
+        options: data.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
         })),
+        render: (row) =>
+          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
       },
       {
         title: "Company Symbol",

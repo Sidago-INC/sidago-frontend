@@ -93,3 +93,15 @@ export function useLogLevel2Result() {
     },
   });
 }
+
+// Reverts a logged Level 2 request by its DB id.
+export function useRevertLevel2Result() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      await api.delete(`/level-2-requests/${id}/revert`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["level-2-history"] });
+    },
+  });
+}

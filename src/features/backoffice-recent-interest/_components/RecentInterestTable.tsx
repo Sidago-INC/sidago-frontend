@@ -3,8 +3,7 @@
 import { CampaignBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import {
-  getLeadId,
-  getLeadIdOptions,
+  getLeadGridLabel,
 } from "@/features/backoffice-shared/constants";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 import { useSearchParams } from "react-router-dom";
@@ -45,12 +44,27 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) => getLeadId(row),
+        getValue: (row) =>
+          getLeadGridLabel({
+            companyName: row.companyName,
+            fullName: row.contactPerson,
+          }),
         type: "select",
-        options: getLeadIdOptions(data).map((value) => ({
+        options: data
+          .map((row) =>
+            getLeadGridLabel({
+              companyName: row.companyName,
+              fullName: row.contactPerson,
+            }),
+          )
+          .filter(Boolean)
+          .map((value) => ({
           label: value,
           value,
         })),
+        render: (row) =>
+          [row.companySymbol, row.contactPerson].filter(Boolean).join(" - ") ||
+          "-",
       },
       {
         title: "Campaign Type",

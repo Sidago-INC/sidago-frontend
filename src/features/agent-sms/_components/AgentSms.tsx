@@ -2,6 +2,7 @@
 
 import { CompanySymbolBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
@@ -21,6 +22,7 @@ import {
   smsStatusOptions,
 } from "../_lib/data";
 import {
+  useLogSms,
   useSmsHistory,
   useSmsQueue,
   useUpdateSmsState,
@@ -68,9 +70,11 @@ function formatSmsHistory(
 
 function LeadButton({
   leadId,
+  label,
   onOpen,
 }: {
   leadId: string;
+  label?: string;
   onOpen: () => void;
 }) {
   return (
@@ -82,7 +86,7 @@ function LeadButton({
       }}
       className="cursor-pointer text-left text-sm font-medium text-slate-700 transition hover:text-slate-900 hover:underline dark:text-slate-200 dark:hover:text-white"
     >
-      {leadId}
+      {label ?? leadId}
     </button>
   );
 }
@@ -95,6 +99,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
   };
   const { data: queueData, isLoading } = useSmsQueue(agentSlug);
   const updateSmsState = useUpdateSmsState();
+  const logSms = useLogSms();
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
@@ -191,23 +196,31 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     );
   };
 
-  const toggleSmsLogged = async (row: AgentSmsRow) => {
-    const nextValue = !row.smsLogged;
+  const submitSmsLog = async (row: AgentSmsRow) => {
+    if (row.smsLogged) {
+      return;
+    }
+
     updateRow(row.id, (currentRow) => ({
       ...currentRow,
-      smsLogged: nextValue,
+      smsLogged: true,
     }));
 
     try {
-      await updateSmsState.mutateAsync({
+      await logSms.mutateAsync({
         leadId: row.leadId,
         brandCode: row.brandCode,
-        body: { isSmsLogged: nextValue },
+        body:
+          row.smsLog.trim() ||
+          row.notes.trim() ||
+          `SMS log recorded for ${row.fullName || row.companyName || row.leadId}`,
+        status: row.smsStatus,
       });
+      showSuccessToast("SMS log recorded successfully.");
     } catch (error) {
       updateRow(row.id, (currentRow) => ({
         ...currentRow,
-        smsLogged: row.smsLogged,
+        smsLogged: false,
       }));
       showErrorToast(error);
     }
@@ -250,7 +263,11 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         title: "Lead ID",
         key: "leadId",
         render: (row) => (
-          <LeadButton leadId={row.leadId} onOpen={() => openDrawer(row)} />
+          <LeadButton
+            leadId={row.leadId}
+            label={getLeadGridLabel(row)}
+            onOpen={() => openDrawer(row)}
+          />
         ),
       },
       {
@@ -334,7 +351,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         render: (row) => (
           <SmsLogButton
             checked={row.smsLogged}
-            onToggle={() => toggleSmsLogged(row)}
+            onToggle={() => submitSmsLog(row)}
           />
         ),
       },

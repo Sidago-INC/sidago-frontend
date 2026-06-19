@@ -27,6 +27,7 @@ import {
 import {
   useLeadOptions,
   useLogLevel2Result,
+  useRevertLevel2Result,
   type BrandStatesResponse,
 } from "../_lib/hooks";
 
@@ -144,6 +145,7 @@ export function Level2Update() {
     }
   });
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -162,6 +164,7 @@ export function Level2Update() {
   const rm95Agents = useUsers("95rm");
   const bentonAgents = useUsers("benton");
   const logResult = useLogLevel2Result();
+  const revertResult = useRevertLevel2Result();
 
   const leadOptions = useMemo(
     () =>
@@ -223,9 +226,26 @@ export function Level2Update() {
     setEditingRowId(newRow.id);
   };
 
-  const handleDelete = (rowId: string) => {
-    setRows((current) => current.filter((row) => row.id !== rowId));
-    setEditingRowId((current) => (current === rowId ? null : current));
+  const handleDelete = async (rowId: string) => {
+    const row = rows.find((r) => r.id === rowId);
+    if (!row) return;
+
+    if (row.api_id) {
+      setDeletingRowId(rowId);
+      try {
+        await revertResult.mutateAsync(row.api_id);
+        setRows((current) => current.filter((r) => r.id !== rowId));
+        setEditingRowId((current) => (current === rowId ? null : current));
+        showSuccessToast("Level 2 result reverted.");
+      } catch (err) {
+        showErrorToast(err);
+      } finally {
+        setDeletingRowId(null);
+      }
+    } else {
+      setRows((current) => current.filter((r) => r.id !== rowId));
+      setEditingRowId((current) => (current === rowId ? null : current));
+    }
   };
 
   const handleCampaignChange = (rowId: string, nextCampaign: BRAND | "") => {
@@ -287,7 +307,7 @@ export function Level2Update() {
     }
 
     try {
-      await logResult.mutateAsync({
+      const result = await logResult.mutateAsync({
         leadId: row.lead,
         brand,
         level2AgentName: row.level_2_agent || null,
@@ -296,7 +316,7 @@ export function Level2Update() {
         callBackDate: row.call_back_date,
       });
       showSuccessToast("Level 2 result logged.");
-      patchRow(rowId, { logged_at: new Date().toISOString() });
+      patchRow(rowId, { logged_at: new Date().toISOString(), api_id: result.id });
     } catch (err) {
       showErrorToast(err);
     }
@@ -489,23 +509,28 @@ export function Level2Update() {
     {
       title: "Delete",
       key: "delete",
-      render: (row) => (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleDelete(row.id);
-          }}
-          className={clsx(
-            actionButtonClass,
-            "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
-          )}
-          aria-label={`Delete ${row.lead_label || "row"}`}
-        >
-          <Trash2 size={16} />
-          Delete
-        </button>
-      ),
+      render: (row) => {
+        const isDeleting = deletingRowId === row.id;
+        return (
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDelete(row.id);
+            }}
+            className={clsx(
+              actionButtonClass,
+              "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
+              isDeleting && "opacity-50 cursor-not-allowed",
+            )}
+            aria-label={`Delete ${row.lead_label || "row"}`}
+          >
+            <Trash2 size={16} />
+            {isDeleting ? "Reverting..." : "Delete"}
+          </button>
+        );
+      },
     },
   ];
 

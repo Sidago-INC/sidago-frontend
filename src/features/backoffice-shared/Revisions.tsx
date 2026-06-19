@@ -1,7 +1,10 @@
 
 
 import { Activity, ActivityTimeline } from "@/components/ui/ActivityTimeline";
-import { useLeadRevisionHistory } from "@/features/backoffice-shared/use-revision-history";
+import {
+  useCompanyRevisionHistory,
+  useLeadRevisionHistory,
+} from "@/features/backoffice-shared/use-revision-history";
 import {
   Popover,
   PopoverButton,
@@ -13,22 +16,36 @@ import { Fragment, useState } from "react";
 
 type RevisionsProps = {
   leadId?: string;
+  companyId?: string;
 };
 
-export default function Revisions({ leadId }: RevisionsProps) {
+export default function Revisions({ leadId, companyId }: RevisionsProps) {
   const [open, setOpen] = useState(false);
   const [notificationMode, setNotificationMode] = useState("mentions");
-  const { data: apiActivities, isLoading } = useLeadRevisionHistory(leadId);
+  const targetId = leadId ?? companyId;
+  const isCompanyRevision = Boolean(companyId && !leadId);
+  const leadRevisionQuery = useLeadRevisionHistory(
+    isCompanyRevision ? undefined : leadId,
+  );
+  const companyRevisionQuery = useCompanyRevisionHistory(
+    isCompanyRevision ? companyId : undefined,
+  );
+  const apiActivities = isCompanyRevision
+    ? companyRevisionQuery.data
+    : leadRevisionQuery.data;
+  const isLoading = isCompanyRevision
+    ? companyRevisionQuery.isLoading
+    : leadRevisionQuery.isLoading;
 
   const PAGE_SIZE = 10;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const activities = leadId ? (apiActivities ?? []) : fallbackActivities;
+  const activities = apiActivities ?? [];
   const visibleActivities = activities.slice(0, visibleCount);
   const hasMore = visibleCount < activities.length;
 
   return (
-    <div className="w-full max-w-xl mx-auto">
+    <div className="w-full">
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -103,7 +120,7 @@ export default function Revisions({ leadId }: RevisionsProps) {
           </div>
 
           <div className="max-h-80 overflow-y-auto p-4 space-y-3">
-            {isLoading && leadId ? (
+            {isLoading && targetId ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Loading revision history…
               </p>
@@ -131,21 +148,3 @@ export default function Revisions({ leadId }: RevisionsProps) {
     </div>
   );
 }
-
-const fallbackActivities: Activity[] = [
-  {
-    id: 1,
-    actor: { type: "user", name: "AW bugs" },
-    action: "edited this lead",
-    time: "11mo ago",
-    sections: [
-      {
-        title: "LEAD TYPE BENTON",
-        items: [
-          { type: "badge", label: "General", variant: "warning" },
-          { type: "badge", label: "Fix" },
-        ],
-      },
-    ],
-  },
-];

@@ -23,6 +23,7 @@ function pickerToDirectoryRow(row: LeadPickerRow): LeadDirectoryRow {
       leadId: row.id,
       lead: row.leadIdExternal ?? row.id,
       companyName,
+      companySymbol: "",
       fullName: row.fullName ?? "",
       phone: "",
       role: "",

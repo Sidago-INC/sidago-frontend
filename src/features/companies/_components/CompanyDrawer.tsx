@@ -10,10 +10,9 @@ import {
 } from "@/components/ui";
 import { COMPANY } from "@/types/company.types";
 import { TIMEZONE_OPTIONS } from "@/types/timezone.types";
-import { useEffect, useMemo, useState } from "react";
-import { useCompanyRevisionHistory } from "@/features/backoffice-shared/use-revision-history";
-import type { Activity } from "@/components/ui/ActivityTimeline";
+import { useEffect, useState } from "react";
 import { CountryPicker } from "./CountryPicker";
+import Revisions from "@/features/backoffice-shared/Revisions";
 
 type CompanyDrawerMode = "create" | "edit";
 
@@ -36,30 +35,6 @@ type CompanyDrawerProps = {
 
 const inputClassName =
   "h-10 rounded border bg-white px-3 py-2 text-sm text-slate-700 transition focus:border-indigo-500 focus:outline-none dark:bg-gray-800 dark:text-slate-200 dark:focus:border-indigo-400";
-const defaultHistoryLogs = `04/28/2026 - COMPANY PROFILE REVIEWED
-04/25/2026 - PRIMARY MARKET DETAILS VERIFIED
-04/18/2026 - COUNTRY AND REGIONAL DATA CONFIRMED`;
-
-function formatCompanyHistory(activity: Activity[]) {
-  return activity
-    .map((entry) => {
-      const changes = (entry.sections ?? [])
-        .flatMap((section) =>
-          section.items.map((item) =>
-            item.type === "badge"
-              ? `${section.title ?? "Changes"}: ${item.label}`
-              : null,
-          ),
-        )
-        .filter(Boolean)
-        .join(" | ");
-
-      return [entry.time.toUpperCase(), entry.actor.name, entry.action, changes]
-        .filter(Boolean)
-        .join(" - ");
-    })
-    .join("\n");
-}
 
 function escapeHtml(value: string) {
   return value
@@ -86,30 +61,23 @@ export function CompanyDrawer({
   onSave,
 }: CompanyDrawerProps) {
   const [copied, setCopied] = useState(false);
-  const { data: revisionHistory = [] } = useCompanyRevisionHistory(companyId);
+  const [isEditMode, setIsEditMode] = useState(mode === "create");
   const title = mode === "create" ? "Create Company" : "Edit Company";
   const subtitle =
     mode === "create"
       ? "Add a company record"
       : `${initialCompany.name} (${initialCompany.symbol})`;
   const canNavigate = mode === "edit" && currentIndex >= 0 && rowCount > 0;
-  const historyLogs = useMemo(() => {
-    const apiHistory = revisionHistory.length
-      ? formatCompanyHistory(revisionHistory)
-      : defaultHistoryLogs;
-    const pendingCountryLog =
-      company.country !== initialCompany.country
-        ? `PENDING UPDATE - Country will change from ${initialCompany.country} to ${company.country} on save`
-        : "";
-
-    return [apiHistory, pendingCountryLog].filter(Boolean).join("\n");
-  }, [company.country, initialCompany.country, revisionHistory]);
 
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), 1800);
     return () => window.clearTimeout(timer);
   }, [copied]);
+
+  useEffect(() => {
+    setIsEditMode(mode === "create");
+  }, [companyId, isOpen, mode]);
 
   const handleCopyLink = async () => {
     if (typeof window === "undefined" || mode !== "edit") return;
@@ -190,16 +158,28 @@ export function CompanyDrawer({
         />
       }
       footer={
-        <EditableDrawerFooter
-          onCancel={onCancel}
-          onReset={onReset}
-          onSave={onSave}
-          saveLabel={isSaving ? "Saving..." : undefined}
-          saveDisabled={isSaving}
-        />
+        isEditMode ? (
+          <EditableDrawerFooter
+            onCancel={() => {
+              setIsEditMode(mode === "create");
+              onCancel();
+            }}
+            onReset={onReset}
+            onSave={() => {
+              onSave();
+              if (mode === "edit") {
+                setIsEditMode(false);
+              }
+            }}
+            saveLabel={isSaving ? "Saving..." : undefined}
+            saveDisabled={isSaving}
+          />
+        ) : (
+          <Revisions companyId={companyId ?? undefined} />
+        )
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-6" onFocus={() => setIsEditMode(true)}>
         <div className="grid gap-4 md:grid-cols-2">
           <TextInput
             label="Company Symbol"
@@ -280,24 +260,6 @@ export function CompanyDrawer({
             onChange={(event) => onChange("zip", event.target.value)}
             error={errors.zip}
             className={inputClassName}
-          />
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              history_logs
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Read-only log history for this company profile.
-            </p>
-          </div>
-          <Textarea
-            value={historyLogs}
-            onChange={() => {}}
-            rows={5}
-            readOnly
-            className="rounded border bg-slate-100 px-3 py-2 font-mono text-xs text-slate-600 focus:border-slate-300 focus:outline-none dark:bg-slate-900 dark:text-slate-300 dark:focus:border-slate-700"
           />
         </div>
       </div>
