@@ -21,6 +21,7 @@ import {
 } from "../_lib/data";
 import {
   useEmailHistory,
+  useLogEmail,
   useEmailQueue,
   useUpdateEmailState,
 } from "../_lib/hooks";
@@ -96,6 +97,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
   const [searchParams] = useSearchParams();
   const { data: queueData, isLoading } = useEmailQueue(agentSlug);
   const updateEmailState = useUpdateEmailState();
+  const logEmail = useLogEmail();
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
@@ -190,6 +192,37 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     setRows((currentRows) =>
       currentRows.map((row) => (row.id === rowId ? updater(row) : row)),
     );
+  };
+
+  const submitEmailLog = async (row: AgentEmailRow) => {
+    if (row.checkToLog) {
+      return;
+    }
+
+    updateRow(row.id, (currentRow) => ({
+      ...currentRow,
+      checkToLog: true,
+    }));
+
+    try {
+      await logEmail.mutateAsync({
+        leadId: row.leadId,
+        brandCode: row.brandCode,
+        subject: `Email log for ${row.fullName || row.companyName || row.leadId}`,
+        body:
+          row.history.trim() ||
+          row.notes.trim() ||
+          `Email log recorded for ${row.fullName || row.companyName || row.leadId}`,
+        status: row.emailToBeSent,
+      });
+      showSuccessToast("Email log recorded successfully.");
+    } catch (error) {
+      updateRow(row.id, (currentRow) => ({
+        ...currentRow,
+        checkToLog: false,
+      }));
+      showErrorToast(error);
+    }
   };
 
   const openDrawer = useCallback((row: AgentEmailRow) => {
@@ -300,17 +333,22 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         key: "checkToLog",
         render: (row) =>
           editingRowId === row.id ? (
-            <AgentEmailBooleanEditor
-              checked={row.checkToLog}
-              onChange={(checked) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  checkToLog: checked,
-                }))
-              }
-            />
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                void submitEmailLog(row);
+              }}
+              className="inline-flex cursor-pointer items-center"
+            >
+              <AgentEmailBooleanRead checked={row.checkToLog} />
+            </button>
           ) : (
-            <AgentEmailEditableTrigger onClick={() => setEditingRowId(row.id)}>
+            <AgentEmailEditableTrigger
+              onClick={() => {
+                void submitEmailLog(row);
+              }}
+            >
               <AgentEmailBooleanRead checked={row.checkToLog} />
             </AgentEmailEditableTrigger>
           ),

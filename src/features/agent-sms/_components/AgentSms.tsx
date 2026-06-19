@@ -21,6 +21,7 @@ import {
   smsStatusOptions,
 } from "../_lib/data";
 import {
+  useLogSms,
   useSmsHistory,
   useSmsQueue,
   useUpdateSmsState,
@@ -95,6 +96,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
   };
   const { data: queueData, isLoading } = useSmsQueue(agentSlug);
   const updateSmsState = useUpdateSmsState();
+  const logSms = useLogSms();
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
@@ -191,23 +193,31 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     );
   };
 
-  const toggleSmsLogged = async (row: AgentSmsRow) => {
-    const nextValue = !row.smsLogged;
+  const submitSmsLog = async (row: AgentSmsRow) => {
+    if (row.smsLogged) {
+      return;
+    }
+
     updateRow(row.id, (currentRow) => ({
       ...currentRow,
-      smsLogged: nextValue,
+      smsLogged: true,
     }));
 
     try {
-      await updateSmsState.mutateAsync({
+      await logSms.mutateAsync({
         leadId: row.leadId,
         brandCode: row.brandCode,
-        body: { isSmsLogged: nextValue },
+        body:
+          row.smsLog.trim() ||
+          row.notes.trim() ||
+          `SMS log recorded for ${row.fullName || row.companyName || row.leadId}`,
+        status: row.smsStatus,
       });
+      showSuccessToast("SMS log recorded successfully.");
     } catch (error) {
       updateRow(row.id, (currentRow) => ({
         ...currentRow,
-        smsLogged: row.smsLogged,
+        smsLogged: false,
       }));
       showErrorToast(error);
     }
@@ -334,7 +344,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         render: (row) => (
           <SmsLogButton
             checked={row.smsLogged}
-            onToggle={() => toggleSmsLogged(row)}
+            onToggle={() => submitSmsLog(row)}
           />
         ),
       },
