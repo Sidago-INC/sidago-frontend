@@ -46,7 +46,7 @@ export default function AdminDashboard() {
             Agent score cards
           </h2>
         </div>
-        <AdminAgentScoreCards />
+        <AdminAgentScoreCards selectedDate={selectedDate} />
       </div>
     </main>
   );

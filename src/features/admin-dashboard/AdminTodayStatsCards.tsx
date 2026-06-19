@@ -1,8 +1,6 @@
 
-
 import { CompanySymbolBadge, StatusCard } from "@/components/ui";
 import { WinnerBadge } from "@/features/agent-dashboard/_components/WinnerBadge";
-import { agentDashboardData } from "@/features/agent-dashboard/_lib/data";
 import clsx from "clsx";
 import { useAdminTodayAgentCards } from "./_lib/hooks";
 
@@ -14,11 +12,13 @@ const CARD_TONES = [
 ];
 
 export function AdminTodayStatsCards({
-  selectedDate: _selectedDate,
+  selectedDate,
 }: {
   selectedDate?: Date;
 }) {
-  const { cards, isLoading } = useAdminTodayAgentCards(agentDashboardData);
+  const dashboardDate = selectedDate ?? new Date();
+  const { data, isLoading } = useAdminTodayAgentCards(dashboardDate);
+  const cards = data?.cards ?? [];
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2 xxl:grid-cols-3">
@@ -33,7 +33,7 @@ export function AdminTodayStatsCards({
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-sm font-bold text-white dark:bg-slate-100 dark:text-slate-900">
                   {agent.name.slice(0, 1)}
-                  {agent.surname.slice(0, 1)}
+                  {agent.surname.slice(0, 1) || agent.name.slice(1, 2)}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
