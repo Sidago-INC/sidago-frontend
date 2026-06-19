@@ -74,10 +74,12 @@ function formatEmailHistory(
 }
 
 function LeadButton({
+  leadId,
   label,
   onOpen,
 }: {
-  label: string;
+  leadId: string;
+  label?: string;
   onOpen: () => void;
 }) {
   return (
@@ -89,7 +91,7 @@ function LeadButton({
       }}
       className="cursor-pointer text-left text-sm font-medium text-slate-700 transition hover:text-slate-900 hover:underline dark:text-slate-200 dark:hover:text-white"
     >
-      {label}
+      {label ?? leadId}
     </button>
   );
 }
@@ -241,6 +243,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         key: "leadId",
         render: (row) => (
           <LeadButton
+            leadId={row.leadId}
             label={getLeadGridLabel(row)}
             onOpen={() => openDrawer(row)}
           />

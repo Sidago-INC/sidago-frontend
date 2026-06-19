@@ -50,6 +50,8 @@ export function CurrentlyHotTable({
           label: value,
           value,
         })),
+        render: (row) =>
+          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
       },
       {
         title: "Company Symbol",

@@ -70,7 +70,7 @@ export function DateRangePicker({
 
       <PopoverPanel
         anchor="bottom start"
-        className="z-[320] mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
+        className="z-320 mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
       >
         {hasValue ? (
           <div className="mb-3 flex justify-end">

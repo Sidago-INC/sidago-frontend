@@ -62,6 +62,9 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
           label: value,
           value,
         })),
+        render: (row) =>
+          [row.companySymbol, row.contactPerson].filter(Boolean).join(" - ") ||
+          "-",
       },
       {
         title: "Campaign Type",

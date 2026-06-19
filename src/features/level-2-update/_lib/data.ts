@@ -22,6 +22,9 @@ export type Level2UpdateRow = {
   lead_type_benton: LEAD_TYPE | "";
   lead_type_95rm: LEAD_TYPE | "";
   logged_at?: string;
+  // Populated after a successful POST /level-2-requests — used to call the
+  // revert endpoint when the user deletes a logged row.
+  api_id?: string;
 };
 
 // The 14 result options the agent can pick from when updating a Level 2 row.
