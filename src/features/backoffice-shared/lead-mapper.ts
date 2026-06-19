@@ -43,6 +43,7 @@ export function leadToHotLeadRow(lead: LEAD): HotLeadRow {
   return {
     lead: lead.lead_type ?? "",
     companyName: lead.company?.name ?? "",
+    companySymbol: lead.company?.symbol ?? "",
     fullName: lead.full_name ?? "",
     phone: lead.phone ?? "",
     role: lead.role ?? "",
@@ -77,6 +78,7 @@ export function leadToRecentInterestRow(
   campaignType: string;
   contactPerson: string;
   companyName: string;
+  companySymbol: string;
   email: string;
   assignedTo: string;
   callResult: string;
@@ -94,6 +96,7 @@ export function leadToRecentInterestRow(
     campaignType: CAMPAIGN_TYPES[index % CAMPAIGN_TYPES.length],
     contactPerson: lead.full_name ?? "",
     companyName: lead.company?.name ?? "",
+    companySymbol: lead.company?.symbol ?? "",
     email: lead.email ?? "",
     assignedTo: lead.to_be_called_by_sidago ?? "",
     callResult: lead.call_result_sidago ?? "",
@@ -108,6 +111,7 @@ export function leadToRecentInterestRow(
 export function leadToClosedContactRow(lead: LEAD): {
   lead: string;
   companyName: string;
+  companySymbol: string;
   fullName: string;
   phone: string;
   email: string;
@@ -131,6 +135,7 @@ export function leadToClosedContactRow(lead: LEAD): {
   return {
     lead: lead.lead_type ?? "",
     companyName: lead.company?.name ?? "",
+    companySymbol: lead.company?.symbol ?? "",
     fullName: lead.full_name ?? "",
     phone: lead.phone ?? "",
     email: lead.email ?? "",

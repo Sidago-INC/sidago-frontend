@@ -59,6 +59,8 @@ export function FixLeadsTable({
         title: "Lead ID",
         key: "leadId",
         getValue: (row) => row.leadId,
+        render: (row) =>
+          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
       },
       { title: "Company Name", key: "companyName" },
       {

@@ -73,9 +73,11 @@ function formatEmailHistory(
 
 function LeadButton({
   leadId,
+  label,
   onOpen,
 }: {
   leadId: string;
+  label?: string;
   onOpen: () => void;
 }) {
   return (
@@ -87,7 +89,7 @@ function LeadButton({
       }}
       className="cursor-pointer text-left text-sm font-medium text-slate-700 transition hover:text-slate-900 hover:underline dark:text-slate-200 dark:hover:text-white"
     >
-      {leadId}
+      {label ?? leadId}
     </button>
   );
 }
@@ -206,7 +208,14 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         title: "Lead ID",
         key: "leadId",
         render: (row) => (
-          <LeadButton leadId={row.leadId} onOpen={() => openDrawer(row)} />
+          <LeadButton
+            leadId={row.leadId}
+            label={
+              [row.companySymbol, row.fullName].filter(Boolean).join(" - ") ||
+              undefined
+            }
+            onOpen={() => openDrawer(row)}
+          />
         ),
       },
       {

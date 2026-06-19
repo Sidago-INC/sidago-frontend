@@ -93,6 +93,8 @@ export function EmailBlocklistDirectory() {
       {
         title: "Lead ID",
         key: "leadId",
+        render: (row) =>
+          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
       },
       { title: "Company", key: "companyName" },
       { title: "Full Name", key: "fullName" },

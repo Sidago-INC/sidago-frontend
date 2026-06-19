@@ -4,6 +4,7 @@ export type ClosedContactRow = {
   leadId?: string;
   lead: string;
   companyName: string;
+  companySymbol: string;
   fullName: string;
   phone: string;
   email: string;
