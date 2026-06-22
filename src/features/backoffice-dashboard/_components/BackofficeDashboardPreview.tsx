@@ -81,7 +81,7 @@ export function BackofficeDashboardPreview({
             value: displayWinner.callsToday,
             className: clsx("rounded-xl px-4 py-3", WINNER_CARD_TONE),
             valueClassName:
-              "text-xl font-bold text-slate-900 dark:text-slate-100",
+              "text-lg font-bold text-slate-900 dark:text-slate-100",
           },
           {
             id: "hot-leads-today",
@@ -89,7 +89,7 @@ export function BackofficeDashboardPreview({
             value: displayWinner.hotLeadsToday,
             className: clsx("rounded-xl px-4 py-3", WINNER_CARD_TONE),
             valueClassName:
-              "text-xl font-bold text-slate-900 dark:text-slate-100",
+              "text-lg font-bold text-slate-900 dark:text-slate-100",
           },
           {
             id: "current-hot-leads",
@@ -97,7 +97,7 @@ export function BackofficeDashboardPreview({
             value: displayWinner.currentHotLeads,
             className: clsx("rounded-xl px-4 py-3", WINNER_CARD_TONE),
             valueClassName:
-              "text-xl font-bold text-slate-900 dark:text-slate-100",
+              "text-lg font-bold text-slate-900 dark:text-slate-100",
           },
         ]}
       />

@@ -53,7 +53,7 @@ export function AdminAgentScoreCards({
                 value: isLoading ? "—" : agent.monthlyPoints,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
-                  "text-xl font-bold text-slate-900 dark:text-slate-100",
+                  "text-lg font-bold text-slate-900 dark:text-slate-100",
               },
               {
                 id: "last-month-points",
@@ -61,7 +61,7 @@ export function AdminAgentScoreCards({
                 value: isLoading ? "—" : agent.lastMonthPoints,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
-                  "text-xl font-bold text-slate-900 dark:text-slate-100",
+                  "text-lg font-bold text-slate-900 dark:text-slate-100",
               },
               {
                 id: "all-points",
@@ -69,7 +69,7 @@ export function AdminAgentScoreCards({
                 value: isLoading ? "—" : agent.allPoints,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
-                  "text-xl font-bold text-slate-900 dark:text-slate-100",
+                  "text-lg font-bold text-slate-900 dark:text-slate-100",
               },
               {
                 id: "wins",
@@ -77,7 +77,7 @@ export function AdminAgentScoreCards({
                 value: isLoading ? "—" : agent.wins,
                 className: clsx("rounded-xl px-4 py-3", tone),
                 valueClassName:
-                  "text-xl font-bold text-slate-900 dark:text-slate-100",
+                  "text-lg font-bold text-slate-900 dark:text-slate-100",
               },
             ]}
             metricsClassName="grid grid-cols-2 gap-3"

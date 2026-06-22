@@ -46,7 +46,6 @@ export const smsAgentProfiles: Record<
 > = {
   "mariz-cabido": { agentName: "Mariz Cabido", brand: "Sidago" },
   "tom-silver": { agentName: "Tom Silver", brand: "Sidago" },
-  "bryan-taylor": { agentName: "Bryan Taylor", brand: "Benton" },
   "chris-moore": { agentName: "Chris Moore", brand: "95RM" },
 };
 

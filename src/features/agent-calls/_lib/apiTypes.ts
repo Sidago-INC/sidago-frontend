@@ -28,6 +28,17 @@ export type QueueResponse = {
   data: QueueLead[];
 };
 
+export type CallsLogResponse = {
+  ok: boolean;
+  agentSlug: string;
+  brandCode: string;
+  counts: { hot: number; general: number };
+  data: {
+    hot: QueueLead[];
+    general: QueueLead[];
+  };
+};
+
 export type HistoryEntry = {
   id: string;
   calledAt: string;

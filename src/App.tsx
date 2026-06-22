@@ -96,14 +96,12 @@ export default function App() {
                 <Route path="/sms" element={<P><SmsPage /></P>} />
                 <Route path="/sms/mariz-cabido" element={<P><AgentSms agentName="Mariz Cabido" agentSlug="mariz-cabido" /></P>} />
                 <Route path="/sms/tom-silver" element={<P><AgentSms agentName="Tom Silver" agentSlug="tom-silver" /></P>} />
-                <Route path="/sms/bryan-taylor" element={<P><AgentSms agentName="Bryan Taylor" agentSlug="bryan-taylor" /></P>} />
                 <Route path="/sms/chris-moore" element={<P><AgentSms agentName="Chris Moore" agentSlug="chris-moore" /></P>} />
 
                 {/* Email */}
                 <Route path="/email" element={<P><EmailPage /></P>} />
                 <Route path="/email/mariz-cabido" element={<P><AgentEmail agentName="Mariz Cabido" agentSlug="mariz-cabido" /></P>} />
                 <Route path="/email/tom-silver" element={<P><AgentEmail agentName="Tom Silver" agentSlug="tom-silver" /></P>} />
-                <Route path="/email/bryan-taylor" element={<P><AgentEmail agentName="Bryan Taylor" agentSlug="bryan-taylor" /></P>} />
                 <Route path="/email/chris-moore" element={<P><AgentEmail agentName="Chris Moore" agentSlug="chris-moore" /></P>} />
 
                 {/* Email management */}

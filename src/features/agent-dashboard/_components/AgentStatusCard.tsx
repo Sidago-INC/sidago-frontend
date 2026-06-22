@@ -41,8 +41,8 @@ export default function AgentStatusCard({
         value: item.value,
         className: clsx("rounded-lg px-4 py-2 dark:bg-gray-800", color.light),
         labelClassName:
-          "mb-1 text-[10px] uppercase text-gray-500 dark:text-gray-400",
-        valueClassName: "text-lg font-bold text-[#003aa0] dark:text-blue-400",
+          "mb-1 text-[9px] uppercase leading-snug text-gray-500 dark:text-gray-400 whitespace-normal break-words",
+        valueClassName: "text-base font-bold text-[#003aa0] dark:text-blue-400",
       }))}
     />
   );

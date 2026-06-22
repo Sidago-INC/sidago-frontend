@@ -1,6 +1,5 @@
-
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Ban,
   ChevronDown,
@@ -24,34 +23,54 @@ import {
   Drawer,
   EditableDrawerFooter,
   EmptyState,
+  ErrorState,
   Select,
+  Wave,
   TextInput,
   Textarea,
   TimezoneBadge,
   TypeBadge,
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import type {
+  LeadDetailResponse,
+  QueueLead,
+} from "@/features/agent-calls/_lib/apiTypes";
 import {
-  getCompanySymbol,
-  getLeadId,
-} from "@/features/backoffice-shared/constants";
-import { getStoredLeads } from "@/features/leads/_lib/storage";
-import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
+  resolveAgentSlug,
+} from "@/features/agent-calls/_lib/agentCallsApi";
+import { getAgentKeyFromCookie } from "@/features/agent-calls/_lib/utils";
+import { getCompanySymbol } from "@/features/backoffice-shared/constants";
+import type { LeadPatchBody } from "@/features/backoffice-shared/use-update-lead";
 import clsx from "clsx";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
-import { showSuccessToast } from "@/lib/toast";
-
-type LeadGroup = {
-  leadType: string;
-  timezones: Array<{
-    timezone: string;
-    leads: LeadDirectoryRow[];
-  }>;
-};
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import {
+  formatCallsHistory,
+  formatNotesHistory,
+  formatRelatedContacts,
+} from "./_lib/format";
+import {
+  buildCallLogGroups,
+  flattenCallsLogLeads,
+  getCallLogLeadLabel,
+  getCallLogPathKey,
+  matchesCallLogSearch,
+} from "./_lib/grouping";
+import {
+  useCallLogDetail,
+  useCallLogFollowUp,
+  useCallLogMarkVoid,
+  useCallsLogQueue,
+  useLogCallResult,
+  usePatchCallLogLead,
+} from "./_lib/hooks";
 
 type EditableCallLogState = {
   fullName: string;
+  role: string;
+  phone: string;
   email: string;
   contactType: string;
   svgLeadType: string;
@@ -61,15 +80,42 @@ type EditableCallLogState = {
   callBackDate: string;
   historyCalls: string;
   historyNotes: string;
-  selectedOutcome: string;
 };
 
-const defaultHistoryCalls = `04/17/2026 - LEVEL 2 TOM - No Answer
-04/13/2026 - LEVEL 1 TOM - Left Voicemail
-04/10/2026 - LEVEL 1 TOM - No Answer`;
-const defaultHistoryNotes = `04/17/2026 - LEVEL 2 TOM - No Answer
-04/13/2026 - LEVEL 1 TOM - Left Voicemail
-04/10/2026 - LEVEL 1 TOM - No Answer`;
+type SavableFormFields = Pick<
+  EditableCallLogState,
+  | "fullName"
+  | "role"
+  | "phone"
+  | "email"
+  | "contactType"
+  | "svgLeadType"
+  | "doesNotWorkAnymore"
+  | "callBackDate"
+>;
+
+function pickSavableFields(form: EditableCallLogState): SavableFormFields {
+  return {
+    fullName: form.fullName,
+    role: form.role,
+    phone: form.phone,
+    email: form.email,
+    contactType: form.contactType,
+    svgLeadType: form.svgLeadType,
+    doesNotWorkAnymore: form.doesNotWorkAnymore,
+    callBackDate: form.callBackDate,
+  };
+}
+
+function hasSavableChanges(
+  form: EditableCallLogState,
+  baseline: EditableCallLogState,
+): boolean {
+  return (
+    JSON.stringify(pickSavableFields(form)) !==
+    JSON.stringify(pickSavableFields(baseline))
+  );
+}
 
 const callOutcomes = [
   {
@@ -120,108 +166,98 @@ const callOutcomes = [
   },
 ] as const;
 
-function getLeadTypeLabel(row: LeadDirectoryRow) {
-  return row.svgLeadType || row.lead || "Uncategorized";
+type BrandKey = "svg" | "95rm" | "benton";
+
+function toBrandKey(brandCode: string): BrandKey {
+  const code = brandCode.toLowerCase();
+  if (code === "95rm") return "95rm";
+  if (code === "benton") return "benton";
+  return "svg";
 }
 
-function getTimezoneLabel(row: LeadDirectoryRow) {
-  return row.timezone || "Unknown";
-}
-
-function getPathKey(leadType: string, timezone: string) {
-  return `${leadType}__${timezone}`;
-}
-
-function matchesSearch(row: LeadDirectoryRow, query: string) {
-  if (!query) {
-    return true;
-  }
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const leadId = getLeadId(row).toLowerCase();
-
-  return [
-    leadId,
-    row.fullName,
-    row.companyName,
-    row.email,
-    row.phone,
-    getLeadTypeLabel(row),
-    getTimezoneLabel(row),
-  ]
-    .filter(Boolean)
-    .some((value) => value.toLowerCase().includes(normalizedQuery));
-}
-
-function buildGroups(rows: LeadDirectoryRow[]): LeadGroup[] {
-  const leadTypeMap = new Map<string, Map<string, LeadDirectoryRow[]>>();
-
-  for (const row of rows) {
-    const leadType = getLeadTypeLabel(row);
-    const timezone = getTimezoneLabel(row);
-
-    if (!leadTypeMap.has(leadType)) {
-      leadTypeMap.set(leadType, new Map());
-    }
-
-    const timezoneMap = leadTypeMap.get(leadType)!;
-
-    if (!timezoneMap.has(timezone)) {
-      timezoneMap.set(timezone, []);
-    }
-
-    timezoneMap.get(timezone)!.push(row);
-  }
-
-  return Array.from(leadTypeMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([leadType, timezoneMap]) => ({
-      leadType,
-      timezones: Array.from(timezoneMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([timezone, groupedRows]) => ({
-          timezone,
-          leads: [...groupedRows].sort((a, b) =>
-            getLeadId(a).localeCompare(getLeadId(b)),
-          ),
-        })),
-    }));
-}
-
-function getEditableState(row: LeadDirectoryRow): EditableCallLogState {
+function formFromDetail(detail: LeadDetailResponse): EditableCallLogState {
   return {
-    fullName: row.fullName,
-    email: row.email,
-    contactType: row.contactType,
-    svgLeadType: row.svgLeadType || row.lead,
+    fullName: detail.lead.fullName,
+    role: detail.lead.role ?? "",
+    phone: detail.lead.phone ?? "",
+    email: detail.lead.email,
+    contactType: detail.lead.contactType,
+    svgLeadType: detail.brandState.leadType,
     notes: "",
-    additionalContacts: "",
-    doesNotWorkAnymore: row.notWorked ?? false,
-    callBackDate: row.svgLastCallDate || row.lastActionDate,
-    historyCalls: defaultHistoryCalls,
-    historyNotes: defaultHistoryNotes,
-    selectedOutcome: "",
+    additionalContacts: formatRelatedContacts(detail.relatedContacts),
+    doesNotWorkAnymore: detail.lead.notWorkAnymore,
+    callBackDate: detail.brandState.followUpDate ?? "",
+    historyCalls: formatCallsHistory(detail.history),
+    historyNotes: formatNotesHistory(detail.history),
   };
 }
 
-function getCompanyContactKey(row: LeadDirectoryRow) {
-  return [
-    getLeadId(row),
-    row.email || "no-email",
-    row.fullName || "no-name",
-    row.phone || "no-phone",
-  ].join("__");
+function buildLeadPatchBody(
+  form: EditableCallLogState,
+  detail: LeadDetailResponse,
+  brandKey: BrandKey,
+): LeadPatchBody | null {
+  const body: LeadPatchBody = {};
+  const leadPatch: NonNullable<LeadPatchBody["lead"]> = {};
+
+  if (form.fullName !== detail.lead.fullName) {
+    leadPatch.full_name = form.fullName;
+  }
+  if (form.role !== (detail.lead.role ?? "")) {
+    leadPatch.role = form.role;
+  }
+  if (form.phone !== (detail.lead.phone ?? "")) {
+    leadPatch.phone = form.phone;
+  }
+  if (form.email !== detail.lead.email) {
+    leadPatch.email = form.email;
+  }
+  if (form.contactType !== detail.lead.contactType) {
+    leadPatch.contact_type = form.contactType;
+  }
+  if (form.doesNotWorkAnymore !== detail.lead.notWorkAnymore) {
+    leadPatch.not_work_anymore = form.doesNotWorkAnymore;
+  }
+
+  const brandPatch: NonNullable<LeadPatchBody["brandStates"]> = {};
+  if (form.svgLeadType !== detail.brandState.leadType) {
+    brandPatch[brandKey] = { lead_type: form.svgLeadType };
+  }
+
+  if (Object.keys(leadPatch).length > 0) {
+    body.lead = leadPatch;
+  }
+  if (Object.keys(brandPatch).length > 0) {
+    body.brandStates = brandPatch;
+  }
+
+  return Object.keys(body).length > 0 ? body : null;
 }
 
 export function AgentCallLogs() {
-  const [rows] = useState<LeadDirectoryRow[]>(() => getStoredLeads());
+  const [searchParams] = useSearchParams();
+  const agentSlug =
+    searchParams.get("agent") ??
+    searchParams.get("agentId") ??
+    resolveAgentSlug(getAgentKeyFromCookie());
+
+  const {
+    data: queueData,
+    isLoading: queueLoading,
+    isError: queueError,
+    refetch: refetchQueue,
+  } = useCallsLogQueue(agentSlug);
+
+  const brandCode = queueData?.brandCode ?? "svg";
+  const brandKey = toBrandKey(brandCode);
+
+  const rows = useMemo(
+    () => (queueData ? flattenCallsLogLeads(queueData.data) : []),
+    [queueData],
+  );
+
   const [search, setSearch] = useState("");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const filteredRows = useMemo(
-    () => rows.filter((row) => matchesSearch(row, search)),
-    [rows, search],
-  );
-  const groups = useMemo(() => buildGroups(filteredRows), [filteredRows]);
   const [expandedLeadTypes, setExpandedLeadTypes] = useState<string[]>([]);
   const [expandedTimezones, setExpandedTimezones] = useState<string[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -229,16 +265,156 @@ export function AgentCallLogs() {
     key: string;
     value: EditableCallLogState;
   } | null>(null);
-  const [companyContactKey, setCompanyContactKey] = useState<string | null>(
+  const [companyContactLeadId, setCompanyContactLeadId] = useState<string | null>(
     null,
   );
   const [companyContactFormState, setCompanyContactFormState] = useState<{
     key: string;
     value: EditableCallLogState;
   } | null>(null);
-  const firstGroup = groups[0];
-  const firstTimezone = firstGroup?.timezones[0];
-  const firstLead = firstTimezone?.leads[0] ?? filteredRows[0] ?? null;
+
+  const filteredRows = useMemo(
+    () => rows.filter((row) => matchesCallLogSearch(row, search)),
+    [rows, search],
+  );
+  const groups = useMemo(() => buildCallLogGroups(filteredRows), [filteredRows]);
+
+  const defaultLead = useMemo(
+    () => groups[0]?.timezones[0]?.leads[0] ?? filteredRows[0] ?? null,
+    [groups, filteredRows],
+  );
+
+  useEffect(() => {
+    setSelectedLeadId(null);
+    setExpandedLeadTypes([]);
+    setExpandedTimezones([]);
+  }, [agentSlug]);
+
+  useEffect(() => {
+    if (!defaultLead) {
+      return;
+    }
+
+    setSelectedLeadId((current) => current ?? defaultLead.leadId);
+
+    const firstGroup = groups[0];
+    const firstTimezone = firstGroup?.timezones[0];
+    if (!firstGroup) {
+      return;
+    }
+
+    setExpandedLeadTypes((current) =>
+      current.length > 0 ? current : [firstGroup.leadType],
+    );
+
+    if (firstTimezone) {
+      setExpandedTimezones((current) =>
+        current.length > 0
+          ? current
+          : [getCallLogPathKey(firstGroup.leadType, firstTimezone.timezone)],
+      );
+    }
+  }, [defaultLead, groups]);
+
+  const selectedLead = useMemo(() => {
+    if (selectedLeadId) {
+      return (
+        filteredRows.find((row) => row.leadId === selectedLeadId) ?? defaultLead
+      );
+    }
+    return defaultLead;
+  }, [filteredRows, selectedLeadId, defaultLead]);
+
+  const {
+    data: detail,
+    isLoading: detailLoading,
+    isFetching: detailFetching,
+  } = useCallLogDetail(selectedLead?.leadId, agentSlug);
+
+  const logResult = useLogCallResult(agentSlug);
+  const followUp = useCallLogFollowUp(agentSlug);
+  const markVoid = useCallLogMarkVoid(agentSlug);
+  const patchLead = usePatchCallLogLead(agentSlug);
+
+  const {
+    data: companyContactDetail,
+    isLoading: companyContactDetailLoading,
+  } = useCallLogDetail(companyContactLeadId, agentSlug);
+
+  useEffect(() => {
+    if (!detail || !selectedLead) {
+      return;
+    }
+
+    setFormState({
+      key: selectedLead.leadId,
+      value: formFromDetail(detail),
+    });
+  }, [detail, selectedLead]);
+
+  useEffect(() => {
+    if (!companyContactDetail || !companyContactLeadId) {
+      return;
+    }
+
+    setCompanyContactFormState({
+      key: companyContactLeadId,
+      value: formFromDetail(companyContactDetail),
+    });
+  }, [companyContactDetail, companyContactLeadId]);
+
+  const form =
+    selectedLead && formState?.key === selectedLead.leadId
+      ? formState.value
+      : detail
+        ? formFromDetail(detail)
+        : null;
+
+  const baselineForm = useMemo(
+    () => (detail ? formFromDetail(detail) : null),
+    [detail],
+  );
+
+  const isDirty = useMemo(() => {
+    if (!form || !baselineForm) {
+      return false;
+    }
+    return hasSavableChanges(form, baselineForm);
+  }, [form, baselineForm]);
+
+  const allCompanyContacts = useMemo(() => {
+    if (!selectedLead) {
+      return [];
+    }
+
+    return rows
+      .filter((row) => row.companyId === selectedLead.companyId)
+      .sort((a, b) =>
+        getCallLogLeadLabel(a).localeCompare(getCallLogLeadLabel(b)),
+      );
+  }, [rows, selectedLead]);
+
+  const selectedCompanyContact = useMemo(
+    () =>
+      companyContactLeadId
+        ? rows.find((row) => row.leadId === companyContactLeadId) ?? null
+        : null,
+    [companyContactLeadId, rows],
+  );
+
+  const selectedCompanyContactIndex = selectedCompanyContact
+    ? allCompanyContacts.findIndex(
+        (row) => row.leadId === selectedCompanyContact.leadId,
+      )
+    : -1;
+
+  const selectedCompanyContactForm =
+    selectedCompanyContact &&
+    companyContactFormState?.key === selectedCompanyContact.leadId
+      ? companyContactFormState.value
+      : companyContactDetail
+        ? formFromDetail(companyContactDetail)
+        : null;
 
   const visibleLeadTypes = useMemo(
     () => new Set(groups.map((group) => group.leadType)),
@@ -249,7 +425,7 @@ export function AgentCallLogs() {
       new Set(
         groups.flatMap((group) =>
           group.timezones.map((timezoneGroup) =>
-            getPathKey(group.leadType, timezoneGroup.timezone),
+            getCallLogPathKey(group.leadType, timezoneGroup.timezone),
           ),
         ),
       ),
@@ -259,97 +435,24 @@ export function AgentCallLogs() {
   const activeExpandedLeadTypes = expandedLeadTypes.filter((leadType) =>
     visibleLeadTypes.has(leadType),
   );
-
   const activeExpandedTimezones = expandedTimezones.filter((key) =>
     visibleTimezoneKeys.has(key),
   );
-
-  const selectedLead = useMemo(() => {
-    if (selectedLeadId) {
-      const matchedLead = filteredRows.find(
-        (row) => getLeadId(row) === selectedLeadId,
-      );
-
-      if (matchedLead) {
-        return matchedLead;
-      }
-    }
-
-    return firstLead;
-  }, [filteredRows, firstLead, selectedLeadId]);
-
-  const form =
-    selectedLead && formState?.key === getLeadId(selectedLead)
-      ? formState.value
-      : selectedLead
-        ? getEditableState(selectedLead)
-        : null;
-  const allCompanyContacts = useMemo(() => {
-    if (!selectedLead) {
-      return [];
-    }
-
-    return rows
-      .filter((row) => row.companyName === selectedLead.companyName)
-      .sort((a, b) => getLeadId(a).localeCompare(getLeadId(b)));
-  }, [rows, selectedLead]);
-  const selectedCompanyContact = useMemo(() => {
-    if (!companyContactKey) {
-      return null;
-    }
-
-    return (
-      allCompanyContacts.find(
-        (row) => getCompanyContactKey(row) === companyContactKey,
-      ) ?? null
-    );
-  }, [allCompanyContacts, companyContactKey]);
-  const selectedCompanyContactIndex = selectedCompanyContact
-    ? allCompanyContacts.findIndex(
-        (row) =>
-          getCompanyContactKey(row) ===
-          getCompanyContactKey(selectedCompanyContact),
-      )
-    : -1;
-  const selectedCompanyContactForm =
-    selectedCompanyContact &&
-    companyContactFormState?.key === getLeadId(selectedCompanyContact)
-      ? companyContactFormState.value
-      : selectedCompanyContact
-        ? getEditableState(selectedCompanyContact)
-        : null;
 
   const contactTypeOptions = useMemo(
     () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
-
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
 
-  const toggleLeadType = (leadType: string) => {
-    const isOpen = activeExpandedLeadTypes.includes(leadType);
-
-    setExpandedLeadTypes(isOpen ? [] : [leadType]);
-
-    if (!isOpen) {
-      const targetGroup = groups.find((group) => group.leadType === leadType);
-      const firstTimezoneLabel = targetGroup?.timezones[0]?.timezone;
-
-      setExpandedTimezones(
-        firstTimezoneLabel ? [getPathKey(leadType, firstTimezoneLabel)] : [],
-      );
-    }
-  };
-
-  const toggleTimezone = (leadType: string, timezone: string) => {
-    const key = getPathKey(leadType, timezone);
-    const isOpen = activeExpandedTimezones.includes(key);
-
-    setExpandedTimezones(isOpen ? [] : [key]);
-  };
+  const actionPending =
+    logResult.isPending ||
+    followUp.isPending ||
+    markVoid.isPending ||
+    patchLead.isPending;
 
   const updateForm = <Key extends keyof EditableCallLogState>(
     key: Key,
@@ -360,7 +463,7 @@ export function AgentCallLogs() {
     }
 
     setFormState({
-      key: getLeadId(selectedLead),
+      key: selectedLead.leadId,
       value: {
         ...form,
         [key]: value,
@@ -377,7 +480,7 @@ export function AgentCallLogs() {
     }
 
     setCompanyContactFormState({
-      key: getLeadId(selectedCompanyContact),
+      key: selectedCompanyContact.leadId,
       value: {
         ...selectedCompanyContactForm,
         [key]: value,
@@ -385,41 +488,163 @@ export function AgentCallLogs() {
     });
   };
 
-  const openCompanyContactDrawer = (row: LeadDirectoryRow) => {
-    setCompanyContactKey(getCompanyContactKey(row));
+  const persistLeadChanges = async (
+    leadId: string,
+    formValue: EditableCallLogState,
+    detailValue: LeadDetailResponse,
+  ) => {
+    const body = buildLeadPatchBody(formValue, detailValue, brandKey);
+    if (body) {
+      await patchLead.mutateAsync({ leadId, body });
+    }
+
+    const baselineCallback = detailValue.brandState.followUpDate ?? "";
+    if (
+      formValue.callBackDate !== baselineCallback &&
+      formValue.callBackDate
+    ) {
+      await followUp.mutateAsync({
+        leadId,
+        followUpDate: formValue.callBackDate,
+      });
+    }
   };
 
-  const closeCompanyContactDrawer = () => {
-    setCompanyContactKey(null);
-  };
-
-  const resetCompanyContactDrawer = () => {
-    if (!selectedCompanyContact) {
+  const handleSaveChanges = async () => {
+    if (!selectedLead || !form || !detail || !isDirty) {
       return;
     }
 
-    setCompanyContactFormState({
-      key: getLeadId(selectedCompanyContact),
-      value: getEditableState(selectedCompanyContact),
+    const body = buildLeadPatchBody(form, detail, brandKey);
+    const callbackChanged =
+      form.callBackDate !== (detail.brandState.followUpDate ?? "");
+
+    if (!body && !callbackChanged) {
+      return;
+    }
+
+    try {
+      await persistLeadChanges(selectedLead.leadId, form, detail);
+      showSuccessToast("Changes saved successfully.");
+    } catch (error) {
+      showErrorToast(error);
+    }
+  };
+
+  const handleCancelChanges = () => {
+    if (!selectedLead || !baselineForm) {
+      return;
+    }
+
+    setFormState({
+      key: selectedLead.leadId,
+      value: baselineForm,
     });
   };
 
-  const saveCompanyContactDrawer = () => {
-    showSuccessToast("Company contact changes saved successfully.");
-  };
-
-  const navigateCompanyContactDrawer = (offset: -1 | 1) => {
-    if (selectedCompanyContactIndex < 0) {
+  const handleOutcome = async (resultCode: string) => {
+    if (!selectedLead || !form || !detail || actionPending) {
       return;
     }
 
-    const nextRow = allCompanyContacts[selectedCompanyContactIndex + offset];
-    if (!nextRow) {
+    try {
+      await persistLeadChanges(selectedLead.leadId, form, detail);
+      await logResult.mutateAsync({
+        agentSlug,
+        leadId: selectedLead.leadId,
+        resultCode,
+        notes: form.notes || undefined,
+        followUpDate: form.callBackDate || undefined,
+        source: "manual",
+      });
+      showSuccessToast("Call outcome logged successfully.");
+    } catch (error) {
+      showErrorToast(error);
+    }
+  };
+
+  const handleMarkVoid = (checked: boolean) => {
+    updateForm("doesNotWorkAnymore", checked);
+  };
+
+  const handleCallBackDateChange = (date: string) => {
+    updateForm("callBackDate", date);
+  };
+
+  const saveCompanyContactDrawer = async () => {
+    if (
+      !selectedCompanyContact ||
+      !selectedCompanyContactForm ||
+      !companyContactDetail
+    ) {
       return;
     }
 
-    setCompanyContactKey(getCompanyContactKey(nextRow));
+    try {
+      await persistLeadChanges(
+        selectedCompanyContact.leadId,
+        selectedCompanyContactForm,
+        companyContactDetail,
+      );
+      showSuccessToast("Company contact changes saved successfully.");
+    } catch (error) {
+      showErrorToast(error);
+    }
   };
+
+  const toggleLeadType = (leadType: string) => {
+    const isOpen = activeExpandedLeadTypes.includes(leadType);
+    setExpandedLeadTypes(isOpen ? [] : [leadType]);
+
+    if (!isOpen) {
+      const targetGroup = groups.find((group) => group.leadType === leadType);
+      const firstTimezone = targetGroup?.timezones[0];
+      setExpandedTimezones(
+        firstTimezone
+          ? [getCallLogPathKey(leadType, firstTimezone.timezone)]
+          : [],
+      );
+
+      const firstLead = firstTimezone?.leads[0];
+      if (firstLead) {
+        setSelectedLeadId(firstLead.leadId);
+      }
+    }
+  };
+
+  const toggleTimezone = (leadType: string, timezone: string) => {
+    const key = getCallLogPathKey(leadType, timezone);
+    const isOpen = activeExpandedTimezones.includes(key);
+    setExpandedTimezones(isOpen ? [] : [key]);
+
+    if (!isOpen) {
+      const targetGroup = groups.find((group) => group.leadType === leadType);
+      const timezoneGroup = targetGroup?.timezones.find(
+        (item) => item.timezone === timezone,
+      );
+      const firstLead = timezoneGroup?.leads[0];
+      if (firstLead) {
+        setSelectedLeadId(firstLead.leadId);
+      }
+    }
+  };
+
+  if (queueLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Wave />
+      </div>
+    );
+  }
+
+  if (queueError) {
+    return (
+      <ErrorState
+        title="Failed to load call logs"
+        onRetry={() => refetchQueue()}
+      />
+    );
+  }
 
   if (!rows.length) {
     return <EmptyState message="No leads found for call logs." />;
@@ -455,16 +680,14 @@ export function AgentCallLogs() {
                 >
                   <CardShell className="flex flex-col gap-4">
                     <div className="space-y-4">
-                      <div className="space-y-3">
-                        <div className="relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-                          <TextInput
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search..."
-                            className="pl-9"
-                          />
-                        </div>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+                        <TextInput
+                          value={search}
+                          onChange={(event) => setSearch(event.target.value)}
+                          placeholder="Search..."
+                          className="pl-9"
+                        />
                       </div>
 
                       <div className="space-y-3">
@@ -472,9 +695,7 @@ export function AgentCallLogs() {
                           <div className="space-y-2">
                             {groups.map((group) => {
                               const isLeadTypeExpanded =
-                                activeExpandedLeadTypes.includes(
-                                  group.leadType,
-                                );
+                                activeExpandedLeadTypes.includes(group.leadType);
 
                               return (
                                 <div
@@ -482,10 +703,8 @@ export function AgentCallLogs() {
                                   className="rounded border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/50"
                                 >
                                   <Button
-                                    onClick={() =>
-                                      toggleLeadType(group.leadType)
-                                    }
-                                    className="flex w-full items-center justify-between gap-3 p-2 rounded text-left cursor-pointer hover:bg-white dark:hover:bg-slate-800"
+                                    onClick={() => toggleLeadType(group.leadType)}
+                                    className="flex w-full items-center justify-between gap-3 rounded p-2 text-left cursor-pointer hover:bg-white dark:hover:bg-slate-800"
                                   >
                                     <div className="flex min-w-0 items-center gap-3">
                                       {isLeadTypeExpanded ? (
@@ -512,7 +731,7 @@ export function AgentCallLogs() {
                                     <div className="mt-2 space-y-2 px-2 pb-2">
                                       {group.timezones.map(
                                         (timezoneGroup, timezoneIndex) => {
-                                          const timezoneKey = getPathKey(
+                                          const timezoneKey = getCallLogPathKey(
                                             group.leadType,
                                             timezoneGroup.timezone,
                                           );
@@ -557,39 +776,34 @@ export function AgentCallLogs() {
                                               </Button>
 
                                               {isTimezoneExpanded ? (
-                                                <div className="mt-2 flex flex-wrap gap-2 px-2 pb-2">
+                                                <div className="mt-2 flex flex-col gap-1 px-2 pb-2">
                                                   {timezoneGroup.leads.map(
                                                     (lead) => {
-                                                      const leadId =
-                                                        getLeadId(lead);
                                                       const isSelected =
-                                                        selectedLead &&
-                                                        getLeadId(
-                                                          selectedLead,
-                                                        ) === leadId;
+                                                        selectedLead?.leadId ===
+                                                        lead.leadId;
 
                                                       return (
                                                         <Button
-                                                          key={leadId}
+                                                          key={lead.leadId}
                                                           onClick={() => {
                                                             setSelectedLeadId(
-                                                              leadId,
+                                                              lead.leadId,
                                                             );
                                                             setIsMobileSidebarOpen(
                                                               false,
                                                             );
                                                           }}
                                                           className={clsx(
-                                                            "rounded-full text-xs transition cursor-pointer",
-                                                            {
-                                                              "font-bold":
-                                                                isSelected,
-                                                              "font-normal":
-                                                                !isSelected,
-                                                            },
+                                                            "w-full rounded border px-2.5 py-1.5 text-left text-xs leading-snug transition cursor-pointer whitespace-normal break-words",
+                                                            isSelected
+                                                              ? "border-indigo-300 bg-indigo-50 font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100"
+                                                              : "border-slate-200 bg-white font-normal text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800",
                                                           )}
                                                         >
-                                                          {leadId}
+                                                          {getCallLogLeadLabel(
+                                                            lead,
+                                                          )}
                                                         </Button>
                                                       );
                                                     },
@@ -618,18 +832,30 @@ export function AgentCallLogs() {
               </div>
             </section>
 
-            <section className="min-h-0 border-t border-slate-200 dark:border-slate-700 lg:h-[calc(100vh-8.5rem)] lg:border-t-0">
-              <div className="h-full overflow-y-auto p-4 sm:p-5">
-                {selectedLead && form ? (
+            <section className="flex min-h-0 flex-col border-t border-slate-200 dark:border-slate-700 lg:h-[calc(100vh-8.5rem)] lg:border-t-0">
+              <div className="relative min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+                {(detailLoading || detailFetching) && selectedLead ? (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-gray-900/60">
+                    <Wave />
+                  </div>
+                ) : null}
+
+                {selectedLead && form && detail ? (
                   <CallLogDetailContent
-                    row={selectedLead}
+                    lead={selectedLead}
+                    detail={detail}
                     form={form}
                     onUpdateForm={updateForm}
-                    historyEditable={false}
+                    onOutcomeSelect={handleOutcome}
+                    onMarkVoid={handleMarkVoid}
+                    onCallBackDateChange={handleCallBackDateChange}
+                    outcomeDisabled={actionPending}
                     showAllCompanyContacts
                     isDrawer={false}
                     allCompanyContacts={allCompanyContacts}
-                    onOpenCompanyContact={openCompanyContactDrawer}
+                    onOpenCompanyContact={(lead) =>
+                      setCompanyContactLeadId(lead.leadId)
+                    }
                     contactTypeOptions={contactTypeOptions}
                     leadTypeOptions={leadTypeOptions}
                   />
@@ -637,6 +863,27 @@ export function AgentCallLogs() {
                   <EmptyState message="Select a lead to view call log details." />
                 )}
               </div>
+
+              {isDirty ? (
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-gray-900 sm:px-5">
+                  <Button
+                    onClick={handleCancelChanges}
+                    disabled={patchLead.isPending || followUp.isPending}
+                    className="cursor-pointer rounded border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveChanges}
+                    disabled={patchLead.isPending || followUp.isPending}
+                    className="cursor-pointer rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
+                  >
+                    {patchLead.isPending || followUp.isPending
+                      ? "Saving..."
+                      : "Save"}
+                  </Button>
+                </div>
+              ) : null}
             </section>
           </div>
         </div>
@@ -644,7 +891,7 @@ export function AgentCallLogs() {
 
       <Drawer
         isOpen={Boolean(selectedCompanyContact && selectedCompanyContactForm)}
-        onClose={closeCompanyContactDrawer}
+        onClose={() => setCompanyContactLeadId(null)}
         direction="right"
         size="560px"
         header={
@@ -652,7 +899,11 @@ export function AgentCallLogs() {
             <div className="flex w-full items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigateCompanyContactDrawer(-1)}
+                onClick={() => {
+                  const prev =
+                    allCompanyContacts[selectedCompanyContactIndex - 1];
+                  if (prev) setCompanyContactLeadId(prev.leadId);
+                }}
                 disabled={selectedCompanyContactIndex <= 0}
                 className="group flex h-7 w-7 cursor-pointer items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
@@ -660,7 +911,11 @@ export function AgentCallLogs() {
               </button>
               <button
                 type="button"
-                onClick={() => navigateCompanyContactDrawer(1)}
+                onClick={() => {
+                  const next =
+                    allCompanyContacts[selectedCompanyContactIndex + 1];
+                  if (next) setCompanyContactLeadId(next.leadId);
+                }}
                 disabled={
                   selectedCompanyContactIndex < 0 ||
                   selectedCompanyContactIndex >= allCompanyContacts.length - 1
@@ -671,10 +926,10 @@ export function AgentCallLogs() {
               </button>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {selectedCompanyContact.lead}
+                  {getCallLogLeadLabel(selectedCompanyContact)}
                 </p>
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {getLeadId(selectedCompanyContact)}
+                  {selectedCompanyContact.fullName}
                 </p>
               </div>
             </div>
@@ -682,17 +937,83 @@ export function AgentCallLogs() {
         }
         footer={
           <EditableDrawerFooter
-            onCancel={closeCompanyContactDrawer}
-            onReset={resetCompanyContactDrawer}
+            onCancel={() => setCompanyContactLeadId(null)}
+            onReset={() => {
+              if (!companyContactDetail || !selectedCompanyContact) {
+                return;
+              }
+              setCompanyContactFormState({
+                key: selectedCompanyContact.leadId,
+                value: formFromDetail(companyContactDetail),
+              });
+            }}
             onSave={saveCompanyContactDrawer}
           />
         }
       >
-        {selectedCompanyContact && selectedCompanyContactForm ? (
+        {companyContactDetailLoading ? (
+          <div className="flex min-h-[200px] items-center justify-center">
+            <Wave />
+          </div>
+        ) : selectedCompanyContact &&
+          selectedCompanyContactForm &&
+          companyContactDetail ? (
           <CallLogDetailContent
-            row={selectedCompanyContact}
+            lead={selectedCompanyContact}
+            detail={companyContactDetail}
             form={selectedCompanyContactForm}
             onUpdateForm={updateCompanyContactForm}
+            onOutcomeSelect={async (resultCode) => {
+              if (!companyContactDetail) return;
+              try {
+                await persistLeadChanges(
+                  selectedCompanyContact.leadId,
+                  selectedCompanyContactForm,
+                  companyContactDetail,
+                );
+                await logResult.mutateAsync({
+                  agentSlug,
+                  leadId: selectedCompanyContact.leadId,
+                  resultCode,
+                  notes: selectedCompanyContactForm.notes || undefined,
+                  followUpDate:
+                    selectedCompanyContactForm.callBackDate || undefined,
+                  source: "manual",
+                });
+                showSuccessToast("Call outcome logged successfully.");
+              } catch (error) {
+                showErrorToast(error);
+              }
+            }}
+            onMarkVoid={async (checked) => {
+              updateCompanyContactForm("doesNotWorkAnymore", checked);
+              if (!checked) return;
+              try {
+                await markVoid.mutateAsync({
+                  leadId: selectedCompanyContact.leadId,
+                  notWorkAnymore: checked,
+                });
+                showSuccessToast(
+                  "Lead marked as no longer working at the company.",
+                );
+              } catch (error) {
+                updateCompanyContactForm("doesNotWorkAnymore", false);
+                showErrorToast(error);
+              }
+            }}
+            onCallBackDateChange={async (date) => {
+              updateCompanyContactForm("callBackDate", date);
+              if (!date) return;
+              try {
+                await followUp.mutateAsync({
+                  leadId: selectedCompanyContact.leadId,
+                  followUpDate: date,
+                });
+              } catch {
+                // Resync on next detail fetch.
+              }
+            }}
+            outcomeDisabled={actionPending}
             historyEditable
             showAllCompanyContacts={false}
             isDrawer
@@ -708,10 +1029,15 @@ export function AgentCallLogs() {
 }
 
 function CallLogDetailContent({
-  row,
+  lead,
+  detail,
   form,
   onUpdateForm,
-  historyEditable,
+  onOutcomeSelect,
+  onMarkVoid,
+  onCallBackDateChange,
+  outcomeDisabled = false,
+  historyEditable = false,
   showAllCompanyContacts,
   isDrawer,
   allCompanyContacts,
@@ -719,27 +1045,35 @@ function CallLogDetailContent({
   contactTypeOptions,
   leadTypeOptions,
 }: {
-  row: LeadDirectoryRow;
+  lead: QueueLead;
+  detail: LeadDetailResponse;
   form: EditableCallLogState;
   onUpdateForm: <Key extends keyof EditableCallLogState>(
     key: Key,
     value: EditableCallLogState[Key],
   ) => void;
-  historyEditable: boolean;
+  onOutcomeSelect: (resultCode: string) => void;
+  onMarkVoid: (checked: boolean) => void;
+  onCallBackDateChange: (date: string) => void;
+  outcomeDisabled?: boolean;
+  historyEditable?: boolean;
   showAllCompanyContacts: boolean;
   isDrawer: boolean;
-  allCompanyContacts: LeadDirectoryRow[];
-  onOpenCompanyContact: (row: LeadDirectoryRow) => void;
+  allCompanyContacts: QueueLead[];
+  onOpenCompanyContact: (lead: QueueLead) => void;
   contactTypeOptions: Array<{ label: string; value: string }>;
   leadTypeOptions: Array<{ label: string; value: string }>;
 }) {
+  const companySymbol =
+    lead.companySymbol ?? getCompanySymbol(lead.companyName);
+
   return (
     <div className="space-y-5">
       <DetailCard>
         <div className="flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <CompanySymbolBadge
-              symbol={getCompanySymbol(row.companyName)}
+              symbol={companySymbol}
               index={0}
               className="rounded"
             />
@@ -748,11 +1082,11 @@ function CallLogDetailContent({
                 Company
               </p>
               <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">
-                {row.companyName}
+                {lead.companyName}
               </p>
             </div>
           </div>
-          <TimezoneBadge timezone={row.timezone} index={0} />
+          <TimezoneBadge timezone={lead.timezone} index={0} />
         </div>
       </DetailCard>
 
@@ -766,18 +1100,16 @@ function CallLogDetailContent({
         </EditableField>
         <EditableField label="Role">
           <TextInput
-            value={row.role || "-"}
-            readOnly
-            tabIndex={-1}
-            className="cursor-default text-xs font-semibold focus:border-gray-300 dark:focus:border-gray-600"
+            value={form.role}
+            onChange={(event) => onUpdateForm("role", event.target.value)}
+            className="text-xs font-semibold"
           />
         </EditableField>
         <EditableField label="Phone">
           <TextInput
-            value={row.phone || "-"}
-            readOnly
-            tabIndex={-1}
-            className="cursor-default text-xs font-semibold focus:border-gray-300 dark:focus:border-gray-600"
+            value={form.phone}
+            onChange={(event) => onUpdateForm("phone", event.target.value)}
+            className="text-xs font-semibold"
           />
         </EditableField>
         <EditableField label="Email">
@@ -821,22 +1153,20 @@ function CallLogDetailContent({
         <EditableField label="Doesn't Work Anymore In The Company">
           <CheckboxInput
             checked={form.doesNotWorkAnymore}
-            onChange={(event) =>
-              onUpdateForm("doesNotWorkAnymore", event.target.checked)
-            }
+            onChange={(event) => onMarkVoid(event.target.checked)}
             labelClassName="justify-end"
           />
         </EditableField>
         <EditableField label="Call Back Date">
           <DatePickerField
             value={form.callBackDate}
-            onChange={(value) => onUpdateForm("callBackDate", value)}
+            onChange={onCallBackDateChange}
             className="text-xs font-semibold"
           />
         </EditableField>
         <EditableField label="Last Called Date">
           <TextInput
-            value={row.svgLastCallDate || "-"}
+            value={detail.brandState.lastCalledDate || lead.lastCalledDate || "-"}
             readOnly
             tabIndex={-1}
             className="cursor-default text-xs font-semibold focus:border-gray-300 dark:focus:border-gray-600"
@@ -844,7 +1174,7 @@ function CallLogDetailContent({
         </EditableField>
         <EditableField label="Last Fixed Date">
           <TextInput
-            value={row.lastFixedDate || "-"}
+            value={detail.brandState.lastFixedDate || "-"}
             readOnly
             tabIndex={-1}
             className="cursor-default text-xs font-semibold focus:border-gray-300 dark:focus:border-gray-600"
@@ -903,8 +1233,9 @@ function CallLogDetailContent({
               key={outcome.label}
               label={outcome.label}
               icon={outcome.icon}
-              onClick={() => onUpdateForm("selectedOutcome", outcome.label)}
+              onClick={() => onOutcomeSelect(outcome.label)}
               className={outcome.className}
+              disabled={outcomeDisabled}
             />
           ))}
         </div>
@@ -915,7 +1246,7 @@ function CallLogDetailContent({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {allCompanyContacts.map((contact) => (
               <button
-                key={getCompanyContactKey(contact)}
+                key={contact.leadId}
                 type="button"
                 onClick={() => onOpenCompanyContact(contact)}
                 className="w-full text-left cursor-pointer"
@@ -930,10 +1261,7 @@ function CallLogDetailContent({
                   <AssociationDetail
                     label="Lead Type"
                     value={
-                      <TypeBadge
-                        value={contact.svgLeadType || contact.lead}
-                        kind="lead"
-                      />
+                      <TypeBadge value={contact.leadType} kind="lead" />
                     }
                   />
                 </DetailCard>

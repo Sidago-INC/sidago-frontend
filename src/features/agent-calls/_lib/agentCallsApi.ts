@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import type {
+  CallsLogResponse,
   QueueResponse,
   LeadDetailResponse,
   LogResultBody,
@@ -9,7 +10,6 @@ import type {
 export const AGENT_SLUG_MAP: Record<string, string> = {
   mariz: "mariz-cabido",
   tom: "tom-silver",
-  bryan: "bryan-taylor",
   chris: "chris-moore",
 };
 
@@ -20,6 +20,11 @@ export function resolveAgentSlug(cookieKey: string): string {
 export const agentCallsApi = {
   queue: (agentSlug: string): Promise<QueueResponse> =>
     api.get(`/agent-calls/queue?agentSlug=${agentSlug}&limit=500`),
+
+  callsLog: (agentSlug: string): Promise<CallsLogResponse> =>
+    api.get(
+      `/agent-calls/calls-log?agentSlug=${encodeURIComponent(agentSlug)}`,
+    ),
 
   detail: (leadId: string, agentSlug: string): Promise<LeadDetailResponse> =>
     api.get(

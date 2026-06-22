@@ -96,7 +96,7 @@ export function StatusCard({
                 <div className="min-w-0">
                   <p
                     className={clsx(
-                      "truncate text-[10px] font-medium uppercase opacity-70 sm:text-xs",
+                      "text-[9px] font-medium uppercase leading-snug opacity-70 sm:text-[10px] whitespace-normal break-words",
                       metricLabelClassName,
                       metric.labelClassName,
                     )}
@@ -105,7 +105,7 @@ export function StatusCard({
                   </p>
                   <p
                     className={clsx(
-                      "truncate text-base font-bold sm:text-xl",
+                      "text-sm font-bold leading-tight sm:text-lg whitespace-normal break-words",
                       metricValueClassName,
                       metric.valueClassName,
                     )}
