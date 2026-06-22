@@ -4,7 +4,6 @@ import { AgentEmail } from "@/features/agent-email/_components/AgentEmail";
 const AGENT_MAP = {
   "mariz-cabido": "Mariz Cabido",
   "tom-silver": "Tom Silver",
-  "bryan-taylor": "Bryan Taylor",
   "chris-moore": "Chris Moore",
 } as const;
 

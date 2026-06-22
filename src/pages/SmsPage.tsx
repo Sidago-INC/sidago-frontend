@@ -4,7 +4,6 @@ import { AgentSms } from "@/features/agent-sms/_components/AgentSms";
 const AGENT_MAP = {
   "mariz-cabido": "Mariz Cabido",
   "tom-silver": "Tom Silver",
-  "bryan-taylor": "Bryan Taylor",
   "chris-moore": "Chris Moore",
 } as const;
 

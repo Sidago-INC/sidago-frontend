@@ -29,14 +29,15 @@ export function MetricTile({
         <p
           className={
             labelClassName ??
-            "truncate text-[10px] font-medium uppercase opacity-70 sm:text-xs"
+            "text-[9px] font-medium uppercase leading-snug opacity-70 sm:text-[10px] whitespace-normal break-words"
           }
         >
           {label}
         </p>
         <p
           className={
-            valueClassName ?? "truncate text-base font-bold sm:text-xl"
+            valueClassName ??
+            "text-sm font-bold leading-tight sm:text-lg whitespace-normal break-words"
           }
         >
           {value}

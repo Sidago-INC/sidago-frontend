@@ -39,8 +39,8 @@ export default function StatusCard({ agent, index }: StatusCardProps) {
               className={clsx(
                 "rounded-lg px-4 py-2 bg-indigo-50 dark:bg-gray-800",
               )}
-              labelClassName="mb-1 text-[10px] uppercase text-gray-500 dark:text-gray-400"
-              valueClassName="text-lg font-bold text-[#003aa0] dark:text-blue-400"
+              labelClassName="mb-1 text-[9px] uppercase leading-snug text-gray-500 dark:text-gray-400 whitespace-normal break-words"
+              valueClassName="text-base font-bold text-[#003aa0] dark:text-blue-400"
             />
           ))}
         </div>

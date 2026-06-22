@@ -43,8 +43,8 @@ export function WidgetCard({
         "transition-all duration-300",
         colorClass,
       )}
-      labelClassName="truncate text-[10px] font-medium opacity-70 sm:text-xs"
-      valueClassName="truncate text-base font-bold sm:text-xl"
+      labelClassName="text-[9px] font-medium leading-snug opacity-70 sm:text-[10px] whitespace-normal break-words"
+      valueClassName="text-sm font-bold leading-tight sm:text-lg whitespace-normal break-words"
     />
   );
 }

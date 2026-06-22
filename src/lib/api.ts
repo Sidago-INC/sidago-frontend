@@ -50,15 +50,19 @@ async function request(url: string, options: RequestInit = {}, retry = true) {
   }
 
   if (!res.ok) {
-    const message =
-      data?.message ??
-      data?.error ??
+    const nestedMessage = data?.error?.message;
+    const topLevelMessage = data?.message;
+    const rawMessage =
+      nestedMessage ??
+      topLevelMessage ??
+      (typeof data?.error === "string" ? data.error : null) ??
       (text && text.length < 200 ? text : null) ??
       `Request failed with status ${res.status}`;
+
     throw {
       status: res.status,
-      message: Array.isArray(message) ? message : [message],
-      code: data?.code || "ERROR",
+      message: Array.isArray(rawMessage) ? rawMessage : [rawMessage],
+      code: data?.error?.code ?? data?.code ?? "ERROR",
     };
   }
 

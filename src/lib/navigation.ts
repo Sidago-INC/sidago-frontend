@@ -59,21 +59,18 @@ const AGENT_CHILDREN: NavigationItem[] = [
 const ADMIN_AGENT_NAMES = [
   { label: "Tom Silver", id: "tom-silver" },
   { label: "Mariz Cabido", id: "mariz-cabido" },
-  { label: "Bryan Taylor", id: "bryan-taylor" },
   { label: "Chris Moore", id: "chris-moore" },
 ];
 
 const SMS_AGENT_NAMES = [
   { label: "Mariz", id: "mariz-cabido" },
   { label: "Tom Silver", id: "tom-silver" },
-  { label: "Bryan Taylor", id: "bryan-taylor" },
   { label: "Chris Moore", id: "chris-moore" },
 ];
 
 const EMAIL_AGENT_NAMES = [
   { label: "Mariz", id: "mariz-cabido" },
   { label: "Tom Silver", id: "tom-silver" },
-  { label: "Bryan Taylor", id: "bryan-taylor" },
   { label: "Chris Moore", id: "chris-moore" },
 ];
 
