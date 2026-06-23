@@ -5,14 +5,21 @@ import {
   flattenNavigationHrefs,
   type UserRole,
 } from "./navigation";
+import { ADMIN_AGENT_ROUTE_PATHS } from "./navigation-agents";
 
 export const AUTH_NOTICE_KEY = "sidago_auth_notice";
 
 const agentRoutes = new Set(flattenNavigationHrefs(agentNavigation));
 
-const backofficeRoutes = new Set(flattenNavigationHrefs(backofficeNavigation));
+const backofficeRoutes = new Set([
+  ...flattenNavigationHrefs(backofficeNavigation),
+  ...ADMIN_AGENT_ROUTE_PATHS,
+]);
 
-const adminRoutes = new Set(flattenNavigationHrefs(adminOnlyNavigation));
+const adminRoutes = new Set([
+  ...flattenNavigationHrefs(adminOnlyNavigation),
+  ...ADMIN_AGENT_ROUTE_PATHS,
+]);
 
 const allProtectedRoutes = new Set([
   ...adminRoutes,

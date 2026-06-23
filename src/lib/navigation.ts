@@ -22,6 +22,11 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import {
+  buildAgentPageNavItems,
+  flattenUniqueAgents,
+  type BrandWithAgents,
+} from "./navigation-agents";
 
 export type UserRole = "agent" | "admin" | "backoffice";
 
@@ -54,24 +59,6 @@ const AGENT_CHILDREN: NavigationItem[] = [
     href: "/lead-manual-update",
     icon: RefreshCw,
   },
-];
-
-const ADMIN_AGENT_NAMES = [
-  { label: "Tom Silver", id: "tom-silver" },
-  { label: "Mariz Cabido", id: "mariz-cabido" },
-  { label: "Chris Moore", id: "chris-moore" },
-];
-
-const SMS_AGENT_NAMES = [
-  { label: "Mariz", id: "mariz-cabido" },
-  { label: "Tom Silver", id: "tom-silver" },
-  { label: "Chris Moore", id: "chris-moore" },
-];
-
-const EMAIL_AGENT_NAMES = [
-  { label: "Mariz", id: "mariz-cabido" },
-  { label: "Tom Silver", id: "tom-silver" },
-  { label: "Chris Moore", id: "chris-moore" },
 ];
 
 function slugifyAgentName(value: string) {
@@ -129,37 +116,77 @@ export const agentNavigation: NavigationItem[] = [
   ...cloneNavigationItems(AGENT_CHILDREN),
 ];
 
-export const adminOnlyNavigation: NavigationItem[] = [
+function buildAgentsNavSection(brands: BrandWithAgents[]): NavigationItem {
+  return {
+    label: "Agents",
+    icon: Users,
+    children: brands
+      .filter((brand) => brand.agents.length > 0)
+      .map((brand) => ({
+        label: brand.brandName,
+        icon: Building2,
+        children: brand.agents.map((agent) => ({
+          label: agent.name,
+          icon: UserPlus,
+          children: buildAgentPageNavItems(agent),
+        })),
+      })),
+  };
+}
+
+function buildSmsNavSection(agents: BrandWithAgents["agents"]): NavigationItem {
+  return {
+    label: "SMS",
+    icon: MessageSquare,
+    children: agents.map((agent) => ({
+      label: agent.name,
+      href: `/sms?agent=${encodeURIComponent(agent.slug)}&agentId=${encodeURIComponent(agent.agentId)}`,
+      icon: MessageSquare,
+    })),
+  };
+}
+
+function buildEmailNavSection(agents: BrandWithAgents["agents"]): NavigationItem {
+  return {
+    label: "Email",
+    icon: Mail,
+    children: [
+      ...agents.map((agent) => ({
+        label: agent.name,
+        href: `/email?agent=${encodeURIComponent(agent.slug)}&agentId=${encodeURIComponent(agent.agentId)}`,
+        icon: Mail,
+      })),
+      {
+        label: "Blocked",
+        href: "/blocked-email",
+        icon: MailX,
+      },
+      {
+        label: "Blocklist Directory",
+        href: "/email-blocklist-directory",
+        icon: List,
+      },
+      {
+        label: "Dead/Missing",
+        href: "/dead-missing-email",
+        icon: MailWarning,
+      },
+    ],
+  };
+}
+
+function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationItem[] {
+  const uniqueAgents = brandsWithAgents
+    ? flattenUniqueAgents(brandsWithAgents)
+    : [];
+
+  return [
   {
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
-  {
-    label: "Agents",
-    icon: Users,
-    children: ADMIN_AGENT_NAMES.map((agent) => ({
-      label: agent.label,
-      icon: UserPlus,
-      children: [
-        {
-          label: "Calls",
-          href: `/calls?agent=${agent.id}&agentId=${agent.id}`,
-          icon: Phone,
-        },
-        {
-          label: "Call Logs",
-          href: `/call-logs?agent=${agent.id}&agentId=${agent.id}`,
-          icon: History,
-        },
-        {
-          label: "Lead Manual Update",
-          href: `/lead-manual-update?agent=${agent.id}&agentId=${agent.id}`,
-          icon: RefreshCw,
-        },
-      ],
-    })),
-  },
+  ...(brandsWithAgents ? [buildAgentsNavSection(brandsWithAgents)] : []),
   {
     label: "Level 2",
     icon: Package,
@@ -186,41 +213,8 @@ export const adminOnlyNavigation: NavigationItem[] = [
     href: "/leads-stats",
     icon: BarChart2,
   },
-  {
-    label: "SMS",
-    icon: MessageSquare,
-    children: SMS_AGENT_NAMES.map((item) => ({
-      label: item.label,
-      href: `/sms?agent=${item.id}&agentId=${item.id}`,
-      icon: MessageSquare,
-    })),
-  },
-  {
-    label: "Email",
-    icon: Mail,
-    children: [
-      ...EMAIL_AGENT_NAMES.map((item) => ({
-        label: item.label,
-        href: `/email?agent=${item.id}&agentId=${item.id}`,
-        icon: Mail,
-      })),
-      {
-        label: "Blocked",
-        href: "/blocked-email",
-        icon: MailX,
-      },
-      {
-        label: "Blocklist Directory",
-        href: "/email-blocklist-directory",
-        icon: List,
-      },
-      {
-        label: "Dead/Missing",
-        href: "/dead-missing-email",
-        icon: MailWarning,
-      },
-    ],
-  },
+  buildSmsNavSection(uniqueAgents),
+  buildEmailNavSection(uniqueAgents),
   {
     label: "Company",
     icon: Building2,
@@ -364,10 +358,19 @@ export const adminOnlyNavigation: NavigationItem[] = [
     ],
   },
 ];
+}
 
-export const backofficeNavigation: NavigationItem[] = cloneNavigationItems(
-  adminOnlyNavigation.filter((item) => item.label !== "Agents"),
-);
+export const adminOnlyNavigation: NavigationItem[] = buildAdminNavigation();
+
+export function buildBackofficeNavigation(
+  brandsWithAgents?: BrandWithAgents[],
+): NavigationItem[] {
+  return cloneNavigationItems(
+    buildAdminNavigation(brandsWithAgents).filter((item) => item.label !== "Agents"),
+  );
+}
+
+export const backofficeNavigation: NavigationItem[] = buildBackofficeNavigation();
 
 const navigationByRole: Record<UserRole, NavigationItem[]> = {
   agent: agentNavigation,
@@ -384,17 +387,32 @@ export function flattenNavigationHrefs(items: NavigationItem[]): string[] {
 
 export const getNavigationsForRole = (
   roleOrUser?: string | NavigationUserContext,
+  brandsWithAgents?: BrandWithAgents[],
 ): NavigationItem[] => {
   if (!roleOrUser) {
     return [];
   }
 
   if (typeof roleOrUser === "string") {
+    if (roleOrUser === "admin") {
+      return buildAdminNavigation(brandsWithAgents);
+    }
+    if (roleOrUser === "backoffice") {
+      return buildBackofficeNavigation(brandsWithAgents);
+    }
     return navigationByRole[roleOrUser as UserRole] ?? [];
   }
 
   if (roleOrUser.role === "agent") {
     return buildAgentNavigation(roleOrUser);
+  }
+
+  if (roleOrUser.role === "admin") {
+    return buildAdminNavigation(brandsWithAgents);
+  }
+
+  if (roleOrUser.role === "backoffice") {
+    return buildBackofficeNavigation(brandsWithAgents);
   }
 
   return navigationByRole[roleOrUser.role] ?? [];

@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { useMe } from "@/hooks/useMe";
+import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
 import {
   getNavigationsForRole,
   type NavigationItem,
@@ -29,7 +30,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading, isError } = useMe();
   const user = data?.user;
-  const navigations = user ? getNavigationsForRole(user) : [];
+  const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
+  const navigations = user ? getNavigationsForRole(user, brandsWithAgents) : [];
 
   const hasRole = (role: UserRole | UserRole[]) => {
     if (!user) return false;
