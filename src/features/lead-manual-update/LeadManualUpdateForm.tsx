@@ -13,8 +13,11 @@ import {
 } from "@/components/ui";
 import { useAuth } from "@/providers/AuthProvider";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 import { useLeadOptions, useAllAgents } from "@/features/level-2-update/_lib/hooks";
+import {
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
 import {
   campaignLabelToBrandCode,
   useCreateManualUpdate,
@@ -36,8 +39,29 @@ const CAMPAIGN_TYPE_OPTIONS = [
   { label: "95RM", value: "95RM" },
 ];
 
+const CALL_RESULT_OPTIONS = [
+  "No Answer",
+  "Left Message",
+  "Bad Number",
+  "Interested",
+  "Interested Again",
+  "Call Lead Back",
+  "Not Interested",
+  "DNC",
+  "Contract Closed",
+].map((value) => ({ label: value, value }));
+
+const FIXED_RESULT_OPTION = { label: "Fixed", value: "Fixed" };
+
+function getResultUpdateOptions(role: string | undefined) {
+  const canSelectFixed = role === "admin" || role === "backoffice";
+  return canSelectFixed
+    ? [...CALL_RESULT_OPTIONS, FIXED_RESULT_OPTION]
+    : CALL_RESULT_OPTIONS;
+}
+
 const selectClassName =
-  "h-10 rounded border-slate-200 text-sm shadow-none focus:border-indigo-500 dark:border-slate-700";
+  "h-10 rounded border-slate-200 text-sm shadow-none dark:border-slate-700";
 
 const readonlyInputClassName =
   "h-10 rounded text-sm bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300";
@@ -61,9 +85,12 @@ export function LeadManualUpdateForm() {
   const { data: agents = [], isLoading: agentsLoading } = useAllAgents();
 
   const isAdmin = user?.role === "admin";
+  const canSelectFixed =
+    user?.role === "admin" || user?.role === "backoffice";
   const currentAgentName = user?.name?.trim() || "Current Agent";
 
   const [form, setForm] = useState<FormValues>(() => createInitialValues(""));
+  const [toBeCalledOnError, setToBeCalledOnError] = useState<string>();
 
   const agentFieldValue = isAdmin ? form.agent : currentAgentName;
   const campaignTypeValue = isAdmin ? form.campaignType : "SVG";
@@ -79,12 +106,8 @@ export function LeadManualUpdateForm() {
   );
 
   const resultUpdateOptions = useMemo(
-    () =>
-      LEAD_TYPE_OPTIONS.map((option) => ({
-        label: option.label,
-        value: option.value,
-      })),
-    [],
+    () => getResultUpdateOptions(user?.role),
+    [user?.role],
   );
 
   const agentOptions = useMemo(() => {
@@ -103,6 +126,14 @@ export function LeadManualUpdateForm() {
 
   const handleClear = () => {
     setForm(createInitialValues(isAdmin ? currentAgentName : ""));
+    setToBeCalledOnError(undefined);
+  };
+
+  const handleToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, "");
+    setToBeCalledOnError(error);
+    if (error) return;
+    updateField("toBeCalledOn", value);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -110,6 +141,18 @@ export function LeadManualUpdateForm() {
 
     if (!form.lead || !form.resultUpdate) {
       showErrorToast(new Error("Lead and result update are required."));
+      return;
+    }
+
+    if (form.resultUpdate === "Fixed" && !canSelectFixed) {
+      showErrorToast(new Error("Fixed is not available for your role."));
+      return;
+    }
+
+    const callbackError = getCallBackDateError(form.toBeCalledOn, "");
+    if (callbackError) {
+      setToBeCalledOnError(callbackError);
+      showErrorToast(new Error(callbackError));
       return;
     }
 
@@ -134,6 +177,7 @@ export function LeadManualUpdateForm() {
       });
       showSuccessToast("Lead manual update submitted successfully.");
       setForm(createInitialValues(isAdmin ? currentAgentName : ""));
+      setToBeCalledOnError(undefined);
     } catch (error) {
       showErrorToast(error);
     }
@@ -177,15 +221,15 @@ export function LeadManualUpdateForm() {
                 onChange={(value) => updateField("resultUpdate", String(value))}
                 className={selectClassName}
               />
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">To be called on</label>
-                <DatePickerField
-                  value={form.toBeCalledOn}
-                  onChange={(value) => updateField("toBeCalledOn", value)}
-                  placeholder="Pick a date"
-                  className={selectClassName}
-                />
-              </div>
+              <DatePickerField
+                label="To be called on"
+                value={form.toBeCalledOn}
+                onChange={handleToBeCalledOnChange}
+                placeholder="Pick a date"
+                className={selectClassName}
+                minDate={getMinCallBackDate("")}
+                error={toBeCalledOnError}
+              />
               {isAdmin ? (
                 <Select
                   label="Agent"

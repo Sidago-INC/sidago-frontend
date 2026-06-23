@@ -1,8 +1,9 @@
+import clsx from "clsx";
 import { Phone } from "lucide-react";
 
-export function CallsLogo() {
+export function CallsLogo({ className }: { className?: string }) {
   return (
-    <div className="mr-2 flex items-center gap-2">
+    <div className={clsx("flex shrink-0 items-center gap-2", className)}>
       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-600">
         <Phone className="h-4 w-4 text-white" />
       </div>

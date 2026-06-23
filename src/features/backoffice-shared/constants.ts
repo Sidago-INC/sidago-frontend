@@ -83,7 +83,15 @@ export function getLeadGridLabel(row: {
   companyName?: string | null;
   fullName?: string | null;
 }): string {
-  return getLeadDrawerTitle(row);
+  const companySymbol =
+    row.companySymbol?.trim() || getCompanySymbol(row.companyName ?? "");
+  const fullName = row.fullName?.trim() ?? "";
+
+  if (companySymbol && fullName) {
+    return `${companySymbol}-${fullName}`;
+  }
+
+  return companySymbol || fullName || "Lead";
 }
 
 export function getCompanySymbolOptions(

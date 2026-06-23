@@ -16,11 +16,11 @@ export const AGENT_COLORS = [
     avatar: "bg-emerald-500",
   },
   {
-    bar: "bg-rose-500",
-    light: "bg-rose-50 dark:bg-rose-950/40",
-    text: "text-rose-700 dark:text-rose-300",
-    border: "border-rose-200 dark:border-rose-800",
-    avatar: "bg-rose-500",
+    bar: "bg-sky-500",
+    light: "bg-sky-50 dark:bg-sky-950/40",
+    text: "text-sky-700 dark:text-sky-300",
+    border: "border-sky-200 dark:border-sky-800",
+    avatar: "bg-sky-500",
   },
   {
     bar: "bg-amber-500",
@@ -30,11 +30,11 @@ export const AGENT_COLORS = [
     avatar: "bg-amber-500",
   },
   {
-    bar: "bg-sky-500",
-    light: "bg-sky-50 dark:bg-sky-950/40",
-    text: "text-sky-700 dark:text-sky-300",
-    border: "border-sky-200 dark:border-sky-800",
-    avatar: "bg-sky-500",
+    bar: "bg-violet-500",
+    light: "bg-violet-50 dark:bg-violet-950/40",
+    text: "text-violet-700 dark:text-violet-300",
+    border: "border-violet-200 dark:border-violet-800",
+    avatar: "bg-violet-500",
   },
 ] as const;
 

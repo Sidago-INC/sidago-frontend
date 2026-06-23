@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "react-day-picker/style.css";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @font-face {
@@ -133,4 +132,48 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+}
+
+button:focus,
+button:focus-visible,
+button:focus-within {
+  outline: none;
+  box-shadow: none;
+}
+
+button[data-headlessui-state~="focus"],
+button[data-headlessui-state~="open"],
+button[data-headlessui-state~="active"] {
+  outline: none;
+  box-shadow: none;
+}
+
+.react-datepicker-wrapper {
+  display: block;
+  width: 100%;
+}
+
+.react-datepicker__input-container {
+  display: block;
+  width: 100%;
+}
+
+.react-datepicker__input-container input {
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.react-datepicker__input-container input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.datepicker-popper,
+.react-datepicker-popper {
+  z-index: 500 !important;
+  line-height: normal;
+}
+
+.react-datepicker-popper .react-datepicker {
+  line-height: initial;
 }

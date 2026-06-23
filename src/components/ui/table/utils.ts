@@ -1,5 +1,5 @@
 import type React from "react";
-import type { DateRange } from "react-day-picker";
+import type { DateRange } from "@/types/date-range.types";
 import type {
   Column,
   FilterCondition,

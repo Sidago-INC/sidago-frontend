@@ -1,5 +1,5 @@
 
-import { Menu } from "lucide-react";
+import { ChevronRight, Menu } from "lucide-react";
 import { Button } from "@/components/ui";
 import Notification from "./Notification";
 import Profile from "./Profile";
@@ -13,6 +13,7 @@ export type Props = {
 export const Header = ({ onMenuClick }: Props) => {
   const { meta } = useRouteMeta();
   const Icon = meta.icon;
+  const breadcrumbs = meta.breadcrumbs;
 
   return (
     <header className="sticky top-0 z-40 flex py-2 items-center justify-between border-b border-slate-200/80 bg-white/75 px-4 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 md:px-8">
@@ -23,14 +24,42 @@ export const Header = ({ onMenuClick }: Props) => {
         <Menu size={22} />
       </Button>
 
-      <div className="hidden md:flex items-center gap-2">
+      <div className="hidden min-w-0 md:flex items-center gap-2">
         {Icon && (
-          <Icon size={24} className="text-white rounded bg-indigo-600 p-1" />
+          <Icon size={24} className="text-white rounded bg-indigo-600 p-1 shrink-0" />
         )}
 
-        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-800 dark:text-slate-100">
-          {meta.label}
-        </h2>
+        <nav
+          aria-label="Breadcrumb"
+          className="flex min-w-0 items-center gap-1.5 text-xs font-bold uppercase tracking-[0.2em]"
+        >
+          {breadcrumbs.map((crumb, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+
+            return (
+              <div
+                key={`${crumb.label}-${crumb.href ?? index}`}
+                className="flex min-w-0 items-center gap-1.5"
+              >
+                {index > 0 && (
+                  <ChevronRight
+                    size={14}
+                    className="shrink-0 text-slate-400 dark:text-slate-500"
+                  />
+                )}
+                <span
+                  className={
+                    isLast
+                      ? "truncate text-slate-800 dark:text-slate-100"
+                      : "truncate text-slate-500 dark:text-slate-400"
+                  }
+                >
+                  {crumb.label}
+                </span>
+              </div>
+            );
+          })}
+        </nav>
       </div>
 
       <div className="flex items-center gap-3">

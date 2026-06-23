@@ -19,6 +19,11 @@ import { api } from "@/lib/api";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUsers } from "@/features/backoffice-shared/use-users";
 import {
+  formatLeadDisplayTitle,
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
+import {
   createEmptyLevel2UpdateRow,
   level2ResultUpdateOptions,
   level2UpdateCampaignOptions,
@@ -41,15 +46,18 @@ const readTextClass =
   "block min-h-8 px-2.5 py-1.5 text-sm text-slate-700 dark:text-slate-100";
 
 const cellSelectClass =
-  "h-8 min-w-[8rem] rounded-lg border-transparent bg-transparent px-2 py-1 text-sm shadow-none hover:bg-slate-50 focus:border-slate-200 dark:border-transparent dark:bg-transparent dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900";
+  "h-8 min-w-[8rem] rounded-lg border-transparent bg-transparent px-2 py-1 text-sm shadow-none hover:bg-slate-50 focus:outline-none focus:ring-0 dark:border-transparent dark:bg-transparent dark:hover:bg-slate-800/70";
 
 // Lead labels are "<EXCHANGE>:<SYMBOL> - <Full Name>" — the default 8rem
 // trigger truncates everything past the exchange. Give it room.
 const leadSelectClass =
-  "h-8 min-w-[18rem] rounded-lg border-transparent bg-transparent px-2 py-1 text-sm shadow-none hover:bg-slate-50 focus:border-slate-200 dark:border-transparent dark:bg-transparent dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900";
+  "h-8 min-w-[18rem] rounded-lg border-transparent bg-transparent px-2 py-1 text-sm shadow-none hover:bg-slate-50 focus:outline-none focus:ring-0 dark:border-transparent dark:bg-transparent dark:hover:bg-slate-800/70";
 
 const cellSelectOptionsClass =
   "z-[300] max-h-72 rounded-xl border-slate-200 p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950";
+
+const cellDatePickerClass =
+  "min-w-[9rem] rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm shadow-none dark:border-slate-700 dark:bg-slate-900";
 
 // The Select panel inherits the trigger width via --button-width. Override
 // it so the lead dropdown shows the full label even on narrow trigger states.
@@ -170,7 +178,11 @@ export function Level2Update() {
     () =>
       (leadOptionsRaw ?? []).map((l) => ({
         value: l.id,
-        label: l.label || l.fullName || l.leadIdExternal || l.id,
+        label:
+          formatLeadDisplayTitle({
+            companySymbol: l.companySymbol,
+            fullName: l.fullName ?? "",
+          }) || l.label || l.fullName || l.leadIdExternal || l.id,
       })),
     [leadOptionsRaw],
   );
@@ -306,6 +318,12 @@ export function Level2Update() {
       return;
     }
 
+    const callbackError = getCallBackDateError(row.call_back_date, "");
+    if (callbackError) {
+      showErrorToast({ message: callbackError });
+      return;
+    }
+
     try {
       const result = await logResult.mutateAsync({
         leadId: row.lead,
@@ -328,6 +346,7 @@ export function Level2Update() {
     {
       title: "Lead",
       key: "lead",
+      getValue: (row) => row.lead_label || row.lead,
       render: (row) =>
         isEditingRow(row.id) ? (
           <div onClick={(event) => event.stopPropagation()}>
@@ -455,8 +474,9 @@ export function Level2Update() {
             <DatePickerField
               value={row.call_back_date}
               onChange={(value) => updateRow(row.id, "call_back_date", value)}
-              className={cellInputClass}
+              className={cellDatePickerClass}
               placeholder="Pick a date"
+              minDate={getMinCallBackDate("")}
             />
           </div>
         ) : (
@@ -467,7 +487,19 @@ export function Level2Update() {
       title: "Created date",
       key: "created_date",
       type: "date",
-      render: (row) => <ReadText value={row.created_date} />,
+      render: (row) =>
+        isEditingRow(row.id) ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <DatePickerField
+              value={row.created_date}
+              onChange={(value) => updateRow(row.id, "created_date", value)}
+              className={cellDatePickerClass}
+              placeholder="Pick a date"
+            />
+          </div>
+        ) : (
+          <ReadText value={row.created_date} />
+        ),
     },
     {
       title: "Lead Type Sidago",

@@ -93,7 +93,7 @@ function SelectOptionsPanel({
     <ListboxOptions
       anchor={placement === "top" ? "top start" : "bottom start"}
       className={clsx(
-        "z-[300] max-h-64 w-[var(--button-width)] overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg [--anchor-gap:0.25rem] dark:border-slate-700 dark:bg-gray-800",
+        "z-300 max-h-64 w-(--button-width) overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg [--anchor-gap:0.25rem] dark:border-slate-700 dark:bg-gray-800",
         optionsClassName,
       )}
     >
@@ -110,7 +110,7 @@ function SelectOptionsPanel({
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => event.stopPropagation()}
               placeholder={searchPlaceholder}
-              className="h-9 w-full rounded border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-700 shadow-none outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-0 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+              className="h-9 w-full rounded border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-700 shadow-none outline-none transition placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
           </div>
         </div>
@@ -125,6 +125,7 @@ function SelectOptionsPanel({
           <ListboxOption
             key={`${String(option.value)}-${index}`}
             value={option.value}
+            title={option.label}
             className={({ focus }) =>
               clsx(
                 "relative cursor-pointer select-none rounded px-4 py-2 text-sm",
@@ -136,7 +137,10 @@ function SelectOptionsPanel({
           >
             {({ selected: isSelected }) => (
               <div className="flex items-center justify-between gap-2">
-                <span className={clsx("truncate", isSelected && "font-medium")}>
+                <span
+                  title={option.label}
+                  className={clsx("truncate", isSelected && "font-medium")}
+                >
                   {option.label}
                 </span>
                 {isSelected && <Check size={14} className="shrink-0" />}
@@ -189,13 +193,14 @@ function SelectControl({
         id={id}
         onClick={updatePlacement}
         className={clsx(
-          "relative w-full appearance-none cursor-pointer rounded border bg-white pr-8 text-left text-slate-900 shadow-none transition focus:border-indigo-500 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-indigo-400",
+          "relative w-full appearance-none cursor-pointer rounded border bg-white pr-8 text-left text-slate-900 shadow-none transition focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 dark:bg-gray-800 dark:text-gray-100",
           error ? "border-red-500" : "border-gray-300 dark:border-gray-600",
           "px-4 py-2",
           className,
         )}
       >
         <span
+          title={selected?.label}
           className={clsx(
             "block truncate",
             !selected && "text-slate-400 dark:text-gray-500",

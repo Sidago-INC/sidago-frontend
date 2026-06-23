@@ -16,6 +16,10 @@ export function BarChart({
   const barMaxPx = 160;
   const sortedAgents = [...agents].sort((a, b) => getValue(b) - getValue(a));
   const maxValue = Math.max(...sortedAgents.map(getValue), 1);
+  const colorByAgentId = new Map(
+    agents.map((agent, index) => [agent.recordId, getAgentColor(index)]),
+  );
+  const minVisibleBarPx = 8;
 
   return (
     <Panel title={title} subtitle={subtitle} bodyClassName="p-5">
@@ -23,13 +27,14 @@ export function BarChart({
         className="flex items-end gap-3"
         style={{ height: `${barMaxPx + 40}px` }}
       >
-        {sortedAgents.map((agent, index) => {
+        {sortedAgents.map((agent) => {
           const value = getValue(agent);
+          const proportionalHeight =
+            value > 0 ? Math.round((value / maxValue) * barMaxPx) : 0;
           const barHeight =
-            value > 0
-              ? Math.max(Math.round((value / maxValue) * barMaxPx), 6)
-              : 0;
-          const color = getAgentColor(index);
+            proportionalHeight >= minVisibleBarPx ? proportionalHeight : 0;
+          const color =
+            colorByAgentId.get(agent.recordId) ?? getAgentColor(0);
 
           return (
             <div

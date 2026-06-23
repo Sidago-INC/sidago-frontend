@@ -6,8 +6,8 @@ export type Level2UpdateRow = {
   // row has been logged to the DB, `logged_at` carries the API timestamp so
   // we can show "logged" feedback in the UI.
   id: string;
-  // Lead picker stores the UUID as the value. `lead_label` is the
-  // "<company_symbol> - <full_name>" string the user actually sees.
+  // Lead picker stores the UUID as the value. `lead_label` is
+  // "<company_symbol>-<full_name>" for display, sorting, and grouping.
   lead: string;
   lead_label: string;
   campaign: BRAND | "";

@@ -132,9 +132,12 @@ export function Table<T>({
 
   if (isLoading) {
     return (
-      <div className="bg-white shadow p-4 space-y-3">
+      <div className="space-y-3 rounded-2xl bg-white p-4 dark:bg-slate-900">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
+          <div
+            key={i}
+            className="h-10 animate-pulse rounded bg-slate-100 dark:bg-slate-800"
+          />
         ))}
       </div>
     );
@@ -144,7 +147,9 @@ export function Table<T>({
     return (
       <div className="overflow-hidden">
         {emptyState ?? (
-          <div className="p-10 text-center text-gray-500">{emptyText}</div>
+          <div className="p-10 text-center text-gray-500 dark:text-slate-400">
+            {emptyText}
+          </div>
         )}
       </div>
     );

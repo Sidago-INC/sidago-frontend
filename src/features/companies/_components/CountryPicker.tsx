@@ -55,16 +55,12 @@ export function CountryPicker({
         className="text-sm"
         menuPlacement="auto"
         styles={{
-          control: (base, state) => ({
+          control: (base, _state) => ({
             ...base,
             minHeight: 40,
             borderRadius: 6,
             backgroundColor: "#ffffff",
-            borderColor: error
-              ? "#ef4444"
-              : state.isFocused
-                ? "#6366f1"
-                : "#d1d5db",
+            borderColor: error ? "#ef4444" : "#d1d5db",
             boxShadow: "none",
           }),
           valueContainer: (base) => ({

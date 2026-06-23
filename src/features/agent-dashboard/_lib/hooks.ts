@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { resolveLeaderboardBadgeStatuses } from "@/lib/resolveLeaderboardBadge";
 import type { Agent } from "@/types";
 
 type DailyScoresResponse = {
@@ -148,7 +149,6 @@ function mergeDashboardScores(params: {
     agent.monthly_lost_hot_leads = score.lostHotLeads;
     agent.monthly_contract_closed = score.contractsClosed;
     agent.monthly_points = score.monthlyPoints;
-    agent.monthly_winner = score.isWinner;
     agent.count_wins = score.wins;
     agent.all_points = score.allPoints;
   });
@@ -166,7 +166,6 @@ function mergeDashboardScores(params: {
     agent.last_month_lost_lead = score.lostHotLeads;
     agent.last_month_contract_closed = score.contractsClosed;
     agent.last_month_points = score.monthlyPoints;
-    agent.last_month_winner = score.isWinner;
   });
 
   params.dailyScores.forEach((score) => {
@@ -179,10 +178,34 @@ function mergeDashboardScores(params: {
 
     agent.today_calls_made = score.callsMade;
     agent.hot_leads_today = score.hotLeads;
-    agent.winner = score.isWinner;
   });
 
-  return Array.from(map.values());
+  const agents = Array.from(map.values());
+  const monthlyStatuses = resolveLeaderboardBadgeStatuses(
+    agents,
+    (agent) => agent.monthly_points,
+    (agent) => agent.recordId,
+  );
+  const lastMonthStatuses = resolveLeaderboardBadgeStatuses(
+    agents,
+    (agent) => agent.last_month_points,
+    (agent) => agent.recordId,
+  );
+  const dailyStatuses = resolveLeaderboardBadgeStatuses(
+    params.dailyScores,
+    (score) => score.points,
+    (score) => score.agentSlug,
+  );
+
+  agents.forEach((agent) => {
+    agent.monthly_winner =
+      monthlyStatuses.get(agent.recordId) === "winner";
+    agent.last_month_winner =
+      lastMonthStatuses.get(agent.recordId) === "winner";
+    agent.winner = dailyStatuses.get(agent.recordId) === "winner";
+  });
+
+  return agents;
 }
 
 export function useAgentDashboard(selectedDate = new Date()) {

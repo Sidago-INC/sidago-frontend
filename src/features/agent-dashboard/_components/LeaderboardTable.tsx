@@ -1,24 +1,31 @@
 import { Agent } from "@/types";
 import { BarChart3 } from "lucide-react";
 import { CompanySymbolBadge } from "@/components/ui";
+import type { LeaderboardBadgeStatus } from "@/lib/resolveLeaderboardBadge";
 import { AgentIdentity } from "./AgentIdentity";
 import { Panel } from "./Panel";
+import { TieBadge } from "./TieBadge";
 import { getAgentColor, RANK_STYLES } from "../_lib/utils";
 
 export function LeaderboardTable({
   title,
   agents,
   getValue,
-  getWinner,
   label,
 }: {
   title: string;
   agents: Agent[];
   getValue: (agent: Agent) => number;
-  getWinner: (agent: Agent) => boolean;
   label: string;
 }) {
   const sortedAgents = [...agents].sort((a, b) => getValue(b) - getValue(a));
+  const topScore = sortedAgents.length > 0 ? getValue(sortedAgents[0]) : null;
+  const topCount =
+    topScore === null
+      ? 0
+      : sortedAgents.filter((agent) => getValue(agent) === topScore).length;
+  const topBadgeStatus: LeaderboardBadgeStatus =
+    topCount > 1 ? "tie" : topCount === 1 ? "winner" : null;
 
   return (
     <Panel
@@ -35,16 +42,21 @@ export function LeaderboardTable({
         const rank = index + 1;
         const rankStyle = RANK_STYLES[rank];
         const color = getAgentColor(index);
-        const isWinner = getWinner(agent);
         const value = getValue(agent);
+        const isAtTop = topScore !== null && value === topScore;
+        const badgeStatus: LeaderboardBadgeStatus = isAtTop ? topBadgeStatus : null;
 
         return (
           <div
             key={agent.recordId}
             className={`flex items-center gap-2 px-3 py-2.5 transition-colors sm:gap-4 sm:px-5 sm:py-3.5 ${
-              rank === 1
-                ? "bg-amber-50/40 dark:bg-amber-900/10"
-                : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
+              badgeStatus === "winner"
+                ? "bg-amber-50 dark:bg-amber-950/20"
+                : badgeStatus === "tie"
+                  ? "bg-slate-50 dark:bg-slate-800/40"
+                  : rank === 1
+                    ? "bg-amber-50/40 dark:bg-amber-900/10"
+                    : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
             }`}
           >
             <div
@@ -68,10 +80,13 @@ export function LeaderboardTable({
               />
             </div>
 
-            {isWinner && (
+            {badgeStatus === "winner" && (
               <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-300 sm:px-2 sm:text-xs">
                 Winner
               </span>
+            )}
+            {badgeStatus === "tie" && (
+              <TieBadge compact label="Tie" />
             )}
 
             <div

@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  applyLeaderboardBadgeStatuses,
+  type LeaderboardBadgeStatus,
+} from "@/lib/resolveLeaderboardBadge";
+
+export type { LeaderboardBadgeStatus };
 
 export type TodayAgentCard = {
   id: string;
@@ -9,7 +15,7 @@ export type TodayAgentCard = {
   callsToday: number;
   hotLeadsToday: number;
   currentHotLeads: number;
-  isWinner: boolean;
+  badgeStatus: LeaderboardBadgeStatus;
 };
 
 export type MonthlyAgentCard = {
@@ -21,7 +27,7 @@ export type MonthlyAgentCard = {
   lastMonthPoints: number;
   allPoints: number;
   wins: number;
-  isWinner: boolean;
+  badgeStatus: LeaderboardBadgeStatus;
 };
 
 type DailyScoresResponse = {
@@ -90,7 +96,7 @@ function formatMonthParam(date: Date) {
 function mapDailyScoresToCards(
   scores: DailyScoresResponse["dailyScores"],
 ): TodayAgentCard[] {
-  return scores.map((score) => {
+  const baseCards = scores.map((score) => {
     const { name, surname } = splitAgentName(score.name);
 
     return {
@@ -101,15 +107,19 @@ function mapDailyScoresToCards(
       callsToday: score.callsMade,
       hotLeadsToday: score.hotLeads,
       currentHotLeads: score.currentHotLeads,
-      isWinner: score.isWinner,
+      points: score.points,
     };
   });
+
+  return applyLeaderboardBadgeStatuses(baseCards, (card) => card.points).map(
+    ({ points: _points, ...card }) => card,
+  );
 }
 
 function mapMonthlyScoresToCards(
   scores: MonthlyScoresResponse["monthlyScores"],
 ): MonthlyAgentCard[] {
-  return scores.map((score) => {
+  const baseCards = scores.map((score) => {
     const { name, surname } = splitAgentName(score.name);
 
     return {
@@ -121,9 +131,13 @@ function mapMonthlyScoresToCards(
       lastMonthPoints: score.lastMonthPoints,
       allPoints: score.allPoints,
       wins: score.wins,
-      isWinner: score.isWinner,
     };
   });
+
+  return applyLeaderboardBadgeStatuses(
+    baseCards,
+    (card) => card.monthlyPoints,
+  );
 }
 
 export function useAdminTodayAgentCards(selectedDate: Date) {

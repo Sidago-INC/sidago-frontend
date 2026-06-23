@@ -53,7 +53,7 @@ export function BackofficeMonthlyStatsView({
     last_month_contract_closed: 0,
     last_month_winner: false,
     last_month_points: card.lastMonthPoints,
-    monthly_winner: card.isWinner,
+    monthly_winner: card.badgeStatus === "winner",
     last_month_lost_lead: 0,
     count_wins: card.wins,
     all_points: card.allPoints,

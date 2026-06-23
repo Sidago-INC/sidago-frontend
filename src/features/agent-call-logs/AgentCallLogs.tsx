@@ -39,7 +39,11 @@ import type {
 import {
   resolveAgentSlug,
 } from "@/features/agent-calls/_lib/agentCallsApi";
-import { getAgentKeyFromCookie } from "@/features/agent-calls/_lib/utils";
+import {
+  getAgentKeyFromCookie,
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
 import { getCompanySymbol } from "@/features/backoffice-shared/constants";
 import type { LeadPatchBody } from "@/features/backoffice-shared/use-update-lead";
 import clsx from "clsx";
@@ -272,6 +276,9 @@ export function AgentCallLogs() {
     key: string;
     value: EditableCallLogState;
   } | null>(null);
+  const [callBackDateError, setCallBackDateError] = useState<string>();
+  const [companyContactCallBackDateError, setCompanyContactCallBackDateError] =
+    useState<string>();
 
   const filteredRows = useMemo(
     () => rows.filter((row) => matchesCallLogSearch(row, search)),
@@ -350,6 +357,12 @@ export function AgentCallLogs() {
       key: selectedLead.leadId,
       value: formFromDetail(detail),
     });
+    setCallBackDateError(
+      getCallBackDateError(
+        detail.brandState.followUpDate ?? "",
+        detail.brandState.lastCalledDate ?? "",
+      ),
+    );
   }, [detail, selectedLead]);
 
   useEffect(() => {
@@ -361,6 +374,12 @@ export function AgentCallLogs() {
       key: companyContactLeadId,
       value: formFromDetail(companyContactDetail),
     });
+    setCompanyContactCallBackDateError(
+      getCallBackDateError(
+        companyContactDetail.brandState.followUpDate ?? "",
+        companyContactDetail.brandState.lastCalledDate ?? "",
+      ),
+    );
   }, [companyContactDetail, companyContactLeadId]);
 
   const form =
@@ -503,6 +522,13 @@ export function AgentCallLogs() {
       formValue.callBackDate !== baselineCallback &&
       formValue.callBackDate
     ) {
+      const callbackError = getCallBackDateError(
+        formValue.callBackDate,
+        detailValue.brandState.lastCalledDate ?? "",
+      );
+      if (callbackError) {
+        throw new Error(callbackError);
+      }
       await followUp.mutateAsync({
         leadId,
         followUpDate: formValue.callBackDate,
@@ -512,6 +538,16 @@ export function AgentCallLogs() {
 
   const handleSaveChanges = async () => {
     if (!selectedLead || !form || !detail || !isDirty) {
+      return;
+    }
+
+    const callbackError = getCallBackDateError(
+      form.callBackDate,
+      detail.brandState.lastCalledDate ?? "",
+    );
+    if (callbackError) {
+      setCallBackDateError(callbackError);
+      showErrorToast(callbackError);
       return;
     }
 
@@ -540,10 +576,26 @@ export function AgentCallLogs() {
       key: selectedLead.leadId,
       value: baselineForm,
     });
+    setCallBackDateError(
+      getCallBackDateError(
+        baselineForm.callBackDate,
+        detail?.brandState.lastCalledDate ?? "",
+      ),
+    );
   };
 
   const handleOutcome = async (resultCode: string) => {
     if (!selectedLead || !form || !detail || actionPending) {
+      return;
+    }
+
+    const callbackError = getCallBackDateError(
+      form.callBackDate,
+      detail.brandState.lastCalledDate ?? "",
+    );
+    if (callbackError) {
+      setCallBackDateError(callbackError);
+      showErrorToast(callbackError);
       return;
     }
 
@@ -568,6 +620,10 @@ export function AgentCallLogs() {
   };
 
   const handleCallBackDateChange = (date: string) => {
+    const lastCalled = detail?.brandState.lastCalledDate ?? "";
+    const error = getCallBackDateError(date, lastCalled);
+    setCallBackDateError(error);
+    if (error) return;
     updateForm("callBackDate", date);
   };
 
@@ -577,6 +633,16 @@ export function AgentCallLogs() {
       !selectedCompanyContactForm ||
       !companyContactDetail
     ) {
+      return;
+    }
+
+    const callbackError = getCallBackDateError(
+      selectedCompanyContactForm.callBackDate,
+      companyContactDetail.brandState.lastCalledDate ?? "",
+    );
+    if (callbackError) {
+      setCompanyContactCallBackDateError(callbackError);
+      showErrorToast(callbackError);
       return;
     }
 
@@ -795,7 +861,7 @@ export function AgentCallLogs() {
                                                             );
                                                           }}
                                                           className={clsx(
-                                                            "w-full rounded border px-2.5 py-1.5 text-left text-xs leading-snug transition cursor-pointer whitespace-normal break-words",
+                                                            "w-full rounded border px-2.5 py-1.5 text-left text-xs leading-snug transition cursor-pointer whitespace-normal wrap-break-word",
                                                             isSelected
                                                               ? "border-indigo-300 bg-indigo-50 font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100"
                                                               : "border-slate-200 bg-white font-normal text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800",
@@ -832,8 +898,8 @@ export function AgentCallLogs() {
               </div>
             </section>
 
-            <section className="flex min-h-0 flex-col border-t border-slate-200 dark:border-slate-700 lg:h-[calc(100vh-8.5rem)] lg:border-t-0">
-              <div className="relative min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <section className="flex min-h-0 min-w-0 flex-col border-t border-slate-200 dark:border-slate-700 lg:h-[calc(100vh-8.5rem)] lg:border-t-0">
+              <div className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-5">
                 {(detailLoading || detailFetching) && selectedLead ? (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-gray-900/60">
                     <Wave />
@@ -849,6 +915,7 @@ export function AgentCallLogs() {
                     onOutcomeSelect={handleOutcome}
                     onMarkVoid={handleMarkVoid}
                     onCallBackDateChange={handleCallBackDateChange}
+                    callBackDateError={callBackDateError}
                     outcomeDisabled={actionPending}
                     showAllCompanyContacts
                     isDrawer={false}
@@ -965,6 +1032,17 @@ export function AgentCallLogs() {
             onUpdateForm={updateCompanyContactForm}
             onOutcomeSelect={async (resultCode) => {
               if (!companyContactDetail) return;
+
+              const callbackError = getCallBackDateError(
+                selectedCompanyContactForm.callBackDate,
+                companyContactDetail.brandState.lastCalledDate ?? "",
+              );
+              if (callbackError) {
+                setCompanyContactCallBackDateError(callbackError);
+                showErrorToast(callbackError);
+                return;
+              }
+
               try {
                 await persistLeadChanges(
                   selectedCompanyContact.leadId,
@@ -1002,6 +1080,12 @@ export function AgentCallLogs() {
               }
             }}
             onCallBackDateChange={async (date) => {
+              const lastCalled =
+                companyContactDetail?.brandState.lastCalledDate ?? "";
+              const error = getCallBackDateError(date, lastCalled);
+              setCompanyContactCallBackDateError(error);
+              if (error) return;
+
               updateCompanyContactForm("callBackDate", date);
               if (!date) return;
               try {
@@ -1013,6 +1097,7 @@ export function AgentCallLogs() {
                 // Resync on next detail fetch.
               }
             }}
+            callBackDateError={companyContactCallBackDateError}
             outcomeDisabled={actionPending}
             historyEditable
             showAllCompanyContacts={false}
@@ -1036,6 +1121,7 @@ function CallLogDetailContent({
   onOutcomeSelect,
   onMarkVoid,
   onCallBackDateChange,
+  callBackDateError,
   outcomeDisabled = false,
   historyEditable = false,
   showAllCompanyContacts,
@@ -1055,6 +1141,7 @@ function CallLogDetailContent({
   onOutcomeSelect: (resultCode: string) => void;
   onMarkVoid: (checked: boolean) => void;
   onCallBackDateChange: (date: string) => void;
+  callBackDateError?: string;
   outcomeDisabled?: boolean;
   historyEditable?: boolean;
   showAllCompanyContacts: boolean;
@@ -1068,7 +1155,7 @@ function CallLogDetailContent({
     lead.companySymbol ?? getCompanySymbol(lead.companyName);
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <DetailCard>
         <div className="flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-3">
@@ -1162,6 +1249,11 @@ function CallLogDetailContent({
             value={form.callBackDate}
             onChange={onCallBackDateChange}
             className="text-xs font-semibold"
+            placeholder="Pick a date"
+            minDate={getMinCallBackDate(
+              detail.brandState.lastCalledDate || lead.lastCalledDate || "",
+            )}
+            error={callBackDateError}
           />
         </EditableField>
         <EditableField label="Last Called Date">
@@ -1242,28 +1334,35 @@ function CallLogDetailContent({
       </DetailCard>
 
       {showAllCompanyContacts ? (
-        <DetailCard label="All Company Contacts">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <DetailCard label="All Company Contacts" className="min-w-0 overflow-hidden">
+          <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {allCompanyContacts.map((contact) => (
               <button
                 key={contact.leadId}
                 type="button"
                 onClick={() => onOpenCompanyContact(contact)}
-                className="w-full text-left cursor-pointer"
+                className="min-w-0 w-full cursor-pointer overflow-hidden text-left"
               >
-                <DetailCard label={contact.companyName}>
-                  <AssociationDetail
-                    label="Contact Type"
-                    value={
-                      <TypeBadge value={contact.contactType} kind="contact" />
-                    }
-                  />
-                  <AssociationDetail
-                    label="Lead Type"
-                    value={
-                      <TypeBadge value={contact.leadType} kind="lead" />
-                    }
-                  />
+                <DetailCard
+                  label={contact.companyName}
+                  className="@container min-w-0"
+                >
+                  <div className="space-y-2">
+                    <AssociationDetail
+                      label="Contact Type"
+                      layout="responsive"
+                      value={
+                        <TypeBadge value={contact.contactType} kind="contact" />
+                      }
+                    />
+                    <AssociationDetail
+                      label="Lead Type"
+                      layout="responsive"
+                      value={
+                        <TypeBadge value={contact.leadType} kind="lead" />
+                      }
+                    />
+                  </div>
                 </DetailCard>
               </button>
             ))}
@@ -1277,18 +1376,28 @@ function CallLogDetailContent({
 function DetailCard({
   label,
   children,
+  className,
 }: {
   label?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rounded border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800">
+    <div
+      className={clsx(
+        "rounded border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-700 dark:bg-gray-800",
+        className,
+      )}
+    >
       {typeof label === "string" && (
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+        <p
+          className="mb-3 truncate text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300"
+          title={label}
+        >
           {label}
         </p>
       )}
-      <div className="space-y-0">{children}</div>
+      <div className="min-w-0 space-y-0">{children}</div>
     </div>
   );
 }
@@ -1344,16 +1453,40 @@ function HistoryText({ value }: { value: string }) {
 function AssociationDetail({
   label,
   value,
+  layout = "row",
 }: {
   label: string;
   value: React.ReactNode;
+  layout?: "row" | "stack" | "responsive";
 }) {
+  if (layout === "stack") {
+    return (
+      <div className="min-w-0 space-y-1 py-1">
+        <p className="text-[10px] uppercase tracking-widest text-slate-400">
+          {label}
+        </p>
+        <div className="min-w-0">{value}</div>
+      </div>
+    );
+  }
+
+  if (layout === "responsive") {
+    return (
+      <div className="flex min-w-0 flex-col gap-1 py-1 @min-[16rem]:flex-row @min-[16rem]:items-center @min-[16rem]:justify-between @min-[16rem]:gap-3">
+        <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
+          {label}
+        </p>
+        <div className="min-w-0 shrink-0 @min-[16rem]:text-right">{value}</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-start justify-between gap-4 py-1">
+    <div className="flex min-w-0 items-start justify-between gap-2 py-1 sm:gap-4">
       <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <div className="min-w-0 text-right text-xs font-semibold text-slate-600 dark:text-slate-200">
+      <div className="min-w-0 max-w-[58%] overflow-hidden text-right text-xs font-semibold text-slate-600 sm:max-w-[65%] dark:text-slate-200">
         {value}
       </div>
     </div>

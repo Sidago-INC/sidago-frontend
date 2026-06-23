@@ -9,14 +9,12 @@ export function Leaderboard({ agents }: { agents: Agent[] }) {
         title={`This Month - ${getMonthName(0)}`}
         agents={agents}
         getValue={(agent) => agent.monthly_points}
-        getWinner={(agent) => agent.monthly_winner}
         label="Ranked by monthly points"
       />
       <LeaderboardTable
         title={`Last Month - ${getMonthName(-1)}`}
         agents={agents}
         getValue={(agent) => agent.last_month_points}
-        getWinner={(agent) => agent.last_month_winner}
         label="Ranked by last month points"
       />
     </div>

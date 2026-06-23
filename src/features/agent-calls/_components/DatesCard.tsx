@@ -1,11 +1,14 @@
 import { Clock4, Wrench } from "lucide-react";
 import { CardShell } from "@/components/ui/CardShell";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { DatePickerField } from "./DatePickerField";
+import { DatePickerField } from "@/components/ui/DatePickerField";
 import { DateReadonlyRow } from "./DateReadonlyRow";
+
+import { getMinCallBackDate } from "../_lib/utils";
 
 type Props = {
   callBackDate: string;
+  callBackDateError?: string;
   lastCalledDate: string;
   lastFixedDate: string;
   onChangeCallBackDate: (value: string) => void;
@@ -13,6 +16,7 @@ type Props = {
 
 export function DatesCard({
   callBackDate,
+  callBackDateError,
   lastCalledDate,
   lastFixedDate,
   onChangeCallBackDate,
@@ -25,6 +29,9 @@ export function DatesCard({
         label="Call Back Date"
         value={callBackDate}
         onChange={onChangeCallBackDate}
+        placeholder="Pick a date"
+        minDate={getMinCallBackDate(lastCalledDate)}
+        error={callBackDateError}
       />
 
       <DateReadonlyRow

@@ -11,10 +11,10 @@ type Props = {
 
 export function IdentityCard({ form, leadName, onChange }: Props) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <SectionLabel>Identity</SectionLabel>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <div>
           <p className="mb-0.5 text-xs text-slate-400 dark:text-gray-500">
             Full Name

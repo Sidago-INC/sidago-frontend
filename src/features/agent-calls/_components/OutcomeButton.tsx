@@ -19,10 +19,10 @@ export function OutcomeButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-13 w-full min-w-0 items-center justify-center gap-2 overflow-hidden rounded-xl px-3 py-3 text-center text-sm font-semibold leading-tight whitespace-nowrap transition-all disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`flex min-h-13 w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-center text-sm font-semibold leading-snug whitespace-normal transition-all disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      <span className="min-w-0 truncate">{label}</span>
+      <span>{label}</span>
     </button>
   );
 }

@@ -9,35 +9,30 @@ type Props = {
 
 export function TableSkeleton({ rows = 5, columns = 4 }: Props) {
   return (
-    <>
-      {/* 🔹 Desktop Table Skeleton */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full bg-white rounded-2xl shadow overflow-hidden">
-          {/* Header */}
-          <thead className="bg-gray-100">
-            <tr>
-              {Array.from({ length: columns }).map((_, i) => (
-                <th key={i} className="p-4">
-                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-                </th>
+    <div className="hidden overflow-x-auto md:block">
+      <table className="w-full overflow-hidden rounded-2xl bg-white dark:bg-slate-900">
+        <thead className="bg-gray-100 dark:bg-slate-800">
+          <tr>
+            {Array.from({ length: columns }).map((_, i) => (
+              <th key={i} className="p-4">
+                <div className="h-4 w-24 animate-pulse rounded bg-gray-200 dark:bg-slate-700" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {Array.from({ length: rows }).map((_, i) => (
+            <tr key={i}>
+              {Array.from({ length: columns }).map((_, j) => (
+                <td key={j} className="p-4">
+                  <div className="h-4 w-full animate-pulse rounded bg-gray-200 dark:bg-slate-700" />
+                </td>
               ))}
             </tr>
-          </thead>
-
-          {/* Body */}
-          <tbody>
-            {Array.from({ length: rows }).map((_, i) => (
-              <tr key={i} className="border-t">
-                {Array.from({ length: columns }).map((_, j) => (
-                  <td key={j} className="p-4">
-                    <div className="h-4 w-full bg-gray-200 rounded animate-pulse" />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

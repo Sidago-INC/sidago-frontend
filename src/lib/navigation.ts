@@ -385,6 +385,163 @@ export function flattenNavigationHrefs(items: NavigationItem[]): string[] {
   ]);
 }
 
+function normalizeQueryString(value: string) {
+  const params = new URLSearchParams(value);
+  const entries = Array.from(params.entries()).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  return new URLSearchParams(entries).toString();
+}
+
+export function navigationHrefMatches(
+  href: string,
+  pathname: string,
+  search = "",
+) {
+  const [hrefPath, hrefQuery = ""] = href.split("?");
+
+  if (hrefPath !== pathname) {
+    return false;
+  }
+
+  if (!hrefQuery) {
+    return true;
+  }
+
+  return normalizeQueryString(hrefQuery) === normalizeQueryString(search);
+}
+
+export function findNavigationTrail(
+  items: NavigationItem[],
+  pathname: string,
+  search = "",
+): NavigationItem[] {
+  let bestTrail: NavigationItem[] = [];
+
+  const considerTrail = (trail: NavigationItem[]) => {
+    const last = trail[trail.length - 1];
+    if (!last?.href) {
+      return;
+    }
+
+    if (trail.length > bestTrail.length) {
+      bestTrail = trail;
+    }
+  };
+
+  const walk = (
+    navItems: NavigationItem[],
+    trail: NavigationItem[],
+    matchMode: "exact" | "path",
+  ) => {
+    for (const item of navItems) {
+      const nextTrail = [...trail, item];
+
+      if (item.href) {
+        const matches =
+          matchMode === "exact"
+            ? navigationHrefMatches(item.href, pathname, search)
+            : !item.href.includes("?") &&
+              item.href.split("?")[0] === pathname;
+
+        if (matches) {
+          considerTrail(nextTrail);
+        }
+      }
+
+      if (item.children?.length) {
+        walk(item.children, nextTrail, matchMode);
+      }
+    }
+  };
+
+  walk(items, [], "exact");
+  if (bestTrail.length > 0) {
+    return bestTrail;
+  }
+
+  walk(items, [], "path");
+  return bestTrail;
+}
+
+const ROUTE_LABEL_FALLBACKS: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/calls": "Calls",
+  "/call-logs": "Call Logs",
+  "/lead-manual-update": "Lead Manual Update",
+  "/leads": "Leads",
+  "/leads/add": "Add Lead",
+  "/leads/bulk-import": "Bulk Import Leads",
+  "/companies/update": "Update Company",
+  "/companies/add": "Add Company",
+  "/companies/bulk-import": "Bulk Import Companies",
+  "/sms": "SMS",
+  "/email": "Email",
+  "/blocked-email": "Blocked Email",
+  "/email-blocklist-directory": "Email Blocklist Directory",
+  "/dead-missing-email": "Dead / Missing Email",
+  "/level-2-update": "Level 2 Update",
+  "/level-2-history": "Level 2 History",
+  "/fix-leads": "Fix Leads",
+  "/leads-stats": "Leads Stats",
+  "/additional-contacts": "Additional Contacts",
+  "/monthly-stats-points": "Monthly Stats",
+  "/closed-contacts": "Closed Contacts",
+  "/currently-hot-leads-svg": "Currently Hot SVG",
+  "/currently-hot-leads-95rm": "Currently Hot 95RM",
+  "/currently-hot-leads-benton": "Currently Hot Benton",
+  "/recent-interest-svg": "Recent Interest SVG",
+  "/recent-interest-95rm": "Recent Interest 95RM",
+  "/recent-interest-benton": "Recent Interest Benton",
+  "/ever-been-hot-svg": "Ever Been Hot SVG",
+  "/ever-been-hot-95rm": "Ever Been Hot 95RM",
+  "/ever-been-hot-benton": "Ever Been Hot Benton",
+  "/unassigned-hot-leads-svg": "Unassigned Hot SVG",
+  "/unassigned-hot-leads-95rm": "Unassigned Hot 95RM",
+  "/unassigned-hot-leads-benton": "Unassigned Hot Benton",
+};
+
+function formatPathFallback(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  const lastSegment = segments[segments.length - 1] ?? "Page";
+
+  return lastSegment
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function getRouteLabelFallback(pathname: string) {
+  if (ROUTE_LABEL_FALLBACKS[pathname]) {
+    return ROUTE_LABEL_FALLBACKS[pathname];
+  }
+
+  if (pathname.startsWith("/fix-leads/") && pathname !== "/fix-leads") {
+    return "Edit Fix Lead";
+  }
+
+  if (pathname.startsWith("/sms/")) {
+    return formatPathFallback(pathname);
+  }
+
+  if (pathname.startsWith("/email/")) {
+    return formatPathFallback(pathname);
+  }
+
+  return formatPathFallback(pathname);
+}
+
+export function getRouteBreadcrumbFallback(pathname: string) {
+  if (pathname.startsWith("/fix-leads/") && pathname !== "/fix-leads") {
+    return [
+      { label: "Fix Leads", href: "/fix-leads" },
+      { label: "Edit Fix Lead", href: pathname },
+    ];
+  }
+
+  return [{ label: getRouteLabelFallback(pathname), href: pathname }];
+};
+
 export const getNavigationsForRole = (
   roleOrUser?: string | NavigationUserContext,
   brandsWithAgents?: BrandWithAgents[],

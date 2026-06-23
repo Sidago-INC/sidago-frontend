@@ -2,7 +2,7 @@
 
 import { DateRangePicker, SimpleStatusCard } from "@/components/ui";
 import { Ban, CircleOff, Target, RefreshCcw, Wrench } from "lucide-react";
-import { type DateRange } from "react-day-picker";
+import type { DateRange } from "@/types/date-range.types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDrawer } from "@/providers/DrawerProvider";
 import {

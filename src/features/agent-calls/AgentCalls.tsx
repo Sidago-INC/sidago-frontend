@@ -13,7 +13,7 @@ import { HeroCard } from "./_components/HeroCard";
 import { PhoneCard } from "./_components/PhoneCard";
 import { WorkToggleRow } from "./_components/WorkToggleRow";
 import type { CallsFormState, CallsModalState } from "@/types";
-import { getAgentKeyFromCookie } from "./_lib/utils";
+import { getAgentKeyFromCookie, getCallBackDateError } from "./_lib/utils";
 import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
 import { MessageSquare, NotebookText, Users } from "lucide-react";
@@ -100,6 +100,7 @@ export function AgentCalls() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
+  const [callBackDateError, setCallBackDateError] = useState<string>();
   const stopAutoCallRef = useRef(false);
 
   // Queue: load on mount + refetch every 90s
@@ -140,7 +141,14 @@ export function AgentCalls() {
       .then((res) => {
         if (cancelled) return;
         setDetail(res);
-        setForm(formFromDetail(res));
+        const nextForm = formFromDetail(res);
+        setForm(nextForm);
+        setCallBackDateError(
+          getCallBackDateError(
+            nextForm.callBackDate,
+            res.brandState.lastCalledDate ?? "",
+          ),
+        );
       })
       .catch((err) => {
         if (cancelled) return;
@@ -170,6 +178,21 @@ export function AgentCalls() {
 
   const handleOutcome = async (resultCode: string) => {
     if (!currentLead || outcomeLoading) return;
+
+    const callbackError = getCallBackDateError(
+      form.callBackDate,
+      detail?.brandState.lastCalledDate ?? "",
+    );
+    if (callbackError) {
+      setCallBackDateError(callbackError);
+      setModal({
+        title: "Invalid Call Back Date",
+        message: callbackError,
+        direction: "top",
+      });
+      return;
+    }
+
     setOutcomeLoading(true);
     try {
       await agentCallsApi.logResult({
@@ -209,6 +232,11 @@ export function AgentCalls() {
   };
 
   const handleFollowUpDate = async (date: string) => {
+    const lastCalled = detail?.brandState.lastCalledDate ?? "";
+    const error = getCallBackDateError(date, lastCalled);
+    setCallBackDateError(error);
+    if (error) return;
+
     setForm((prev) => ({ ...prev, callBackDate: date }));
     if (!currentLead || !date) return;
     try {
@@ -289,7 +317,7 @@ export function AgentCalls() {
         onStop={handleStopAutoCalling}
       />
 
-      <main className="mx-auto space-y-4 px-4 py-6">
+      <main className="mx-auto max-w-5xl space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
         <HeroCard currentLead={currentLead} />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -310,6 +338,7 @@ export function AgentCalls() {
             </CardShell>
             <DatesCard
               callBackDate={form.callBackDate}
+              callBackDateError={callBackDateError}
               lastCalledDate={detail?.brandState.lastCalledDate ?? ""}
               lastFixedDate={detail?.brandState.lastFixedDate ?? ""}
               onChangeCallBackDate={handleFollowUpDate}

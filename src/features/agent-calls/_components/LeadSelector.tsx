@@ -14,8 +14,8 @@ export function LeadSelector({ leads, currentIndex, onSelect }: Props) {
   }));
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <label className="whitespace-nowrap text-xs font-medium text-slate-400 dark:text-gray-500">
+    <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+      <label className="hidden shrink-0 text-xs font-medium text-slate-400 sm:inline dark:text-gray-500">
         Lead
       </label>
       <Select
@@ -25,10 +25,10 @@ export function LeadSelector({ leads, currentIndex, onSelect }: Props) {
         searchable
         searchPlaceholder="Search leads..."
         onChange={(value) => onSelect(Number(value))}
-        className="max-w-55 cursor-pointer truncate rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 transition focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+        className="min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700 transition focus:outline-none focus:ring-0 sm:max-w-55 sm:px-3 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
       />
-      <span className="whitespace-nowrap text-sm font-bold text-slate-850 dark:text-gray-850">
-        {currentIndex + 1} / {leads.length}
+      <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-600 sm:text-sm dark:text-gray-300">
+        {currentIndex + 1}/{leads.length}
       </span>
     </div>
   );

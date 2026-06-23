@@ -141,7 +141,9 @@ export function TableBody<T>({
         <tr>
           <td colSpan={columns.length} className="px-0 py-0">
             {emptyState ?? (
-              <div className="p-10 text-center text-gray-500">{emptyText}</div>
+              <div className="p-10 text-center text-gray-500 dark:text-slate-400">
+                {emptyText}
+              </div>
             )}
           </td>
         </tr>
