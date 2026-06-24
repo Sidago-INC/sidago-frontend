@@ -94,12 +94,17 @@ export function getLeadGridLabel(row: {
   return companySymbol || fullName || "Lead";
 }
 
+export function getRowCompanySymbol(row: {
+  companySymbol?: string | null;
+  companyName?: string | null;
+}): string {
+  return row.companySymbol?.trim() || getCompanySymbol(row.companyName ?? "");
+}
+
 export function getCompanySymbolOptions(
-  rows: { companyName: string }[],
+  rows: { companyName: string; companySymbol?: string | null }[],
 ): string[] {
-  return Array.from(
-    new Set(rows.map((row) => getCompanySymbol(row.companyName))),
-  );
+  return Array.from(new Set(rows.map(getRowCompanySymbol).filter(Boolean)));
 }
 
 export function getLeadIdOptions(

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { parseCompanySymbolFromLabel } from "@/features/companies/_lib/hooks";
 import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
 import { createLeadDirectoryRow } from "@/features/leads/_lib/data";
+import { api } from "@/lib/api";
 
 export type LeadPickerRow = {
   id: string;
@@ -16,14 +17,18 @@ type LeadsResponse = { ok: true; count: number; data: LeadPickerRow[] };
 function pickerToDirectoryRow(row: LeadPickerRow): LeadDirectoryRow {
   const companyName = row.label.includes(" - ")
     ? row.label.split(" - ").slice(1).join(" - ")
-    : "";
+    : row.label.trim();
+  const companySymbol =
+    row.companySymbol?.trim() ||
+    parseCompanySymbolFromLabel(row.label) ||
+    "";
 
   return createLeadDirectoryRow(
     {
       leadId: row.id,
       lead: row.leadIdExternal ?? row.id,
       companyName,
-      companySymbol: "",
+      companySymbol,
       fullName: row.fullName ?? "",
       phone: "",
       role: "",

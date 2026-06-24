@@ -11,13 +11,18 @@ import {
   TypeBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
-import { getCompanySymbol, getLeadId, type LeadRow } from "../_lib/data";
-import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
-import { AGENT_VALUES } from "@/types/agent.types";
-import { COMPANY_VALUES } from "@/types/company.types";
+import {
+  findCompanyPickerRow,
+  parseCompanySymbolFromLabel,
+  resolveCompanyFromDirectory,
+  resolveCompanyTimezone,
+  useCompanyBySymbol,
+  useCompanyOptions,
+  useDrawerCompanyNameSelectSource,
+  type CompanyRow,
+} from "@/features/companies/_lib/hooks";
+import { useUsers } from "@/features/backoffice-shared/use-users";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
@@ -25,6 +30,20 @@ import {
   type LeadPatchBody,
 } from "@/features/backoffice-shared/use-update-lead";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import {
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
+import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import {
+  findCompanyForLead,
+  getHotLeadTimezone,
+  getLeadId,
+  getRowCompanySymbol,
+  type LeadRow,
+} from "../_lib/data";
 
 type CurrentlyHotSvgDrawerProps = {
   data: LeadRow[];
@@ -94,10 +113,6 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-function stripTimezonePrefix(timezone: string | undefined) {
-  return (timezone ?? "").replace(/^\d+-/, "");
-}
-
 function ToggleField({
   checked,
   label,
@@ -129,6 +144,29 @@ function ToggleField({
   );
 }
 
+function buildLeadCompanyRow(row: LeadRow): CompanyRow | null {
+  const name = row.companyName?.trim();
+  if (!name) return null;
+
+  return {
+    id: "",
+    symbol: row.companySymbol ?? null,
+    name,
+    label: row.companySymbol ? `${row.companySymbol} - ${name}` : name,
+    timezone: row.timezone ?? null,
+    country: null,
+    description: null,
+    estimatedMarketcap: null,
+    city: null,
+    state: null,
+    zip: null,
+    website: null,
+    twitter: null,
+    createdAt: null,
+    updatedAt: null,
+  };
+}
+
 export function CurrentlyHotDrawer({
   data,
   columns,
@@ -139,6 +177,16 @@ export function CurrentlyHotDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+  const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
+  const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
+    useState<string>();
+  const [pinnedCompanyOption, setPinnedCompanyOption] = useState<{
+    label: string;
+    value: string;
+  } | null>(null);
+  const [pinnedCompanyRow, setPinnedCompanyRow] = useState<CompanyRow | null>(
+    null,
+  );
   const [formState, setFormState] = useState<{
     key: string;
     value: EditableDrawerState;
@@ -146,32 +194,115 @@ export function CurrentlyHotDrawer({
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.email ?? "";
+  const drawerOpen = row !== null && selectedIndex !== null;
   const initialForm = useMemo(
     () => (row ? getEditableState(row) : null),
     [row],
   );
   const form = formState?.key === rowKey ? formState.value : initialForm;
   const updateLead = useUpdateLead();
+  const companyChanged = form?.companyName !== initialForm?.companyName;
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
     return JSON.stringify(form) !== JSON.stringify(initialForm);
   }, [form, initialForm]);
 
-  const companyOptions = useMemo(
-    () =>
-      COMPANY_VALUES.map((company) => ({
-        label: `${company.name} (${company.symbol})`,
-        value: company.name,
-      })),
-    [],
+  const extraCompanyOptions = useMemo(() => {
+    const currentName = form?.companyName?.trim();
+    if (!currentName) return [];
+
+    if (
+      pinnedCompanyOption &&
+      String(pinnedCompanyOption.value) === currentName
+    ) {
+      return [pinnedCompanyOption];
+    }
+
+    return [
+      {
+        value: currentName,
+        label: row?.companySymbol
+          ? `${row.companySymbol} - ${currentName}`
+          : currentName,
+      },
+    ];
+  }, [form?.companyName, pinnedCompanyOption, row?.companySymbol]);
+
+  const companySelectSource = useDrawerCompanyNameSelectSource(
+    extraCompanyOptions,
+    drawerOpen,
   );
-  const agentOptions = useMemo(
+  const { data: allCompanies = [] } = useCompanyOptions();
+  const companyOptions = useMemo(() => {
+    const currentName = form?.companyName?.trim();
+    if (!currentName || !pinnedCompanyOption) {
+      return companySelectSource.options;
+    }
+
+    if (String(pinnedCompanyOption.value) !== currentName) {
+      return companySelectSource.options;
+    }
+
+    const exists = companySelectSource.options.some(
+      (option) => String(option.value) === currentName,
+    );
+
+    if (exists) {
+      return companySelectSource.options;
+    }
+
+    return [pinnedCompanyOption, ...companySelectSource.options];
+  }, [companySelectSource.options, form?.companyName, pinnedCompanyOption]);
+  const loadedCompanyRows = useMemo(
+    () => [
+      ...companySelectSource.browseItems,
+      ...companySelectSource.remoteItems,
+    ],
+    [companySelectSource.browseItems, companySelectSource.remoteItems],
+  );
+  const companyRows = useMemo(() => {
+    let rows = companyChanged ? [...loadedCompanyRows] : loadedCompanyRows;
+
+    if (!companyChanged) {
+      const leadCompany = row ? buildLeadCompanyRow(row) : null;
+      if (
+        leadCompany &&
+        !findCompanyPickerRow(leadCompany.name, leadCompany.symbol, rows)
+      ) {
+        rows = [leadCompany, ...rows];
+      }
+    }
+
+    if (
+      pinnedCompanyRow &&
+      !findCompanyPickerRow(
+        pinnedCompanyRow.name,
+        pinnedCompanyRow.symbol,
+        rows,
+      )
+    ) {
+      rows = [pinnedCompanyRow, ...rows];
+    }
+
+    return rows;
+  }, [companyChanged, loadedCompanyRows, pinnedCompanyRow, row]);
+  const svgAgentsQuery = useUsers("svg");
+  const bentonAgentsQuery = useUsers("benton");
+  const svgAgentOptions = useMemo(
     () =>
-      AGENT_VALUES.map((agent) => {
-        const fullName = `${agent.name} ${agent.surname}`;
-        return { label: fullName, value: fullName };
-      }),
-    [],
+      (svgAgentsQuery.data ?? []).map((agent) => ({
+        label: agent.name,
+        value: agent.name,
+      })),
+    [svgAgentsQuery.data],
+  );
+  const bentonAgentOptions = useMemo(
+    () =>
+      (bentonAgentsQuery.data ?? []).map((agent) => ({
+        label: agent.name,
+        value: agent.name,
+      })),
+    [bentonAgentsQuery.data],
   );
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
@@ -181,13 +312,105 @@ export function CurrentlyHotDrawer({
     () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
-  const selectedCompany = useMemo(
-    () => COMPANY_VALUES.find((company) => company.name === form?.companyName),
-    [form?.companyName],
+  const selectedCompany = useMemo(() => {
+    if (pinnedCompanyRow) {
+      return pinnedCompanyRow;
+    }
+
+    return findCompanyPickerRow(
+      form?.companyName,
+      getRowCompanySymbol({
+        companySymbol: row?.companySymbol,
+        companyName: form?.companyName || row?.companyName,
+      }),
+      companyRows,
+    );
+  }, [companyRows, form?.companyName, pinnedCompanyRow, row?.companyName, row?.companySymbol]);
+  const activeCompanySymbol = useMemo(
+    () =>
+      getRowCompanySymbol({
+        companySymbol:
+          pinnedCompanyRow?.symbol ||
+          selectedCompany?.symbol ||
+          row?.companySymbol,
+        companyName: form?.companyName || row?.companyName || "",
+      }),
+    [
+      form?.companyName,
+      pinnedCompanyRow?.symbol,
+      row?.companyName,
+      row?.companySymbol,
+      selectedCompany?.symbol,
+    ],
   );
-  const selectedTimezone = stripTimezonePrefix(
-    selectedCompany?.timezone ?? row?.timezone,
+  const { data: companyBySymbol } = useCompanyBySymbol(
+    activeCompanySymbol,
+    drawerOpen && Boolean(activeCompanySymbol.trim()),
   );
+  const selectedCompanySymbol = useMemo(() => {
+    if (companyChanged) {
+      return (
+        selectedCompany?.symbol ||
+        getRowCompanySymbol({
+          companyName: form?.companyName,
+          companySymbol: "",
+        })
+      );
+    }
+
+    return getRowCompanySymbol({
+      companySymbol: row?.companySymbol,
+      companyName: form?.companyName || row?.companyName,
+    });
+  }, [
+    companyChanged,
+    form?.companyName,
+    row?.companyName,
+    row?.companySymbol,
+    selectedCompany?.symbol,
+  ]);
+  const displayCompanySymbol = useMemo(() => {
+    if (companyChanged) {
+      return selectedCompanySymbol;
+    }
+
+    return getRowCompanySymbol({
+      companySymbol: row?.companySymbol,
+      companyName: form?.companyName || row?.companyName,
+    });
+  }, [
+    companyChanged,
+    form?.companyName,
+    row?.companyName,
+    row?.companySymbol,
+    selectedCompanySymbol,
+  ]);
+  const displayTimezone = useMemo(() => {
+    const leadContext = {
+      companyName: form?.companyName || row?.companyName || "",
+      companySymbol: activeCompanySymbol,
+      timezone: row?.timezone || "",
+    };
+    const lookupCompanies = [...companyRows, ...allCompanies];
+    const activeCompany = pinnedCompanyRow ?? selectedCompany;
+
+    return (
+      companyBySymbol?.timezone?.trim() ||
+      resolveCompanyTimezone(activeCompany, lookupCompanies) ||
+      findCompanyForLead(leadContext, lookupCompanies)?.timezone?.trim() ||
+      getHotLeadTimezone(leadContext, lookupCompanies)
+    );
+  }, [
+    activeCompanySymbol,
+    allCompanies,
+    companyBySymbol?.timezone,
+    companyRows,
+    form?.companyName,
+    pinnedCompanyRow,
+    row?.companyName,
+    row?.timezone,
+    selectedCompany,
+  ]);
 
   const detailItems = useMemo(() => {
     if (!row) return [];
@@ -224,6 +447,67 @@ export function CurrentlyHotDrawer({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
+  useEffect(() => {
+    setSvgToBeCalledOnError(undefined);
+    setBentonToBeCalledOnError(undefined);
+    setPinnedCompanyOption(null);
+    setPinnedCompanyRow(null);
+    companySelectSource.onSearchChange("");
+  }, [rowKey, companySelectSource.onSearchChange]);
+
+  useEffect(() => {
+    if (!pinnedCompanyOption || allCompanies.length === 0) return;
+
+    const resolved = resolveCompanyFromDirectory(
+      pinnedCompanyOption,
+      pinnedCompanyRow ?? undefined,
+      allCompanies,
+    );
+
+    if (!resolved?.timezone?.trim()) return;
+
+    setPinnedCompanyRow((current) => {
+      if (
+        current?.id &&
+        resolved.id &&
+        current.id !== resolved.id &&
+        current.timezone?.trim()
+      ) {
+        return current;
+      }
+
+      if (current?.timezone?.trim() === resolved.timezone?.trim()) {
+        return current;
+      }
+
+      return resolved;
+    });
+  }, [allCompanies, pinnedCompanyOption, pinnedCompanyRow]);
+
+  useEffect(() => {
+    if (!companyBySymbol?.timezone?.trim()) return;
+
+    setPinnedCompanyRow((current) => {
+      if (
+        current?.symbol &&
+        companyBySymbol.symbol &&
+        current.symbol.trim().toUpperCase() !==
+          companyBySymbol.symbol.trim().toUpperCase()
+      ) {
+        return current;
+      }
+
+      if (current?.timezone?.trim() === companyBySymbol.timezone?.trim()) {
+        return current;
+      }
+
+      return {
+        ...(current ?? companyBySymbol),
+        ...companyBySymbol,
+      };
+    });
+  }, [companyBySymbol]);
+
   if (!row || selectedIndex === null || !form) return null;
 
   const currentIndex = selectedIndex;
@@ -245,8 +529,55 @@ export function CurrentlyHotDrawer({
     }));
   };
 
+  const handleCompanyChange = (value: string | number) => {
+    const stringValue = String(value);
+    const selectedOption = companyOptions.find(
+      (option) => String(option.value) === stringValue,
+    );
+    const selectedSymbol =
+      parseCompanySymbolFromLabel(selectedOption?.label ?? "") ??
+      parseCompanySymbolFromLabel(stringValue) ??
+      undefined;
+    const selectedRow = findCompanyPickerRow(
+      stringValue,
+      selectedSymbol,
+      loadedCompanyRows,
+    );
+    const resolvedRow =
+      resolveCompanyFromDirectory(
+        selectedOption,
+        selectedRow,
+        allCompanies,
+      ) ?? selectedRow;
+
+    if (selectedOption) {
+      setPinnedCompanyOption(selectedOption);
+    }
+    if (resolvedRow) {
+      setPinnedCompanyRow(resolvedRow);
+    }
+
+    updateForm("companyName", stringValue);
+  };
+
   const handleReset = () => {
     setFormState(null);
+    setSvgToBeCalledOnError(undefined);
+    setBentonToBeCalledOnError(undefined);
+  };
+
+  const handleSvgToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, "");
+    setSvgToBeCalledOnError(error);
+    if (error) return;
+    updateForm("svgToBeCalledOn", value);
+  };
+
+  const handleBentonToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, "");
+    setBentonToBeCalledOnError(error);
+    if (error) return;
+    updateForm("bentonToBeCalledOn", value);
   };
 
   const handleSave = async () => {
@@ -256,6 +587,15 @@ export function CurrentlyHotDrawer({
       showErrorToast(
         new Error("Cannot save: this row has no leadId (mock data?)"),
       );
+      return;
+    }
+
+    const svgDateError = getCallBackDateError(form.svgToBeCalledOn, "");
+    const bentonDateError = getCallBackDateError(form.bentonToBeCalledOn, "");
+    if (svgDateError || bentonDateError) {
+      setSvgToBeCalledOnError(svgDateError);
+      setBentonToBeCalledOnError(bentonDateError);
+      showErrorToast(new Error(svgDateError || bentonDateError));
       return;
     }
 
@@ -406,8 +746,9 @@ export function CurrentlyHotDrawer({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {getLeadDrawerTitle({
-                  companyName: row.companyName,
-                  fullName: row.fullName,
+                  companySymbol: displayCompanySymbol,
+                  companyName: form.companyName,
+                  fullName: form.fullName,
                 })}
               </p>
             </div>
@@ -459,27 +800,46 @@ export function CurrentlyHotDrawer({
     >
       <div className="space-y-5">
         <DetailCard>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <CompanySymbolBadge
-                symbol={getCompanySymbol(form.companyName)}
-                index={data.findIndex((item) => item.email === row.email)}
-                className="rounded"
-              />
-              <EditableField label="Company">
-                <Select
-                  value={form.companyName}
-                  onChange={(value) => updateForm("companyName", String(value))}
-                  options={companyOptions}
-                  placeholder="Select company"
-                  className="py-1.5 text-xs"
-                />
-              </EditableField>
-            </div>
-            <TimezoneBadge
-              timezone={selectedTimezone}
+          <div className="flex items-end gap-3">
+            <CompanySymbolBadge
+              symbol={displayCompanySymbol}
               index={data.findIndex((item) => item.email === row.email)}
+              className="rounded"
+              maxWidth="7.5rem"
             />
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">
+                Company
+              </p>
+              <Select
+                key={rowKey}
+                value={form.companyName}
+                onChange={handleCompanyChange}
+                options={companyOptions}
+                placeholder={
+                  companySelectSource.isLoading &&
+                  companySelectSource.options.length === 0
+                    ? "Loading companies..."
+                    : "Select company"
+                }
+                disabled={
+                  companySelectSource.isLoading &&
+                  companySelectSource.options.length === 0
+                }
+                searchable
+                searchPlaceholder="Search company"
+                searchValue={companySelectSource.searchInput}
+                onSearchChange={companySelectSource.onSearchChange}
+                filterOptionsLocally={false}
+                onLoadMore={companySelectSource.onLoadMore}
+                hasMore={companySelectSource.hasMore}
+                isLoadingMore={companySelectSource.isLoadingMore}
+                isSearching={companySelectSource.isSearching}
+                optionsClassName="z-[500] !w-[min(26rem,calc(100vw-2rem))] max-h-72 shadow-xl dark:border-slate-700 dark:bg-slate-950"
+                className="w-full py-1.5 text-xs"
+              />
+            </div>
+            <TimezoneBadge timezone={displayTimezone} className="shrink-0" />
           </div>
         </DetailCard>
 
@@ -560,34 +920,39 @@ export function CurrentlyHotDrawer({
             <Select
               value={form.svgToBeCalledBy}
               onChange={(value) => updateForm("svgToBeCalledBy", String(value))}
-              options={agentOptions}
-              placeholder="Select assignee"
+              options={svgAgentOptions}
+              placeholder={
+                svgAgentsQuery.isLoading ? "Loading agents..." : "Select assignee"
+              }
+              disabled={svgAgentsQuery.isLoading}
+              searchable
+              searchPlaceholder="Search agent"
               className="py-1.5 text-xs"
             />
           </EditableField>
           <EditableField label="To Be Called On">
             <DatePickerField
               value={form.svgToBeCalledOn}
-              onChange={(value) => updateForm("svgToBeCalledOn", value)}
+              onChange={handleSvgToBeCalledOnChange}
+              minDate={getMinCallBackDate("")}
+              error={svgToBeCalledOnError}
               className="text-xs font-semibold"
             />
           </EditableField>
           <EditableField label="History Calls" align="stack">
             <Textarea
               value={form.svgHistoryCalls}
-              onChange={(event) =>
-                updateForm("svgHistoryCalls", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
           <EditableField label="History Notes" align="stack">
             <Textarea
               value={form.svgHistoryNotes}
-              onChange={(event) =>
-                updateForm("svgHistoryNotes", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
         </DetailCard>
@@ -608,34 +973,41 @@ export function CurrentlyHotDrawer({
               onChange={(value) =>
                 updateForm("bentonToBeCalledBy", String(value))
               }
-              options={agentOptions}
-              placeholder="Select assignee"
+              options={bentonAgentOptions}
+              placeholder={
+                bentonAgentsQuery.isLoading
+                  ? "Loading agents..."
+                  : "Select assignee"
+              }
+              disabled={bentonAgentsQuery.isLoading}
+              searchable
+              searchPlaceholder="Search agent"
               className="py-1.5 text-xs"
             />
           </EditableField>
           <EditableField label="To Be Called On">
             <DatePickerField
               value={form.bentonToBeCalledOn}
-              onChange={(value) => updateForm("bentonToBeCalledOn", value)}
+              onChange={handleBentonToBeCalledOnChange}
+              minDate={getMinCallBackDate("")}
+              error={bentonToBeCalledOnError}
               className="text-xs font-semibold"
             />
           </EditableField>
           <EditableField label="History Calls" align="stack">
             <Textarea
               value={form.bentonHistoryCalls}
-              onChange={(event) =>
-                updateForm("bentonHistoryCalls", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
           <EditableField label="History Notes" align="stack">
             <Textarea
               value={form.bentonHistoryNotes}
-              onChange={(event) =>
-                updateForm("bentonHistoryNotes", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
         </DetailCard>

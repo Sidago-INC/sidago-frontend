@@ -5,6 +5,7 @@ import {
   EmailLink,
   TypeBadge,
 } from "@/components/ui";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import {
   BlockedEmailRow,
   getBlockedBrandLabel,
@@ -54,7 +55,7 @@ export function BlockedEmailDrawer({
             Review Blocked Email
           </h2>
           <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-            {row ? row.leadId : "Blocked email entry"}
+            {row ? getLeadGridLabel(row) : "Blocked email entry"}
           </p>
         </div>
       }
@@ -84,7 +85,7 @@ export function BlockedEmailDrawer({
         <dl className="grid gap-3">
           <DetailRow
             label="Lead ID"
-            value={row.leadId}
+            value={getLeadGridLabel(row)}
           />
           <DetailRow label="Company Name" value={row.companyName || "-"} />
           <DetailRow label="Full Name" value={row.fullName || "-"} />

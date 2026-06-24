@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { usePaginatedSelectSource } from "@/lib/use-paginated-select-source";
+import { formatLeadDisplayTitle } from "@/features/agent-calls/_lib/utils";
 
 export type LeadPickerRow = {
   id: string;
@@ -27,6 +29,56 @@ export type BrandStatesResponse = {
 
 type LeadsResponse = { ok: true; count: number; data: LeadPickerRow[] };
 type AgentsResponse = { ok: true; count: number; data: AgentUser[] };
+
+const LEAD_PAGE_SIZE = 50;
+
+export async function fetchLeadsPage({
+  limit = LEAD_PAGE_SIZE,
+  page = 1,
+  search,
+}: {
+  limit?: number;
+  page?: number;
+  search?: string;
+}) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+  });
+
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+
+  if (search?.trim()) {
+    params.set("search", search.trim());
+  }
+
+  const json = (await api.get(`/leads?${params}`)) as LeadsResponse;
+  return { data: json.data, count: json.count };
+}
+
+function buildLeadSelectOptions(leads: LeadPickerRow[]) {
+  return leads.map((lead) => ({
+    value: lead.id,
+    label:
+      formatLeadDisplayTitle({
+        companySymbol: lead.companySymbol,
+        fullName: lead.fullName ?? "",
+      }) || lead.label || lead.fullName || lead.leadIdExternal || lead.id,
+  }));
+}
+
+export function useLeadSelectSource(
+  extraOptions: Array<{ label: string; value: string }> = [],
+) {
+  return usePaginatedSelectSource({
+    queryKeyPrefix: "leads",
+    pageSize: LEAD_PAGE_SIZE,
+    fetchPage: fetchLeadsPage,
+    buildOptions: buildLeadSelectOptions,
+    extraOptions,
+  });
+}
 
 // Loads the lead picker list. 5-min stale time matches the agents hook — the
 // pool of pickable leads doesn't churn second-to-second.

@@ -1,8 +1,12 @@
 
 
 import { useMemo } from "react";
-import ReactSelect, { type SingleValue } from "react-select";
+import ReactSelect, {
+  type FilterOptionOption,
+  type SingleValue,
+} from "react-select";
 import countryList from "react-select-country-list";
+import { optionMatchesSelectSearch } from "@/lib/select-search";
 
 type CountryOption = {
   label: string;
@@ -12,6 +16,7 @@ type CountryOption = {
 type CountryPickerProps = {
   error?: string;
   label?: string;
+  required?: boolean;
   value: string;
   onChange: (value: string) => void;
 };
@@ -24,6 +29,7 @@ type CountryPickerProps = {
 export function CountryPicker({
   error,
   label = "Country",
+  required = false,
   value,
   onChange,
 }: CountryPickerProps) {
@@ -43,7 +49,10 @@ export function CountryPicker({
 
   return (
     <div className="flex w-full flex-col gap-1">
-      <label className="text-sm font-medium">{label}</label>
+      <label className="text-sm font-medium">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </label>
       <ReactSelect
         options={countryOptions}
         value={selectedCountry}
@@ -52,6 +61,13 @@ export function CountryPicker({
         }
         placeholder="Search and select a country"
         isSearchable
+        aria-required={required || undefined}
+        filterOption={(option: FilterOptionOption<CountryOption>, inputValue) =>
+          optionMatchesSelectSearch(
+            { label: option.label, value: option.value },
+            inputValue,
+          )
+        }
         className="text-sm"
         menuPlacement="auto"
         styles={{

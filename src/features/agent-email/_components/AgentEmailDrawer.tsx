@@ -13,6 +13,10 @@ import {
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import {
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
+import {
   contactTypeOptions,
   leadTypeOptions,
 } from "@/features/backoffice-closed-contacts/_lib/data";
@@ -186,6 +190,11 @@ export function AgentEmailDrawer({
   onSave,
 }: AgentEmailDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const [callBackDateError, setCallBackDateError] = useState<string>();
+
+  useEffect(() => {
+    setCallBackDateError(undefined);
+  }, [row?.id]);
 
   useEffect(() => {
     if (!copied) {
@@ -209,7 +218,15 @@ export function AgentEmailDrawer({
   const historyNotes = row?.history.trim()
     ? row.history
     : "No email history recorded yet.";
-  const historyCalls = row?.notes.trim() ? row.notes : defaultHistoryCalls;
+
+  const handleCallBackDateChange = (value: string) => {
+    const error = getCallBackDateError(value, row?.lastActionDate ?? "");
+    setCallBackDateError(error);
+    if (error) {
+      return;
+    }
+    onChange("callBackDate", value);
+  };
 
   const handleCopyLink = async () => {
     if (!drawerUrl) {
@@ -370,10 +387,7 @@ export function AgentEmailDrawer({
                   </p>
                 </div>
               </div>
-              <TimezoneBadge
-                timezone={row.timezone}
-                index={currentIndex >= 0 ? currentIndex : 0}
-              />
+              <TimezoneBadge timezone={row.timezone} />
             </div>
           </DetailCard>
 
@@ -474,7 +488,9 @@ export function AgentEmailDrawer({
             <EditableField label="Call Back Date">
               <DatePickerField
                 value={row.callBackDate}
-                onChange={(value) => onChange("callBackDate", value)}
+                onChange={handleCallBackDateChange}
+                minDate={getMinCallBackDate(row.lastActionDate ?? "")}
+                error={callBackDateError}
                 className="text-xs font-semibold"
               />
             </EditableField>
@@ -483,18 +499,16 @@ export function AgentEmailDrawer({
           <DetailCard label="History">
             <EditableField label="History Calls" align="stack">
               <Textarea
-                value={historyCalls}
-                onChange={(event) => onChange("notes", event.target.value)}
-                className="text-xs font-semibold leading-5"
-                placeholder={defaultHistoryCalls}
+                value={defaultHistoryCalls}
+                readOnly
+                className="cursor-default bg-slate-100 text-xs font-semibold leading-5 dark:bg-slate-900/50"
               />
             </EditableField>
             <EditableField label="History Notes" align="stack">
               <Textarea
-                value={row.history}
-                onChange={(event) => onChange("history", event.target.value)}
-                className="text-xs font-semibold leading-5"
-                placeholder={historyNotes}
+                value={historyNotes}
+                readOnly
+                className="cursor-default bg-slate-100 text-xs font-semibold leading-5 dark:bg-slate-900/50"
               />
             </EditableField>
           </DetailCard>

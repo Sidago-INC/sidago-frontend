@@ -24,6 +24,6 @@ export function RecentInterest95rm() {
   }
 
   return (
-    <RecentInterestTable data={data ?? []} title="Recent Interest - 95RM" />
+    <RecentInterestTable data={data ?? []} title="Recent Interest - 95RM" brand="95rm" />
   );
 }

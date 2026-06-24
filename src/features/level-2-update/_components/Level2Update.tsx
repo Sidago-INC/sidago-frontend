@@ -19,7 +19,6 @@ import { api } from "@/lib/api";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUsers } from "@/features/backoffice-shared/use-users";
 import {
-  formatLeadDisplayTitle,
   getCallBackDateError,
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
@@ -30,7 +29,7 @@ import {
   type Level2UpdateRow,
 } from "../_lib/data";
 import {
-  useLeadOptions,
+  useLeadSelectSource,
   useLogLevel2Result,
   useRevertLevel2Result,
   type BrandStatesResponse,
@@ -163,7 +162,18 @@ export function Level2Update() {
     }
   }, [rows]);
 
-  const { data: leadOptionsRaw, isLoading: leadsLoading } = useLeadOptions();
+  const extraLeadOptions = useMemo(
+    () =>
+      rows
+        .filter((row) => row.lead && row.lead_label)
+        .map((row) => ({ value: row.lead, label: row.lead_label }))
+        .filter(
+          (option, index, all) =>
+            all.findIndex((item) => item.value === option.value) === index,
+        ),
+    [rows],
+  );
+  const leadSelectSource = useLeadSelectSource(extraLeadOptions);
   // One agents query per brand — each result is cached for 5 minutes, so even
   // with three hooks the network footprint is tiny. Per-row agent options are
   // derived from whichever brand the row's campaign points at, so picking
@@ -174,24 +184,11 @@ export function Level2Update() {
   const logResult = useLogLevel2Result();
   const revertResult = useRevertLevel2Result();
 
-  const leadOptions = useMemo(
-    () =>
-      (leadOptionsRaw ?? []).map((l) => ({
-        value: l.id,
-        label:
-          formatLeadDisplayTitle({
-            companySymbol: l.companySymbol,
-            fullName: l.fullName ?? "",
-          }) || l.label || l.fullName || l.leadIdExternal || l.id,
-      })),
-    [leadOptionsRaw],
-  );
-
-  const leadLabelById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const opt of leadOptions) map.set(opt.value, opt.label);
-    return map;
-  }, [leadOptions]);
+  const getLeadLabel = (leadId: string) =>
+    leadSelectSource.options.find((option) => String(option.value) === leadId)
+      ?.label ??
+    rows.find((row) => row.lead === leadId)?.lead_label ??
+    "";
 
   const getAgentOptions = (campaign: BRAND | "") => {
     if (campaign === "SVG") {
@@ -269,7 +266,7 @@ export function Level2Update() {
   };
 
   const handleLeadChange = async (rowId: string, leadId: string) => {
-    const label = leadLabelById.get(leadId) ?? "";
+    const label = getLeadLabel(leadId);
     // Reset the brand lead types until the fetch resolves so the user never
     // sees stale data from the previously selected lead.
     patchRow(rowId, {
@@ -352,10 +349,22 @@ export function Level2Update() {
           <div onClick={(event) => event.stopPropagation()}>
             <Select
               value={row.lead}
-              options={leadOptions}
-              placeholder={leadsLoading ? "Loading leads..." : "Select lead"}
+              options={leadSelectSource.options}
+              placeholder={
+                leadSelectSource.isLoading &&
+                leadSelectSource.options.length === 0
+                  ? "Loading leads..."
+                  : "Select lead"
+              }
               searchable
               searchPlaceholder="Search lead"
+              searchValue={leadSelectSource.searchInput}
+              onSearchChange={leadSelectSource.onSearchChange}
+              filterOptionsLocally={false}
+              onLoadMore={leadSelectSource.onLoadMore}
+              hasMore={leadSelectSource.hasMore}
+              isLoadingMore={leadSelectSource.isLoadingMore}
+              isSearching={leadSelectSource.isSearching}
               onChange={(nextValue) =>
                 handleLeadChange(row.id, String(nextValue))
               }

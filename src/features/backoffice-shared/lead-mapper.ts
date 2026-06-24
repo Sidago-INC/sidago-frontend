@@ -1,5 +1,6 @@
 import { generateRandomLeads } from "@/lib/mocks/leads";
 import type { LEAD } from "@/types/lead.types";
+import { stripTimezonePrefix } from "@/types/timezone.types";
 import type { HotLeadRow } from "./types";
 
 const CAMPAIGN_TYPES = [
@@ -9,10 +10,6 @@ const CAMPAIGN_TYPES = [
   "Outbound",
   "Referral",
 ] as const;
-
-function stripTimezonePrefix(tz: string | undefined): string {
-  return (tz ?? "").replace(/^\d+-/, "");
-}
 
 function isoToDate(iso: string | undefined): string {
   if (!iso) return "";

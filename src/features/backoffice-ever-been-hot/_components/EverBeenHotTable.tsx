@@ -4,16 +4,17 @@ import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
-import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  getCompanySymbolOptions,
+  getLeadGridLabel,
+  getRowCompanySymbol,
+} from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import React, { useEffect, useMemo, useState } from "react";
 import { EverBeenHotDrawer } from "./EverBeenHotDrawer";
-
 import {
-  assigneeOptions,
   contactTypeOptions,
   EverBeenHotRow,
-  getCompanySymbol,
-  getCompanySymbolOptions,
   leadTypeOptions,
   timezoneOptions,
 } from "../_lib/data";
@@ -40,6 +41,10 @@ export function EverBeenHotTable({
     setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
   }, [data, selectedLead]);
 
+  const svgAgentsQuery = useAgentSelectOptions("svg");
+  const bentonAgentsQuery = useAgentSelectOptions("benton");
+  const rm95AgentsQuery = useAgentSelectOptions("95rm");
+
   const columns = useMemo<Column<EverBeenHotRow>[]>(() => {
     const baseColumns: Column<EverBeenHotRow>[] = [
       {
@@ -51,13 +56,12 @@ export function EverBeenHotTable({
           label: value,
           value,
         })),
-        render: (row) =>
-          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
+        render: (row) => getLeadGridLabel(row) || "-",
       },
       {
         title: "Company Symbol",
         key: "companySymbol",
-        getValue: (row) => getCompanySymbol(row.companyName),
+        getValue: (row) => getRowCompanySymbol(row),
         type: "select",
         options: getCompanySymbolOptions(data).map((value) => ({
           label: value,
@@ -65,8 +69,10 @@ export function EverBeenHotTable({
         })),
         render: (row) => (
           <CompanySymbolBadge
-            symbol={getCompanySymbol(row.companyName)}
+            symbol={getRowCompanySymbol(row)}
             index={data.findIndex((item) => item.email === row.email)}
+            className="rounded"
+            maxWidth="6.5rem"
           />
         ),
       },
@@ -80,10 +86,7 @@ export function EverBeenHotTable({
         type: "select",
         options: timezoneOptions.map((value) => ({ label: value, value })),
         render: (row) => (
-          <TimezoneBadge
-            timezone={row.timezone}
-            index={data.findIndex((item) => item.email === row.email)}
-          />
+          <TimezoneBadge timezone={row.timezone} />
         ),
       },
       {
@@ -109,7 +112,7 @@ export function EverBeenHotTable({
           title: "To Be Called (Sidago)",
           key: "svgToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: svgAgentsQuery.options,
         },
         {
           title: "SVG - Last Called Date",
@@ -127,7 +130,7 @@ export function EverBeenHotTable({
           title: "To Be Called (Benton)",
           key: "bentonToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: bentonAgentsQuery.options,
         },
         {
           title: "Benton - Last Called Date",
@@ -160,7 +163,7 @@ export function EverBeenHotTable({
           title: "95RM - To Be Called By",
           key: "rm95ToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: rm95AgentsQuery.options,
         },
         {
           title: "95RM - Last Called Date",
@@ -192,7 +195,7 @@ export function EverBeenHotTable({
         title: "SVG - To Be Called By",
         key: "svgToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: svgAgentsQuery.options,
       },
       {
         title: "SVG - Last Called Date",
@@ -210,7 +213,7 @@ export function EverBeenHotTable({
         title: "Benton - To Be Called By",
         key: "bentonToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: bentonAgentsQuery.options,
       },
       {
         title: "Benton - Last Called Date",
@@ -227,7 +230,7 @@ export function EverBeenHotTable({
         key: "lastActionDate",
       },
     ];
-  }, [data, variant]);
+  }, [bentonAgentsQuery.options, data, rm95AgentsQuery.options, svgAgentsQuery.options, variant]);
 
   return (
     <div className="min-h-full">
@@ -243,6 +246,7 @@ export function EverBeenHotTable({
       <EverBeenHotDrawer
         data={data}
         columns={columns}
+        variant={variant}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         onClose={() => setSelectedIndex(null)}

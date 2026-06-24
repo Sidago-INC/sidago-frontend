@@ -6,6 +6,7 @@ import { InputHTMLAttributes, useId } from "react";
 type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   error?: string;
+  required?: boolean;
   wrapperClassName?: string;
   labelClassName?: string;
 };
@@ -13,6 +14,7 @@ type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
 export function TextInput({
   label,
   error,
+  required = false,
   className,
   wrapperClassName,
   labelClassName,
@@ -31,12 +33,14 @@ export function TextInput({
           className={clsx("text-sm font-medium", labelClassName)}
         >
           {label}
+          {required ? <span className="text-red-500"> *</span> : null}
         </label>
       )}
 
       <input
         id={inputId}
         type={type}
+        aria-required={required || undefined}
         className={clsx(
           "w-full rounded border bg-white px-3 py-1.5 text-sm text-slate-700 transition focus:border-indigo-500 focus:outline-none dark:bg-gray-800 dark:text-slate-200 dark:focus:border-indigo-400",
           error ? "border-red-500" : "border-gray-300 dark:border-gray-600",

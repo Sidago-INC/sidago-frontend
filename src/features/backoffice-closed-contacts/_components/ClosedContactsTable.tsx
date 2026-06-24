@@ -80,10 +80,7 @@ export function ClosedContactsTable({
         type: "select",
         options: timezoneOptions.map((value) => ({ label: value, value })),
         render: (row) => (
-          <TimezoneBadge
-            timezone={row.timezone}
-            index={data.findIndex((item) => item.email === row.email)}
-          />
+          <TimezoneBadge timezone={row.timezone} />
         ),
       },
       {

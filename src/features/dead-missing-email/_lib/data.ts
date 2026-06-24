@@ -1,3 +1,4 @@
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -27,11 +28,7 @@ type ClearDeadEmailResponse = {
 };
 
 export function getDeadEmailDisplayLeadId(row: DeadMissingEmailRow): string {
-  if (row.leadIdExternal && row.companySymbol) {
-    return `${row.companySymbol}-${row.leadIdExternal}`;
-  }
-
-  return row.leadIdExternal || row.leadId;
+  return getLeadGridLabel(row);
 }
 
 export function getDeadEmailBrandLabel(brand: string): string {

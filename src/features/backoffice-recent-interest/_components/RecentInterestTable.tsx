@@ -1,17 +1,19 @@
 
 
-import { CampaignBadge, TypeBadge } from "@/components/ui";
+import { CampaignBadge, CompanySymbolBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import {
+  getCompanySymbolOptions,
   getLeadGridLabel,
+  getRowCompanySymbol,
 } from "@/features/backoffice-shared/constants";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import { useSearchParams } from "react-router-dom";
 import React, { useEffect, useMemo, useState } from "react";
 import { RecentInterestDrawer } from "./RecentInterestDrawer";
 import {
   RecentInterestRow,
-  recentInterestAssigneeOptions,
   recentInterestCallResultOptions,
   recentInterestCampaignOptions,
   recentInterestLeadTypeOptions,
@@ -20,11 +22,25 @@ import {
 type RecentInterestTableProps = {
   data: RecentInterestRow[];
   title: string;
+  brand: "svg" | "95rm" | "benton";
 };
 
-export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
+function getRecentInterestLeadLabel(row: RecentInterestRow) {
+  return getLeadGridLabel({
+    companySymbol: getRowCompanySymbol(row),
+    companyName: row.companyName,
+    fullName: row.contactPerson,
+  });
+}
+
+export function RecentInterestTable({
+  data,
+  title,
+  brand,
+}: RecentInterestTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
+  const agentsQuery = useAgentSelectOptions(brand);
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
     findDrawerRouteIndex(data, selectedLead),
@@ -44,27 +60,16 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
       {
         title: "Lead ID",
         key: "lead",
-        getValue: (row) =>
-          getLeadGridLabel({
-            companyName: row.companyName,
-            fullName: row.contactPerson,
-          }),
+        getValue: getRecentInterestLeadLabel,
         type: "select",
         options: data
-          .map((row) =>
-            getLeadGridLabel({
-              companyName: row.companyName,
-              fullName: row.contactPerson,
-            }),
-          )
+          .map(getRecentInterestLeadLabel)
           .filter(Boolean)
           .map((value) => ({
-          label: value,
-          value,
-        })),
-        render: (row) =>
-          [row.companySymbol, row.contactPerson].filter(Boolean).join(" - ") ||
-          "-",
+            label: value,
+            value,
+          })),
+        render: (row) => getRecentInterestLeadLabel(row) || "-",
       },
       {
         title: "Campaign Type",
@@ -76,6 +81,24 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
         })),
         render: (row) => <CampaignBadge value={row.campaignType} />,
       },
+      {
+        title: "Company Symbol",
+        key: "companySymbol",
+        getValue: (row) => getRowCompanySymbol(row),
+        type: "select",
+        options: getCompanySymbolOptions(data).map((value) => ({
+          label: value,
+          value,
+        })),
+        render: (row) => (
+          <CompanySymbolBadge
+            symbol={getRowCompanySymbol(row)}
+            index={data.findIndex((item) => item.email === row.email)}
+            className="rounded"
+            maxWidth="6.5rem"
+          />
+        ),
+      },
       { title: "Company Name", key: "companyName" },
       { title: "Contact Person", key: "contactPerson" },
       { title: "Email", key: "email" },
@@ -83,10 +106,7 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
         title: "Assigned To",
         key: "assignedTo",
         type: "select",
-        options: recentInterestAssigneeOptions.map((value) => ({
-          label: value,
-          value,
-        })),
+        options: agentsQuery.options,
       },
       {
         title: "Call Result",
@@ -110,7 +130,7 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
       { title: "Notes", key: "notes" },
       { title: "Phone", key: "phone" },
     ],
-    [data],
+    [agentsQuery.options, data],
   );
 
   return (
@@ -127,6 +147,7 @@ export function RecentInterestTable({ data, title }: RecentInterestTableProps) {
       <RecentInterestDrawer
         data={data}
         columns={columns}
+        brand={brand}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         onClose={() => setSelectedIndex(null)}

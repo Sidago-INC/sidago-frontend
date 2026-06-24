@@ -1,18 +1,26 @@
 
 
 import {
-  CompanySymbolBadge,
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
   Select,
-  TimezoneBadge,
   Textarea,
   TextInput,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import {
-  recentInterestAssigneeOptions,
+  getLeadGridLabel,
+  getLeadId,
+} from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { useDrawerCompanySelect } from "@/features/backoffice-shared/use-drawer-company-select";
+import {
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
+import {
   recentInterestCallResultOptions,
   recentInterestLeadTypeOptions,
   type RecentInterestRow,
@@ -20,17 +28,13 @@ import {
 import { ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import {
-  getCompanySymbol,
-  getLeadDrawerTitle,
-  getLeadId,
-} from "@/features/backoffice-shared/constants";
 import { showSuccessToast } from "@/lib/toast";
 import Revisions from "@/features/backoffice-shared/Revisions";
 
 type RecentInterestDrawerProps = {
   data: RecentInterestRow[];
   columns?: Column<RecentInterestRow>[];
+  brand: "svg" | "95rm" | "benton";
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;
@@ -66,10 +70,6 @@ function getEditableState(row: RecentInterestRow): EditableRecentInterestState {
   };
 }
 
-const assigneeSelectOptions = recentInterestAssigneeOptions.map((value) => ({
-  label: value,
-  value,
-}));
 const callResultSelectOptions = recentInterestCallResultOptions.map(
   (value) => ({
     label: value,
@@ -92,6 +92,7 @@ function escapeHtml(value: string) {
 export function RecentInterestDrawer({
   data,
   columns,
+  brand,
   selectedIndex,
   onSelectedIndexChange,
   onClose,
@@ -99,20 +100,55 @@ export function RecentInterestDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+  const [followUpDateError, setFollowUpDateError] = useState<string>();
   const [editModeKey, setEditModeKey] = useState<string | null>(null);
   const [formState, setFormState] = useState<{
     key: string;
     value: EditableRecentInterestState;
   } | null>(null);
+  const agentsQuery = useAgentSelectOptions(brand);
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.email ?? "";
+  const drawerOpen = row !== null && selectedIndex !== null;
   const isEditMode = rowKey !== "" && editModeKey === rowKey;
   const initialForm = useMemo(
     () => (row ? getEditableState(row) : null),
     [row],
   );
   const form = formState?.key === rowKey ? formState.value : initialForm;
+
+  const updateForm = <Key extends keyof EditableRecentInterestState>(
+    key: Key,
+    value: EditableRecentInterestState[Key],
+  ) => {
+    if (!form) return;
+
+    setFormState({
+      key: rowKey,
+      value: {
+        ...(formState?.key === rowKey && formState.value ? formState.value : form),
+        [key]: value,
+      },
+    });
+  };
+
+  const {
+    companyOptions,
+    companySelectSource,
+    displayCompanySymbol,
+    displayTimezone,
+    handleCompanyChange,
+  } = useDrawerCompanySelect({
+    drawerOpen,
+    rowKey,
+    companyName: form?.companyName ?? "",
+    initialCompanyName: initialForm?.companyName ?? "",
+    rowCompanySymbol: row?.companySymbol,
+    rowCompanyName: row?.companyName,
+    rowTimezone: row?.timezone,
+    onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
+  });
 
   const detailItems = useMemo(() => {
     if (!row) {
@@ -155,32 +191,31 @@ export function RecentInterestDrawer({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
+  useEffect(() => {
+    setFollowUpDateError(undefined);
+  }, [rowKey]);
+
   if (!row || selectedIndex === null || !form) {
     return null;
   }
 
   const currentIndex = selectedIndex;
 
-  const updateForm = <Key extends keyof EditableRecentInterestState>(
-    key: Key,
-    value: EditableRecentInterestState[Key],
-  ) => {
-    setFormState((current) => ({
-      key: rowKey,
-      value: {
-        ...(current?.key === rowKey && current.value ? current.value : form),
-        [key]: value,
-      },
-    }));
-  };
-
   const handleReset = () => {
     setFormState(null);
+    setFollowUpDateError(undefined);
   };
 
   const handleEditStart = () => {
     if (!rowKey) return;
     setEditModeKey(rowKey);
+  };
+
+  const handleFollowUpDateChange = (value: string) => {
+    const error = getCallBackDateError(value, "");
+    setFollowUpDateError(error);
+    if (error) return;
+    updateForm("followUpDateCleaned", value);
   };
 
   const handleSave = () => {
@@ -284,9 +319,10 @@ export function RecentInterestDrawer({
             </button>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {getLeadDrawerTitle({
-                  companyName: row.companyName,
-                  fullName: row.contactPerson,
+                {getLeadGridLabel({
+                  companySymbol: displayCompanySymbol,
+                  companyName: form.companyName,
+                  fullName: form.contactPerson,
                 })}
               </p>
             </div>
@@ -331,30 +367,16 @@ export function RecentInterestDrawer({
     >
       <div className="space-y-5" onFocus={handleEditStart}>
         <DetailCard>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <CompanySymbolBadge
-                symbol={getCompanySymbol(form.companyName)}
-                index={data.findIndex((item) => item.email === row.email)}
-                className="rounded"
-              />
-              <div className="min-w-0">
-                <EditableField label="Company">
-                  <TextInput
-                    value={form.companyName}
-                    onChange={(event) =>
-                      updateForm("companyName", event.target.value)
-                    }
-                    className="h-8 text-sm font-semibold"
-                  />
-                </EditableField>
-              </div>
-            </div>
-            <TimezoneBadge
-              timezone={row.timezone}
-              index={data.findIndex((item) => item.email === row.email)}
-            />
-          </div>
+          <DrawerCompanyField
+            rowKey={rowKey}
+            badgeIndex={data.findIndex((item) => item.email === row.email)}
+            companyName={form.companyName}
+            displayCompanySymbol={displayCompanySymbol}
+            displayTimezone={displayTimezone}
+            companyOptions={companyOptions}
+            companySelectSource={companySelectSource}
+            onCompanyChange={handleCompanyChange}
+          />
         </DetailCard>
 
         <DetailCard label="Contact Details">
@@ -394,9 +416,9 @@ export function RecentInterestDrawer({
             />
           </EditableField>
           <EditableField label="Created">
-            <TextInput
+            <DatePickerField
               value={form.created}
-              onChange={(event) => updateForm("created", event.target.value)}
+              onChange={(value) => updateForm("created", value)}
               className="text-xs font-semibold"
             />
           </EditableField>
@@ -404,21 +426,22 @@ export function RecentInterestDrawer({
             <Select
               value={form.assignedTo}
               onChange={(value) => updateForm("assignedTo", String(value))}
-              options={assigneeSelectOptions}
+              options={agentsQuery.options}
+              placeholder={
+                agentsQuery.isLoading ? "Loading agents..." : "Select assignee"
+              }
+              disabled={agentsQuery.isLoading}
+              searchable
+              searchPlaceholder="Search agent"
               className="py-1.5 text-xs font-semibold"
             />
           </EditableField>
           <EditableField label="Followup Date">
             <DatePickerField
               value={form.followUpDateCleaned}
-              onChange={(value) => updateForm("followUpDateCleaned", value)}
-              className="text-xs font-semibold"
-            />
-          </EditableField>
-          <EditableField label="Followup Date(Cleaned)">
-            <DatePickerField
-              value={form.followUpDateCleaned}
-              onChange={(value) => updateForm("followUpDateCleaned", value)}
+              onChange={handleFollowUpDateChange}
+              minDate={getMinCallBackDate("")}
+              error={followUpDateError}
               className="text-xs font-semibold"
             />
           </EditableField>

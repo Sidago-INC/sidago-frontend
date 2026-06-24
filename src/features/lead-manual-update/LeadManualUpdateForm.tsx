@@ -13,7 +13,7 @@ import {
 } from "@/components/ui";
 import { useAuth } from "@/providers/AuthProvider";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { useLeadOptions, useAllAgents } from "@/features/level-2-update/_lib/hooks";
+import { useLeadSelectSource, useAllAgents } from "@/features/level-2-update/_lib/hooks";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -81,7 +81,7 @@ function createInitialValues(agentName: string): FormValues {
 export function LeadManualUpdateForm() {
   const { user } = useAuth();
   const createManualUpdate = useCreateManualUpdate();
-  const { data: leadRows = [], isLoading: leadsLoading } = useLeadOptions();
+  const leadSelectSource = useLeadSelectSource();
   const { data: agents = [], isLoading: agentsLoading } = useAllAgents();
 
   const isAdmin = user?.role === "admin";
@@ -95,15 +95,6 @@ export function LeadManualUpdateForm() {
   const agentFieldValue = isAdmin ? form.agent : currentAgentName;
   const campaignTypeValue = isAdmin ? form.campaignType : "SVG";
   const toBeLoggedValue = true;
-
-  const leadOptions = useMemo(
-    () =>
-      leadRows.map((row) => ({
-        label: row.label || row.fullName || row.id,
-        value: row.id,
-      })),
-    [leadRows],
-  );
 
   const resultUpdateOptions = useMemo(
     () => getResultUpdateOptions(user?.role),
@@ -205,13 +196,29 @@ export function LeadManualUpdateForm() {
               <Select
                 label="Lead"
                 value={form.lead}
-                options={leadOptions}
-                placeholder={leadsLoading ? "Loading leads..." : "Select lead"}
+                options={leadSelectSource.options}
+                placeholder={
+                  leadSelectSource.isLoading &&
+                  leadSelectSource.options.length === 0
+                    ? "Loading leads..."
+                    : "Select lead"
+                }
                 searchable
                 searchPlaceholder="Search lead"
+                searchValue={leadSelectSource.searchInput}
+                onSearchChange={leadSelectSource.onSearchChange}
+                filterOptionsLocally={false}
+                onLoadMore={leadSelectSource.onLoadMore}
+                hasMore={leadSelectSource.hasMore}
+                isLoadingMore={leadSelectSource.isLoadingMore}
+                isSearching={leadSelectSource.isSearching}
                 onChange={(value) => updateField("lead", String(value))}
                 className={selectClassName}
-                disabled={leadsLoading || createManualUpdate.isPending}
+                disabled={
+                  (leadSelectSource.isLoading &&
+                    leadSelectSource.options.length === 0) ||
+                  createManualUpdate.isPending
+                }
               />
               <Select
                 label="Result Update"

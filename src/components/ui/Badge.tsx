@@ -1,5 +1,9 @@
-import { ReactNode } from "react";
+import { ReactNode, useLayoutEffect, useRef } from "react";
 import { Check, Clock3 } from "lucide-react";
+import {
+  getTimezoneBadgeStyle,
+  resolveTimezoneLabel,
+} from "@/types/timezone.types";
 
 const COMPANY_BADGE_COLORS = [
   "bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-800",
@@ -60,17 +64,6 @@ const CAMPAIGN_TYPE_STYLES: Record<string, string> = {
     "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
 };
 
-const TIMEZONE_STYLES = [
-  "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
-  "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
-  "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
-  "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
-  "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
-  "border-pink-200 bg-pink-100 text-pink-700 dark:border-pink-800 dark:bg-pink-950/40 dark:text-pink-300",
-  "border-orange-200 bg-orange-100 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
-] as const;
-
 const EMAIL_PRIORITY_STYLES = [
   "border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
   "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
@@ -78,14 +71,6 @@ const EMAIL_PRIORITY_STYLES = [
   "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
   "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
 ] as const;
-
-function getTimezoneStyle(label: string) {
-  const hash = label
-    .split("")
-    .reduce((total, char) => total + char.charCodeAt(0), 0);
-
-  return TIMEZONE_STYLES[hash % TIMEZONE_STYLES.length];
-}
 
 function badgeClassName(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -117,26 +102,91 @@ export const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
+function AutoFitBadgeText({
+  text,
+  minFontSize = 8,
+  maxFontSize = 12,
+}: {
+  text: string;
+  minFontSize?: number;
+  maxFontSize?: number;
+}) {
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const textEl = textRef.current;
+    if (!container || !textEl) return;
+
+    const fit = () => {
+      let size = maxFontSize;
+      textEl.style.fontSize = `${size}px`;
+      textEl.style.lineHeight = "1.2";
+
+      while (size > minFontSize && textEl.scrollWidth > container.clientWidth) {
+        size -= 0.5;
+        textEl.style.fontSize = `${size}px`;
+      }
+    };
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [text, minFontSize, maxFontSize]);
+
+  return (
+    <span ref={containerRef} className="block w-full overflow-hidden">
+      <span ref={textRef} className="block whitespace-nowrap">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export const CompanySymbolBadge = ({
   symbol,
   index,
   className = "rounded-full",
+  fitText,
+  maxWidth = "5.75rem",
 }: {
   symbol: ReactNode;
   index: number;
   className?: string;
+  fitText?: boolean;
+  maxWidth?: string;
 }) => {
   const color = COMPANY_BADGE_COLORS[index % COMPANY_BADGE_COLORS.length];
+  const shouldFitText = fitText ?? className === "rounded";
+  const symbolText =
+    typeof symbol === "string" || typeof symbol === "number"
+      ? String(symbol)
+      : null;
 
   return (
     <span
       className={badgeClassName(
-        "inline-flex items-center px-2.5 py-1 text-xs font-semibold",
+        "inline-flex shrink-0 items-center justify-center px-2.5 py-1 text-xs font-semibold",
+        shouldFitText && "overflow-hidden",
         color,
         className,
       )}
+      style={
+        shouldFitText
+          ? {
+              maxWidth,
+              minHeight: "1.75rem",
+            }
+          : undefined
+      }
     >
-      {symbol}
+      {shouldFitText && symbolText != null ? (
+        <AutoFitBadgeText text={symbolText} />
+      ) : (
+        symbol
+      )}
     </span>
   );
 };
@@ -203,11 +253,9 @@ export const CampaignBadge = ({
 
 export const TimezoneBadge = ({
   timezone,
-  index,
   className,
 }: {
   timezone: string;
-  index?: number;
   className?: string;
 }) => {
   const trimmedTimezone = timezone.trim();
@@ -215,12 +263,8 @@ export const TimezoneBadge = ({
     return null;
   }
 
-  const normalizedTimezone = trimmedTimezone.toUpperCase();
-  const label =
-    typeof index === "number"
-      ? `${index + 1}-${normalizedTimezone}`
-      : normalizedTimezone;
-  const timezoneStyle = getTimezoneStyle(label);
+  const label = resolveTimezoneLabel(trimmedTimezone);
+  const timezoneStyle = getTimezoneBadgeStyle(trimmedTimezone);
 
   return (
     <span

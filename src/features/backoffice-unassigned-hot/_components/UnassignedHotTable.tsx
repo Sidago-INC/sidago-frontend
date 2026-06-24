@@ -9,14 +9,16 @@ import {
 import { Table, type Column } from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
-import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  getCompanySymbolOptions,
+  getLeadGridLabel,
+  getRowCompanySymbol,
+} from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import React, { useEffect, useMemo, useState } from "react";
 import { UnassignedHotDrawer } from "./UnassignedHotDrawer";
 import {
-  assigneeOptions,
   contactTypeOptions,
-  getCompanySymbol,
-  getCompanySymbolOptions,
   leadTypeOptions,
   timezoneOptions,
   UnassignedHotLeadRow,
@@ -44,6 +46,10 @@ export function UnassignedHotTable({
     setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
   }, [data, selectedLead]);
 
+  const svgAgentsQuery = useAgentSelectOptions("svg");
+  const bentonAgentsQuery = useAgentSelectOptions("benton");
+  const rm95AgentsQuery = useAgentSelectOptions("95rm");
+
   const columns = useMemo<Column<UnassignedHotLeadRow>[]>(() => {
     const baseColumns: Column<UnassignedHotLeadRow>[] = [
       {
@@ -55,13 +61,12 @@ export function UnassignedHotTable({
           label: value,
           value,
         })),
-        render: (row) =>
-          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
+        render: (row) => getLeadGridLabel(row) || "-",
       },
       {
         title: "Company Symbol",
         key: "companySymbol",
-        getValue: (row) => getCompanySymbol(row.companyName),
+        getValue: (row) => getRowCompanySymbol(row),
         type: "select",
         options: getCompanySymbolOptions(data).map((value) => ({
           label: value,
@@ -69,8 +74,10 @@ export function UnassignedHotTable({
         })),
         render: (row) => (
           <CompanySymbolBadge
-            symbol={getCompanySymbol(row.companyName)}
+            symbol={getRowCompanySymbol(row)}
             index={data.findIndex((item) => item.email === row.email)}
+            className="rounded"
+            maxWidth="6.5rem"
           />
         ),
       },
@@ -84,10 +91,7 @@ export function UnassignedHotTable({
         type: "select",
         options: timezoneOptions.map((value) => ({ label: value, value })),
         render: (row) => (
-          <TimezoneBadge
-            timezone={row.timezone}
-            index={data.findIndex((item) => item.email === row.email)}
-          />
+          <TimezoneBadge timezone={row.timezone} />
         ),
       },
       {
@@ -113,7 +117,7 @@ export function UnassignedHotTable({
           title: "To be called by Sidago",
           key: "svgToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: svgAgentsQuery.options,
         },
         {
           title: "Last called date Sidago",
@@ -131,7 +135,7 @@ export function UnassignedHotTable({
           title: "To be called by Benton",
           key: "bentonToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: bentonAgentsQuery.options,
         },
         {
           title: "Last called date Benton",
@@ -149,7 +153,7 @@ export function UnassignedHotTable({
           title: "To be called by 95RM",
           key: "rm95ToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: rm95AgentsQuery.options,
         },
         {
           title: "Last called date 95RM",
@@ -182,7 +186,7 @@ export function UnassignedHotTable({
           title: "95RM-To be Called by",
           key: "rm95ToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: rm95AgentsQuery.options,
         },
         {
           title: "95RM-Last Call Date",
@@ -214,7 +218,7 @@ export function UnassignedHotTable({
         title: "SVG-To be Called by",
         key: "svgToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: svgAgentsQuery.options,
       },
       {
         title: "SVG-Last Call Date",
@@ -232,7 +236,7 @@ export function UnassignedHotTable({
         title: "Benton-To be Called by",
         key: "bentonToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: bentonAgentsQuery.options,
       },
       {
         title: "Benton-Last Call Date",
@@ -249,7 +253,13 @@ export function UnassignedHotTable({
         key: "lastActionDate",
       },
     ];
-  }, [data, variant]);
+  }, [
+    bentonAgentsQuery.options,
+    data,
+    rm95AgentsQuery.options,
+    svgAgentsQuery.options,
+    variant,
+  ]);
 
   return (
     <div className="min-h-full">
@@ -271,6 +281,7 @@ export function UnassignedHotTable({
       <UnassignedHotDrawer
         data={data}
         columns={columns}
+        variant={variant}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         onClose={() => setSelectedIndex(null)}

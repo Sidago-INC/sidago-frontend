@@ -1,36 +1,46 @@
 
 
 import {
-  CompanySymbolBadge,
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
   Select,
   Textarea,
   TextInput,
-  TimezoneBadge,
   TypeBadge,
+  Wave,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import Revisions from "@/features/backoffice-shared/Revisions";
+import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { useDrawerCompanySelect } from "@/features/backoffice-shared/use-drawer-company-select";
 import {
   useUpdateLead,
   type LeadPatchBody,
 } from "@/features/backoffice-shared/use-update-lead";
-import { AGENT_VALUES } from "@/types/agent.types";
-import { COMPANY_VALUES } from "@/types/company.types";
+import {
+  useLeadFull,
+  useRelatedLeads,
+} from "@/features/fix-leads/_lib/data";
+import {
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
+import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
-  getCompanySymbol,
-  getLeadId,
-  type LeadDirectoryRow,
-} from "../_lib/data";
+  leadDetailToDirectoryRow,
+  leadDetailToFormState,
+  type LeadDrawerFormState,
+} from "../_lib/lead-detail";
+import { type LeadDirectoryRow } from "../_lib/data";
 
 type LeadsDrawerProps = {
   data: LeadDirectoryRow[];
@@ -41,72 +51,6 @@ type LeadsDrawerProps = {
 };
 
 const iconClass = "w-4 h-4 stroke-[2]";
-const defaultHistoryCalls = `04/17/2026 - LEVEL 2 TOM - No Answer
-04/13/2026 - LEVEL 1 TOM - Left Voicemail
-04/10/2026 - LEVEL 1 TOM - No Answer`;
-const defaultHistoryNotes = `04/17/2026 - LEVEL 2 TOM - No Answer
-04/13/2026 - LEVEL 1 TOM - Left Voicemail
-04/10/2026 - LEVEL 1 TOM - No Answer`;
-
-type EditableDrawerState = {
-  companyName: string;
-  contactType: string;
-  fullName: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  email: string;
-  phone: string;
-  phoneExtension: string;
-  notWorked: boolean;
-  otherContacts: string;
-  svgLeadType: string;
-  svgToBeCalledBy: string;
-  svgHistoryCalls: string;
-  svgHistoryNotes: string;
-  svgToBeCalledOn: string;
-  bentonLeadType: string;
-  bentonToBeCalledBy: string;
-  bentonHistoryCalls: string;
-  bentonHistoryNotes: string;
-  bentonToBeCalledOn: string;
-  rm95LeadType: string;
-  rm95ToBeCalledBy: string;
-  rm95HistoryCalls: string;
-  rm95HistoryNotes: string;
-  rm95ToBeCalledOn: string;
-};
-
-function getEditableState(row: LeadDirectoryRow): EditableDrawerState {
-  return {
-    companyName: row.companyName,
-    contactType: row.contactType,
-    fullName: row.fullName,
-    firstName: row.firstName,
-    lastName: row.lastName,
-    role: row.role ?? "",
-    email: row.email,
-    phone: row.phone,
-    phoneExtension: row.phoneExtension,
-    notWorked: row.notWorked ?? false,
-    otherContacts: "",
-    svgLeadType: row.svgLeadType,
-    svgToBeCalledBy: row.svgToBeCalledBy,
-    svgHistoryCalls: defaultHistoryCalls,
-    svgHistoryNotes: defaultHistoryNotes,
-    svgToBeCalledOn: row.svgLastCallDate,
-    bentonLeadType: row.bentonLeadType,
-    bentonToBeCalledBy: row.bentonToBeCalledBy,
-    bentonHistoryCalls: defaultHistoryCalls,
-    bentonHistoryNotes: defaultHistoryNotes,
-    bentonToBeCalledOn: row.bentonLastCallDate,
-    rm95LeadType: row.rm95LeadType,
-    rm95ToBeCalledBy: row.rm95ToBeCalledBy,
-    rm95HistoryCalls: defaultHistoryCalls,
-    rm95HistoryNotes: defaultHistoryNotes,
-    rm95ToBeCalledOn: row.rm95LastCallDate,
-  };
-}
 
 function escapeHtml(value: string) {
   return value
@@ -114,10 +58,6 @@ function escapeHtml(value: string) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
-}
-
-function stripTimezonePrefix(timezone: string | undefined) {
-  return (timezone ?? "").replace(/^\d+-/, "");
 }
 
 function ToggleField({
@@ -160,39 +100,74 @@ export function LeadsDrawer({
 }: LeadsDrawerProps) {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
+  const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
+  const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
+    useState<string>();
+  const [rm95ToBeCalledOnError, setRm95ToBeCalledOnError] = useState<string>();
   const [editModeKey, setEditModeKey] = useState<string | null>(null);
   const [formState, setFormState] = useState<{
     key: string;
-    value: EditableDrawerState;
+    value: LeadDrawerFormState;
   } | null>(null);
   const updateLead = useUpdateLead();
+  const svgAgentsQuery = useAgentSelectOptions("svg");
+  const bentonAgentsQuery = useAgentSelectOptions("benton");
+  const rm95AgentsQuery = useAgentSelectOptions("95rm");
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
-  const rowKey = row?.email ?? "";
+  const rowKey = row?.leadId ?? row?.email ?? "";
+  const drawerOpen = row !== null && selectedIndex !== null;
+  const leadDetailQuery = useLeadFull(drawerOpen ? row?.leadId : undefined);
+  const relatedQuery = useRelatedLeads(drawerOpen ? row?.leadId : undefined);
+  const displayRow = useMemo(() => {
+    if (!row) return null;
+    if (!leadDetailQuery.data) return row;
+    return leadDetailToDirectoryRow(leadDetailQuery.data, row);
+  }, [leadDetailQuery.data, row]);
   const isEditMode = rowKey !== "" && editModeKey === rowKey;
-  const initialForm = useMemo(
-    () => (row ? getEditableState(row) : null),
-    [row],
-  );
+  const initialForm = useMemo(() => {
+    if (!leadDetailQuery.data) return null;
+    return leadDetailToFormState(
+      leadDetailQuery.data,
+      relatedQuery.data ?? [],
+    );
+  }, [leadDetailQuery.data, relatedQuery.data]);
   const form = formState?.key === rowKey ? formState.value : initialForm;
 
-  const companyOptions = useMemo(
-    () =>
-      COMPANY_VALUES.map((company) => ({
-        label: `${company.name} (${company.symbol})`,
-        value: company.name,
-      })),
-    [],
-  );
-  const agentOptions = useMemo(
-    () =>
-      AGENT_VALUES.map((agent) => {
-        const fullName = `${agent.name} ${agent.surname}`;
-        return { label: fullName, value: fullName };
-      }),
-    [],
-  );
+  const updateForm = <Key extends keyof LeadDrawerFormState>(
+    key: Key,
+    value: LeadDrawerFormState[Key],
+  ) => {
+    if (!form) return;
+
+    setFormState({
+      key: rowKey,
+      value: {
+        ...(formState?.key === rowKey && formState.value ? formState.value : form),
+        [key]: value,
+      },
+    });
+  };
+
+  const {
+    companyOptions,
+    companySelectSource,
+    displayCompanySymbol,
+    displayTimezone,
+    handleCompanyChange,
+  } = useDrawerCompanySelect({
+    drawerOpen,
+    rowKey,
+    companyName: form?.companyName ?? "",
+    initialCompanyName: initialForm?.companyName ?? "",
+    rowCompanySymbol: displayRow?.companySymbol,
+    rowCompanyName: displayRow?.companyName,
+    rowTimezone: displayRow?.timezone,
+    onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
+  });
+
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
@@ -201,21 +176,14 @@ export function LeadsDrawer({
     () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
-  const selectedCompany = useMemo(
-    () => COMPANY_VALUES.find((company) => company.name === form?.companyName),
-    [form?.companyName],
-  );
-  const selectedTimezone = stripTimezonePrefix(
-    selectedCompany?.timezone ?? row?.timezone,
-  );
 
   const detailItems = useMemo(() => {
-    if (!row) return [];
+    if (!displayRow) return [];
 
     return (columns ?? []).map((column) => {
       const resolvedValue = column.getValue
-        ? column.getValue(row)
-        : row[column.key as keyof LeadDirectoryRow];
+        ? column.getValue(displayRow)
+        : displayRow[column.key as keyof LeadDirectoryRow];
 
       return {
         label: column.title,
@@ -227,14 +195,14 @@ export function LeadsDrawer({
               : String(resolvedValue),
       };
     });
-  }, [columns, row]);
+  }, [columns, displayRow]);
 
   const drawerUrl = useMemo(() => {
-    if (!row || typeof window === "undefined") return "";
+    if (!displayRow || typeof window === "undefined") return "";
     const params = new URLSearchParams(searchParams.toString());
-    params.set("lead", getLeadId(row));
+    params.set("lead", getLeadGridLabel(displayRow));
     return `${window.location.origin}${pathname}?${params.toString()}`;
-  }, [pathname, row, searchParams]);
+  }, [displayRow, pathname, searchParams]);
 
   useEffect(() => {
     if (!copied) return;
@@ -242,19 +210,151 @@ export function LeadsDrawer({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  if (!row || selectedIndex === null || !form) return null;
+  useEffect(() => {
+    setFormState(null);
+    setEditModeKey(null);
+    setSvgToBeCalledOnError(undefined);
+    setBentonToBeCalledOnError(undefined);
+    setRm95ToBeCalledOnError(undefined);
+  }, [rowKey]);
 
-  const updateForm = <Key extends keyof EditableDrawerState>(
-    key: Key,
-    value: EditableDrawerState[Key],
-  ) => {
-    setFormState((current) => ({
-      key: rowKey,
-      value: {
-        ...(current?.key === rowKey && current.value ? current.value : form),
-        [key]: value,
-      },
-    }));
+  if (!row || selectedIndex === null) return null;
+
+  const isDetailLoading = leadDetailQuery.isLoading;
+  const isDetailError = leadDetailQuery.isError;
+
+  const handleCopyUrl = async () => {
+    if (!drawerUrl) return;
+    await navigator.clipboard.writeText(drawerUrl);
+    setCopied(true);
+  };
+
+  const renderDrawerHeader = (
+    title: {
+      companySymbol?: string | null;
+      companyName?: string | null;
+      fullName?: string | null;
+    },
+    actionsEnabled = true,
+  ) => (
+    <div className="flex w-full items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() =>
+            onSelectedIndexChange(Math.max(0, selectedIndex - 1))
+          }
+          disabled={selectedIndex <= 0}
+          className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          <ChevronUp
+            className={`${iconClass} group-hover:-translate-y-0.5 transition`}
+          />
+        </button>
+        <button
+          onClick={() =>
+            onSelectedIndexChange(
+              Math.min(data.length - 1, selectedIndex + 1),
+            )
+          }
+          disabled={selectedIndex >= data.length - 1}
+          className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        >
+          <ChevronDown
+            className={`${iconClass} group-hover:translate-y-0.5 transition`}
+          />
+        </button>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {getLeadGridLabel(title)}
+          </p>
+        </div>
+      </div>
+      {actionsEnabled ? (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <Printer
+              className={`${iconClass} group-hover:scale-110 transition`}
+            />
+          </button>
+          <button
+            onClick={handleCopyUrl}
+            className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <Link className={`${iconClass} group-hover:scale-110 transition`} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (isDetailLoading) {
+    return (
+      <Drawer
+        isOpen={selectedIndex !== null}
+        onClose={onClose}
+        direction="right"
+        size="560px"
+        header={renderDrawerHeader(
+          {
+            companySymbol: displayRow?.companySymbol,
+            companyName: displayRow?.companyName,
+            fullName: displayRow?.fullName,
+          },
+          false,
+        )}
+      >
+        <div className="flex justify-center py-16">
+          <Wave />
+        </div>
+      </Drawer>
+    );
+  }
+
+  if (isDetailError || !form || !displayRow) {
+    return (
+      <Drawer
+        isOpen={selectedIndex !== null}
+        onClose={onClose}
+        direction="right"
+        size="560px"
+        header={renderDrawerHeader(
+          {
+            companySymbol: displayRow?.companySymbol,
+            companyName: displayRow?.companyName,
+            fullName: displayRow?.fullName,
+          },
+          false,
+        )}
+      >
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          Could not load lead details. Please close and try again.
+        </div>
+      </Drawer>
+    );
+  }
+
+  const handleSvgToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, displayRow.svgLastCallDate ?? "");
+    setSvgToBeCalledOnError(error);
+    if (error) return;
+    updateForm("svgToBeCalledOn", value);
+  };
+
+  const handleBentonToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, displayRow.bentonLastCallDate ?? "");
+    setBentonToBeCalledOnError(error);
+    if (error) return;
+    updateForm("bentonToBeCalledOn", value);
+  };
+
+  const handleRm95ToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, displayRow.rm95LastCallDate ?? "");
+    setRm95ToBeCalledOnError(error);
+    if (error) return;
+    updateForm("rm95ToBeCalledOn", value);
   };
 
   const handleEditStart = () => {
@@ -262,7 +362,12 @@ export function LeadsDrawer({
     setEditModeKey(rowKey);
   };
 
-  const handleReset = () => setFormState(null);
+  const handleReset = () => {
+    setFormState(null);
+    setSvgToBeCalledOnError(undefined);
+    setBentonToBeCalledOnError(undefined);
+    setRm95ToBeCalledOnError(undefined);
+  };
   const handleSave = async () => {
     if (!row || !form || !initialForm) return;
 
@@ -330,17 +435,17 @@ export function LeadsDrawer({
 
     try {
       await updateLead.mutateAsync({ leadId: row.leadId, body });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["lead-full", row.leadId] }),
+        queryClient.invalidateQueries({ queryKey: ["lead-related", row.leadId] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", "directory"] }),
+      ]);
       showSuccessToast("Lead changes saved successfully.");
       setEditModeKey(null);
       setFormState(null);
     } catch (error) {
       showErrorToast(error);
     }
-  };
-  const handleCopyUrl = async () => {
-    if (!drawerUrl) return;
-    await navigator.clipboard.writeText(drawerUrl);
-    setCopied(true);
   };
 
   const handlePrint = () => {
@@ -366,12 +471,12 @@ export function LeadsDrawer({
     printWindow.document.write(`
       <html>
         <head>
-          <title>${escapeHtml(row.companyName)} | Lead</title>
+          <title>${escapeHtml(displayRow.companyName)} | Lead</title>
         </head>
         <body style="font-family:Arial,sans-serif;padding:24px;color:#0f172a;">
-          <h1>${escapeHtml(row.companyName)}</h1>
+          <h1>${escapeHtml(displayRow.companyName)}</h1>
           <p style="margin-bottom:20px;color:#475569;">
-            ${escapeHtml(row.fullName)} | ${escapeHtml(row.email)}
+            ${escapeHtml(displayRow.fullName)} | ${escapeHtml(displayRow.email)}
           </p>
           <table style="width:100%;border-collapse:collapse;">
             ${rowsMarkup}
@@ -390,62 +495,11 @@ export function LeadsDrawer({
       onClose={onClose}
       direction="right"
       size="560px"
-      header={
-        <div className="flex w-full items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() =>
-                onSelectedIndexChange(Math.max(0, selectedIndex - 1))
-              }
-              disabled={selectedIndex <= 0}
-              className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <ChevronUp
-                className={`${iconClass} group-hover:-translate-y-0.5 transition`}
-              />
-            </button>
-            <button
-              onClick={() =>
-                onSelectedIndexChange(
-                  Math.min(data.length - 1, selectedIndex + 1),
-                )
-              }
-              disabled={selectedIndex >= data.length - 1}
-              className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <ChevronDown
-                className={`${iconClass} group-hover:translate-y-0.5 transition`}
-              />
-            </button>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {getLeadDrawerTitle({
-                  companyName: row.companyName,
-                  fullName: row.fullName,
-                })}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Printer
-                className={`${iconClass} group-hover:scale-110 transition`}
-              />
-            </button>
-            <button
-              onClick={handleCopyUrl}
-              className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Link
-                className={`${iconClass} group-hover:scale-110 transition`}
-              />
-            </button>
-          </div>
-        </div>
-      }
+      header={renderDrawerHeader({
+        companySymbol: displayCompanySymbol,
+        companyName: form.companyName,
+        fullName: form.fullName,
+      })}
       footer={
         isEditMode ? (
           <EditableDrawerFooter
@@ -463,28 +517,16 @@ export function LeadsDrawer({
     >
       <div className="space-y-5" onFocus={handleEditStart}>
         <DetailCard>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <CompanySymbolBadge
-                symbol={getCompanySymbol(form.companyName)}
-                index={data.findIndex((item) => item.email === row.email)}
-                className="rounded"
-              />
-              <EditableField label="Company">
-                <Select
-                  value={form.companyName}
-                  onChange={(value) => updateForm("companyName", String(value))}
-                  options={companyOptions}
-                  placeholder="Select company"
-                  className="py-1.5 text-xs"
-                />
-              </EditableField>
-            </div>
-            <TimezoneBadge
-              timezone={selectedTimezone}
-              index={data.findIndex((item) => item.email === row.email)}
-            />
-          </div>
+          <DrawerCompanyField
+            rowKey={rowKey}
+            badgeIndex={data.findIndex((item) => item.leadId === row.leadId)}
+            companyName={form.companyName}
+            displayCompanySymbol={displayCompanySymbol}
+            displayTimezone={displayTimezone}
+            companyOptions={companyOptions}
+            companySelectSource={companySelectSource}
+            onCompanyChange={handleCompanyChange}
+          />
         </DetailCard>
 
         <DetailCard label="Personal Details">
@@ -582,13 +624,14 @@ export function LeadsDrawer({
             updateForm("svgToBeCalledBy", String(value))
           }
           toBeCalledOn={form.svgToBeCalledOn}
-          onToBeCalledOnChange={(value) => updateForm("svgToBeCalledOn", value)}
+          onToBeCalledOnChange={handleSvgToBeCalledOnChange}
+          toBeCalledOnError={svgToBeCalledOnError}
+          minCallBackDate={getMinCallBackDate(displayRow.svgLastCallDate ?? "")}
           historyCalls={form.svgHistoryCalls}
-          onHistoryCallsChange={(value) => updateForm("svgHistoryCalls", value)}
           historyNotes={form.svgHistoryNotes}
-          onHistoryNotesChange={(value) => updateForm("svgHistoryNotes", value)}
           leadTypeOptions={leadTypeOptions}
-          agentOptions={agentOptions}
+          agentOptions={svgAgentsQuery.options}
+          agentsLoading={svgAgentsQuery.isLoading}
         />
 
         <LeadDetailsCard
@@ -602,19 +645,14 @@ export function LeadsDrawer({
             updateForm("bentonToBeCalledBy", String(value))
           }
           toBeCalledOn={form.bentonToBeCalledOn}
-          onToBeCalledOnChange={(value) =>
-            updateForm("bentonToBeCalledOn", value)
-          }
+          onToBeCalledOnChange={handleBentonToBeCalledOnChange}
+          toBeCalledOnError={bentonToBeCalledOnError}
+          minCallBackDate={getMinCallBackDate(displayRow.bentonLastCallDate ?? "")}
           historyCalls={form.bentonHistoryCalls}
-          onHistoryCallsChange={(value) =>
-            updateForm("bentonHistoryCalls", value)
-          }
           historyNotes={form.bentonHistoryNotes}
-          onHistoryNotesChange={(value) =>
-            updateForm("bentonHistoryNotes", value)
-          }
           leadTypeOptions={leadTypeOptions}
-          agentOptions={agentOptions}
+          agentOptions={bentonAgentsQuery.options}
+          agentsLoading={bentonAgentsQuery.isLoading}
         />
 
         <LeadDetailsCard
@@ -628,19 +666,14 @@ export function LeadsDrawer({
             updateForm("rm95ToBeCalledBy", String(value))
           }
           toBeCalledOn={form.rm95ToBeCalledOn}
-          onToBeCalledOnChange={(value) =>
-            updateForm("rm95ToBeCalledOn", value)
-          }
+          onToBeCalledOnChange={handleRm95ToBeCalledOnChange}
+          toBeCalledOnError={rm95ToBeCalledOnError}
+          minCallBackDate={getMinCallBackDate(displayRow.rm95LastCallDate ?? "")}
           historyCalls={form.rm95HistoryCalls}
-          onHistoryCallsChange={(value) =>
-            updateForm("rm95HistoryCalls", value)
-          }
           historyNotes={form.rm95HistoryNotes}
-          onHistoryNotesChange={(value) =>
-            updateForm("rm95HistoryNotes", value)
-          }
           leadTypeOptions={leadTypeOptions}
-          agentOptions={agentOptions}
+          agentOptions={rm95AgentsQuery.options}
+          agentsLoading={rm95AgentsQuery.isLoading}
         />
 
         <DetailCard label="Associated Contacts">
@@ -676,12 +709,13 @@ function LeadDetailsCard({
   onToBeCalledByChange,
   toBeCalledOn,
   onToBeCalledOnChange,
+  toBeCalledOnError,
+  minCallBackDate,
   historyCalls,
-  onHistoryCallsChange,
   historyNotes,
-  onHistoryNotesChange,
   leadTypeOptions,
   agentOptions,
+  agentsLoading,
 }: {
   title: string;
   leadType: string;
@@ -690,12 +724,13 @@ function LeadDetailsCard({
   onToBeCalledByChange: (value: string) => void;
   toBeCalledOn: string;
   onToBeCalledOnChange: (value: string) => void;
+  toBeCalledOnError?: string;
+  minCallBackDate: Date;
   historyCalls: string;
-  onHistoryCallsChange: (value: string) => void;
   historyNotes: string;
-  onHistoryNotesChange: (value: string) => void;
   leadTypeOptions: Array<{ label: string; value: string }>;
   agentOptions: Array<{ label: string; value: string }>;
+  agentsLoading: boolean;
 }) {
   return (
     <DetailCard label={title}>
@@ -713,7 +748,10 @@ function LeadDetailsCard({
           value={toBeCalledBy}
           onChange={(value) => onToBeCalledByChange(String(value))}
           options={agentOptions}
-          placeholder="Select assignee"
+          placeholder={agentsLoading ? "Loading agents..." : "Select assignee"}
+          disabled={agentsLoading}
+          searchable
+          searchPlaceholder="Search agent"
           className="py-1.5 text-xs"
         />
       </EditableField>
@@ -721,21 +759,25 @@ function LeadDetailsCard({
         <DatePickerField
           value={toBeCalledOn}
           onChange={onToBeCalledOnChange}
+          minDate={minCallBackDate}
+          error={toBeCalledOnError}
           className="text-xs font-semibold"
         />
       </EditableField>
       <EditableField label="History Calls" align="stack">
         <Textarea
           value={historyCalls}
-          onChange={(event) => onHistoryCallsChange(event.target.value)}
-          className="text-xs font-semibold leading-5"
+          readOnly
+          rows={4}
+          className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
         />
       </EditableField>
       <EditableField label="History Notes" align="stack">
         <Textarea
           value={historyNotes}
-          onChange={(event) => onHistoryNotesChange(event.target.value)}
-          className="text-xs font-semibold leading-5"
+          readOnly
+          rows={4}
+          className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
         />
       </EditableField>
     </DetailCard>

@@ -24,6 +24,6 @@ export function RecentInterestSvg() {
   }
 
   return (
-    <RecentInterestTable data={data ?? []} title="Recent Interest - SVG" />
+    <RecentInterestTable data={data ?? []} title="Recent Interest - SVG" brand="svg" />
   );
 }

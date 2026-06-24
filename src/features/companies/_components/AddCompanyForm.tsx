@@ -3,16 +3,16 @@
 import {
   Card,
   CardContent,
-  Select,
   Textarea,
   TextInput,
+  TimezoneSelect,
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
 import { companyValidationSchema } from "@/lib/validation/company";
 import { type COMPANY } from "@/types/company.types";
-import { TIMEZONE_OPTIONS } from "@/types/timezone.types";
+import type { TIMEZONE } from "@/types/timezone.types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -152,6 +152,7 @@ export function AddCompanyForm() {
                 value={form.symbol}
                 onChange={(event) => updateField("symbol", event.target.value)}
                 error={errors.symbol}
+                required
                 className={inputClassName}
               />
               <TextInput
@@ -159,20 +160,22 @@ export function AddCompanyForm() {
                 value={form.name}
                 onChange={(event) => updateField("name", event.target.value)}
                 error={errors.name}
+                required
                 className={inputClassName}
               />
-              <Select
+              <TimezoneSelect
                 label="Time Zone"
                 value={form.timezone}
-                onChange={(value) => updateField("timezone", String(value))}
-                options={TIMEZONE_OPTIONS}
+                onChange={(value) => updateField("timezone", value as TIMEZONE)}
                 error={errors.timezone}
+                required
                 className="h-10 rounded text-sm"
               />
               <CountryPicker
                 value={form.country}
                 onChange={(value) => updateField("country", value)}
                 error={errors.country}
+                required
               />
             </div>
 

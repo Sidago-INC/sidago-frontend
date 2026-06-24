@@ -24,6 +24,6 @@ export function RecentInterestBenton() {
   }
 
   return (
-    <RecentInterestTable data={data ?? []} title="Recent Interest - Benton" />
+    <RecentInterestTable data={data ?? []} title="Recent Interest - Benton" brand="benton" />
   );
 }

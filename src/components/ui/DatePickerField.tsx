@@ -74,7 +74,7 @@ export function DatePickerField({
           dateFormat="yyyy-MM-dd"
           wrapperClassName="w-full"
           className={clsx(selectLikeFieldClassName, className)}
-          clearButtonClassName="!right-7"
+          clearButtonClassName="!right-2"
         />
         {!hasValue && (
           <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">

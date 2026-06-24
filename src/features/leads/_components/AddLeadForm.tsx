@@ -8,7 +8,7 @@ import {
   leadCreateValidationSchema,
   type LeadCreateFormValues,
 } from "@/lib/validation/lead-create";
-import { useCompanyOptions } from "@/features/companies/_lib/hooks";
+import { useCompanyIdSelectSource } from "@/features/companies/_lib/hooks";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import PhoneInput from "react-phone-input-2";
@@ -45,17 +45,7 @@ export function AddLeadForm() {
   >({});
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: companiesRaw, isLoading: companiesLoading } =
-    useCompanyOptions();
-
-  const companyOptions = useMemo(
-    () =>
-      (companiesRaw ?? []).map((c) => ({
-        value: c.id,
-        label: c.label || c.name || c.symbol || c.id,
-      })),
-    [companiesRaw],
-  );
+  const companySelectSource = useCompanyIdSelectSource();
 
   const normalizedForm = useMemo(
     () => ({
@@ -135,15 +125,23 @@ export function AddLeadForm() {
                 </label>
                 <Select
                   value={form.companyId}
-                  options={companyOptions}
+                  options={companySelectSource.options}
                   onChange={(value) => updateField("companyId", String(value))}
                   placeholder={
-                    companiesLoading
+                    companySelectSource.isLoading &&
+                    companySelectSource.options.length === 0
                       ? "Loading companies..."
                       : "Select a company"
                   }
                   searchable
                   searchPlaceholder="Search company"
+                  searchValue={companySelectSource.searchInput}
+                  onSearchChange={companySelectSource.onSearchChange}
+                  filterOptionsLocally={false}
+                  onLoadMore={companySelectSource.onLoadMore}
+                  hasMore={companySelectSource.hasMore}
+                  isLoadingMore={companySelectSource.isLoadingMore}
+                  isSearching={companySelectSource.isSearching}
                   className={companySelectClass}
                   optionsClassName={companySelectOptionsClass}
                   error={errors.companyId}

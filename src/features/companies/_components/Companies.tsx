@@ -18,6 +18,7 @@ import {
 } from "../_lib/hooks";
 
 const DEFAULT_ROWS_PER_PAGE = 10;
+const COMPANY_GRID_FETCH_LIMIT = 500;
 
 type DrawerState = {
   isOpen: boolean;
@@ -93,7 +94,7 @@ const EMPTY_COMPANY: COMPANY = {
 export function Companies() {
   const [searchParams] = useSearchParams();
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data: rows, isLoading } = useCompanyOptions(rowsPerPage);
+  const { data: rows, isLoading } = useCompanyOptions(COMPANY_GRID_FETCH_LIMIT);
   const updateCompany = useUpdateCompany();
 
   const [drawerState, setDrawerState] = useState<DrawerState>({
@@ -153,7 +154,6 @@ export function Companies() {
         render: (row) => (
           <TimezoneBadge
             timezone={row.timezone ?? ""}
-            index={companies.findIndex((company) => company.id === row.id)}
           />
         ),
       },

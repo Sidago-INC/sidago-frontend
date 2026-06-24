@@ -15,6 +15,8 @@ import { Users } from "lucide-react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import {
   type FixQueueRow,
+  getFixQueueTimezone,
+  getFixQueueTimezoneLabel,
   useRelatedLeads,
 } from "../_lib/data";
 
@@ -80,13 +82,19 @@ export function FixLeadsTable({
       {
         title: "Timezone",
         key: "timezone",
-        render: (row) =>
-          row.timezone ? (
-            <TimezoneBadge
-              timezone={row.timezone}
-              index={data.findIndex((item) => item.leadId === row.leadId)}
-            />
-          ) : null,
+        getValue: (row) => getFixQueueTimezoneLabel(row),
+        type: "select",
+        options: Array.from(
+          new Set(data.map(getFixQueueTimezoneLabel).filter(Boolean)),
+        ).map((value) => ({ label: value, value })),
+        render: (row) => {
+          const timezone = getFixQueueTimezone(row);
+          return timezone ? (
+            <TimezoneBadge timezone={timezone} />
+          ) : (
+            <span className="text-xs text-slate-400">—</span>
+          );
+        },
       },
       { title: "Name", key: "fullName" },
       { title: "Phone", key: "phone" },

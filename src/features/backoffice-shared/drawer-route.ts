@@ -1,8 +1,10 @@
-import { getCompanySymbol, getLeadId } from "./constants";
+import { getCompanySymbol, getLeadGridLabel, getLeadId } from "./constants";
 
 type DrawerRouteRow = {
   email?: string;
   lead?: string;
+  fullName?: string | null;
+  companySymbol?: string | null;
   leadType?: string;
   svgLeadType?: string;
   bentonLeadType?: string;
@@ -39,6 +41,7 @@ function getRouteCandidates(row: DrawerRouteRow) {
 
   return [
     row.email,
+    getLeadGridLabel(row),
     getLeadId({
       companyName: row.companyName ?? "",
       lead: row.lead ?? "",

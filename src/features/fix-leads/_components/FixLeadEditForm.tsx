@@ -4,9 +4,11 @@ import {
   CheckboxInput,
   Select,
   TextInput,
+  TimezoneBadge,
   TypeBadge,
   Wave,
 } from "@/components/ui";
+import { resolveLeadTimezone } from "@/types/timezone.types";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
@@ -165,6 +167,7 @@ export function FixLeadEditForm() {
   };
 
   const lead = data.lead;
+  const leadTimezone = resolveLeadTimezone(lead.timezone, lead.companyTimezone);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 lg:px-6">
@@ -238,12 +241,18 @@ export function FixLeadEditForm() {
                 placeholder="Select contact type"
                 className="h-10 rounded text-sm"
               />
-              <TextInput
-                label="Lead Timezone"
-                value={lead.timezone ?? lead.companyTimezone ?? ""}
-                readOnly
-                className={`${inputClassName} bg-slate-100 dark:bg-slate-800`}
-              />
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Lead Timezone
+                </span>
+                <div className="flex h-10 items-center">
+                  {leadTimezone ? (
+                    <TimezoneBadge timezone={leadTimezone} />
+                  ) : (
+                    <span className="text-sm text-slate-400">—</span>
+                  )}
+                </div>
+              </div>
               <CheckboxInput
                 label="Not Work Anymore"
                 checked={form.notWorkAnymore}

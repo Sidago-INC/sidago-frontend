@@ -4,12 +4,12 @@ import {
   Drawer,
   DrawerActionHeader,
   EditableDrawerFooter,
-  Select,
   Textarea,
   TextInput,
+  TimezoneSelect,
 } from "@/components/ui";
 import { COMPANY } from "@/types/company.types";
-import { TIMEZONE_OPTIONS } from "@/types/timezone.types";
+import type { TIMEZONE } from "@/types/timezone.types";
 import { useEffect, useState } from "react";
 import { CountryPicker } from "./CountryPicker";
 import Revisions from "@/features/backoffice-shared/Revisions";
@@ -186,6 +186,7 @@ export function CompanyDrawer({
             value={company.symbol}
             onChange={(event) => onChange("symbol", event.target.value)}
             error={errors.symbol}
+            required
             className={inputClassName}
           />
           <TextInput
@@ -193,20 +194,22 @@ export function CompanyDrawer({
             value={company.name}
             onChange={(event) => onChange("name", event.target.value)}
             error={errors.name}
+            required
             className={inputClassName}
           />
-          <Select
+          <TimezoneSelect
             label="Time Zone"
             value={company.timezone}
-            onChange={(value) => onChange("timezone", String(value))}
-            options={TIMEZONE_OPTIONS}
+            onChange={(value) => onChange("timezone", value as TIMEZONE)}
             error={errors.timezone}
+            required
             className="h-10 rounded text-sm"
           />
           <CountryPicker
             value={company.country}
             onChange={(value) => onChange("country", value)}
             error={errors.country}
+            required
           />
           <Textarea
             label="Description"

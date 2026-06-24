@@ -1,27 +1,29 @@
 
 
 import {
-  CompanySymbolBadge,
   DatePickerField,
   Drawer,
   Select,
   Textarea,
   TextInput,
-  TimezoneBadge,
   TypeBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import {
-  getCompanySymbol,
   getLeadId,
   type UnassignedHotLeadRow,
 } from "../_lib/data";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
-import { AGENT_VALUES } from "@/types/agent.types";
-import { COMPANY_VALUES } from "@/types/company.types";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { useDrawerCompanySelect } from "@/features/backoffice-shared/use-drawer-company-select";
+import {
+  getCallBackDateError,
+  getMinCallBackDate,
+} from "@/features/agent-calls/_lib/utils";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
@@ -33,6 +35,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 type UnassignedHotLeadsDrawerProps = {
   data: UnassignedHotLeadRow[];
   columns?: Column<UnassignedHotLeadRow>[];
+  variant: "svg" | "95rm" | "benton";
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;
@@ -98,10 +101,6 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-function stripTimezonePrefix(timezone: string | undefined) {
-  return (timezone ?? "").replace(/^\d+-/, "");
-}
-
 function ToggleField({
   checked,
   label,
@@ -136,6 +135,7 @@ function ToggleField({
 export function UnassignedHotDrawer({
   data,
   columns,
+  variant,
   selectedIndex,
   onSelectedIndexChange,
   onClose,
@@ -143,6 +143,9 @@ export function UnassignedHotDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+  const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
+  const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
+    useState<string>();
   const [formState, setFormState] = useState<{
     key: string;
     value: EditableDrawerState;
@@ -150,33 +153,51 @@ export function UnassignedHotDrawer({
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.email ?? "";
+  const drawerOpen = row !== null && selectedIndex !== null;
   const initialForm = useMemo(
     () => (row ? getEditableState(row) : null),
     [row],
   );
   const form = formState?.key === rowKey ? formState.value : initialForm;
   const updateLead = useUpdateLead();
+  const svgAgentsQuery = useAgentSelectOptions("svg");
+  const bentonAgentsQuery = useAgentSelectOptions("benton");
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
     return JSON.stringify(form) !== JSON.stringify(initialForm);
   }, [form, initialForm]);
 
-  const companyOptions = useMemo(
-    () =>
-      COMPANY_VALUES.map((company) => ({
-        label: `${company.name} (${company.symbol})`,
-        value: company.name,
-      })),
-    [],
-  );
-  const agentOptions = useMemo(
-    () =>
-      AGENT_VALUES.map((agent) => {
-        const fullName = `${agent.name} ${agent.surname}`;
-        return { label: fullName, value: fullName };
-      }),
-    [],
-  );
+  const updateForm = <Key extends keyof EditableDrawerState>(
+    key: Key,
+    value: EditableDrawerState[Key],
+  ) => {
+    if (!form) return;
+
+    setFormState({
+      key: rowKey,
+      value: {
+        ...(formState?.key === rowKey && formState.value ? formState.value : form),
+        [key]: value,
+      },
+    });
+  };
+
+  const {
+    companyOptions,
+    companySelectSource,
+    displayCompanySymbol,
+    displayTimezone,
+    handleCompanyChange,
+  } = useDrawerCompanySelect({
+    drawerOpen,
+    rowKey,
+    companyName: form?.companyName ?? "",
+    initialCompanyName: initialForm?.companyName ?? "",
+    rowCompanySymbol: row?.companySymbol,
+    rowCompanyName: row?.companyName,
+    rowTimezone: row?.timezone,
+    onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
+  });
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
@@ -184,13 +205,6 @@ export function UnassignedHotDrawer({
   const contactTypeOptions = useMemo(
     () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
-  );
-  const selectedCompany = useMemo(
-    () => COMPANY_VALUES.find((company) => company.name === form?.companyName),
-    [form?.companyName],
-  );
-  const selectedTimezone = stripTimezonePrefix(
-    selectedCompany?.timezone ?? row?.timezone,
   );
 
   const detailItems = useMemo(() => {
@@ -228,25 +242,33 @@ export function UnassignedHotDrawer({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
+  useEffect(() => {
+    setSvgToBeCalledOnError(undefined);
+    setBentonToBeCalledOnError(undefined);
+  }, [rowKey]);
+
   if (!row || selectedIndex === null || !form) return null;
 
   const currentIndex = selectedIndex;
 
-  const updateForm = <Key extends keyof EditableDrawerState>(
-    key: Key,
-    value: EditableDrawerState[Key],
-  ) => {
-    setFormState((current) => ({
-      key: rowKey,
-      value: {
-        ...(current?.key === rowKey && current.value ? current.value : form),
-        [key]: value,
-      },
-    }));
-  };
-
   const handleReset = () => {
     setFormState(null);
+    setSvgToBeCalledOnError(undefined);
+    setBentonToBeCalledOnError(undefined);
+  };
+
+  const handleSvgToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, row.svgLastCallDate ?? "");
+    setSvgToBeCalledOnError(error);
+    if (error) return;
+    updateForm("svgToBeCalledOn", value);
+  };
+
+  const handleBentonToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, row.bentonLastCallDate ?? "");
+    setBentonToBeCalledOnError(error);
+    if (error) return;
+    updateForm("bentonToBeCalledOn", value);
   };
 
   const handleSave = async () => {
@@ -404,9 +426,10 @@ export function UnassignedHotDrawer({
 
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {getLeadDrawerTitle({
-                  companyName: row.companyName,
-                  fullName: row.fullName,
+                {getLeadGridLabel({
+                  companySymbol: displayCompanySymbol,
+                  companyName: form.companyName,
+                  fullName: form.fullName,
                 })}
               </p>
             </div>
@@ -457,28 +480,16 @@ export function UnassignedHotDrawer({
     >
       <div className="space-y-5">
         <DetailCard>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <CompanySymbolBadge
-                symbol={getCompanySymbol(form.companyName)}
-                index={data.findIndex((item) => item.email === row.email)}
-                className="rounded"
-              />
-              <EditableField label="Company">
-                <Select
-                  value={form.companyName}
-                  onChange={(value) => updateForm("companyName", String(value))}
-                  options={companyOptions}
-                  placeholder="Select company"
-                  className="py-1.5 text-xs"
-                />
-              </EditableField>
-            </div>
-            <TimezoneBadge
-              timezone={selectedTimezone}
-              index={data.findIndex((item) => item.email === row.email)}
-            />
-          </div>
+          <DrawerCompanyField
+            rowKey={rowKey}
+            badgeIndex={data.findIndex((item) => item.email === row.email)}
+            companyName={form.companyName}
+            displayCompanySymbol={displayCompanySymbol}
+            displayTimezone={displayTimezone}
+            companyOptions={companyOptions}
+            companySelectSource={companySelectSource}
+            onCompanyChange={handleCompanyChange}
+          />
         </DetailCard>
 
         <DetailCard label="Personal Details">
@@ -558,34 +569,39 @@ export function UnassignedHotDrawer({
             <Select
               value={form.svgToBeCalledBy}
               onChange={(value) => updateForm("svgToBeCalledBy", String(value))}
-              options={agentOptions}
-              placeholder="Select assignee"
+              options={svgAgentsQuery.options}
+              placeholder={
+                svgAgentsQuery.isLoading ? "Loading agents..." : "Select assignee"
+              }
+              disabled={svgAgentsQuery.isLoading}
+              searchable
+              searchPlaceholder="Search agent"
               className="py-1.5 text-xs"
             />
           </EditableField>
           <EditableField label="To Be Called On">
             <DatePickerField
               value={form.svgToBeCalledOn}
-              onChange={(value) => updateForm("svgToBeCalledOn", value)}
+              onChange={handleSvgToBeCalledOnChange}
+              minDate={getMinCallBackDate(row.svgLastCallDate ?? "")}
+              error={svgToBeCalledOnError}
               className="text-xs font-semibold"
             />
           </EditableField>
           <EditableField label="History Calls" align="stack">
             <Textarea
               value={form.svgHistoryCalls}
-              onChange={(event) =>
-                updateForm("svgHistoryCalls", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
           <EditableField label="History Notes" align="stack">
             <Textarea
               value={form.svgHistoryNotes}
-              onChange={(event) =>
-                updateForm("svgHistoryNotes", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
         </DetailCard>
@@ -606,34 +622,41 @@ export function UnassignedHotDrawer({
               onChange={(value) =>
                 updateForm("bentonToBeCalledBy", String(value))
               }
-              options={agentOptions}
-              placeholder="Select assignee"
+              options={bentonAgentsQuery.options}
+              placeholder={
+                bentonAgentsQuery.isLoading
+                  ? "Loading agents..."
+                  : "Select assignee"
+              }
+              disabled={bentonAgentsQuery.isLoading}
+              searchable
+              searchPlaceholder="Search agent"
               className="py-1.5 text-xs"
             />
           </EditableField>
           <EditableField label="To Be Called On">
             <DatePickerField
               value={form.bentonToBeCalledOn}
-              onChange={(value) => updateForm("bentonToBeCalledOn", value)}
+              onChange={handleBentonToBeCalledOnChange}
+              minDate={getMinCallBackDate(row.bentonLastCallDate ?? "")}
+              error={bentonToBeCalledOnError}
               className="text-xs font-semibold"
             />
           </EditableField>
           <EditableField label="History Calls" align="stack">
             <Textarea
               value={form.bentonHistoryCalls}
-              onChange={(event) =>
-                updateForm("bentonHistoryCalls", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
           <EditableField label="History Notes" align="stack">
             <Textarea
               value={form.bentonHistoryNotes}
-              onChange={(event) =>
-                updateForm("bentonHistoryNotes", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              rows={4}
+              className="cursor-default resize-none bg-slate-100/80 text-xs font-semibold leading-5 dark:bg-slate-900/50"
             />
           </EditableField>
         </DetailCard>

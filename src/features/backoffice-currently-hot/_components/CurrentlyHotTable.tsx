@@ -2,14 +2,16 @@
 
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
+import { useCompanyOptions } from "@/features/companies/_lib/hooks";
 import React, { useEffect, useMemo, useState } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { CurrentlyHotDrawer } from "./CurrentlyHotDrawer";
 import {
   assigneeOptions,
   contactTypeOptions,
-  getCompanySymbol,
   getCompanySymbolOptions,
+  getHotLeadTimezone,
+  getRowCompanySymbol,
   LeadRow,
   leadTypeOptions,
   timezoneOptions,
@@ -39,6 +41,8 @@ export function CurrentlyHotTable({
     setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
   }, [data, selectedLead]);
 
+  const { data: companies = [] } = useCompanyOptions();
+
   const columns = useMemo<Column<LeadRow>[]>(() => {
     const baseColumns: Column<LeadRow>[] = [
       {
@@ -50,13 +54,12 @@ export function CurrentlyHotTable({
           label: value,
           value,
         })),
-        render: (row) =>
-          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
+        render: (row) => getLeadGridLabel(row),
       },
       {
         title: "Company Symbol",
         key: "companySymbol",
-        getValue: (row) => getCompanySymbol(row.companyName),
+        getValue: (row) => getRowCompanySymbol(row),
         type: "select",
         options: getCompanySymbolOptions(data).map((value) => ({
           label: value,
@@ -64,8 +67,10 @@ export function CurrentlyHotTable({
         })),
         render: (row) => (
           <CompanySymbolBadge
-            symbol={getCompanySymbol(row.companyName)}
+            symbol={getRowCompanySymbol(row)}
             index={data.findIndex((item) => item.email === row.email)}
+            className="rounded"
+            maxWidth="6.5rem"
           />
         ),
       },
@@ -82,10 +87,7 @@ export function CurrentlyHotTable({
           value,
         })),
         render: (row) => (
-          <TimezoneBadge
-            timezone={row.timezone}
-            index={data.findIndex((item) => item.email === row.email)}
-          />
+          <TimezoneBadge timezone={getHotLeadTimezone(row, companies)} />
         ),
       },
       {
@@ -224,7 +226,7 @@ export function CurrentlyHotTable({
         key: "lastActionDate",
       },
     ];
-  }, [data, variant]);
+  }, [companies, data, variant]);
 
   return (
     <div className="min-h-full">

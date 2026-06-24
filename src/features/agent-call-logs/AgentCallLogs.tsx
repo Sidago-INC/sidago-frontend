@@ -796,7 +796,7 @@ export function AgentCallLogs() {
                                   {isLeadTypeExpanded ? (
                                     <div className="mt-2 space-y-2 px-2 pb-2">
                                       {group.timezones.map(
-                                        (timezoneGroup, timezoneIndex) => {
+                                        (timezoneGroup) => {
                                           const timezoneKey = getCallLogPathKey(
                                             group.leadType,
                                             timezoneGroup.timezone,
@@ -833,7 +833,6 @@ export function AgentCallLogs() {
                                                     timezone={
                                                       timezoneGroup.timezone
                                                     }
-                                                    index={timezoneIndex}
                                                   />
                                                 </div>
                                                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -1173,7 +1172,7 @@ function CallLogDetailContent({
               </p>
             </div>
           </div>
-          <TimezoneBadge timezone={lead.timezone} index={0} />
+          <TimezoneBadge timezone={lead.timezone} />
         </div>
       </DetailCard>
 

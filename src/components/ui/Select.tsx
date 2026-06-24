@@ -16,6 +16,7 @@ import {
 } from "@headlessui/react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import clsx from "clsx";
+import { filterSelectOptions } from "@/lib/select-search";
 
 export type SelectOption = {
   label: string;
@@ -38,6 +39,13 @@ type Props = {
   floatingOptions?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  filterOptionsLocally?: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  isSearching?: boolean;
 };
 
 type SelectOptionsPanelProps = {
@@ -48,6 +56,11 @@ type SelectOptionsPanelProps = {
   searchable: boolean;
   searchPlaceholder: string;
   setSearch: (value: string) => void;
+  filterOptionsLocally: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  isSearching?: boolean;
 };
 
 type SelectControlProps = {
@@ -66,6 +79,11 @@ type SelectControlProps = {
   selected?: SelectOption;
   setSearch: (value: string) => void;
   updatePlacement: () => void;
+  filterOptionsLocally: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  isSearching?: boolean;
 };
 
 function SelectOptionsPanel({
@@ -76,79 +94,148 @@ function SelectOptionsPanel({
   searchable,
   searchPlaceholder,
   setSearch,
+  filterOptionsLocally,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  isSearching,
 }: SelectOptionsPanelProps) {
-  const filteredOptions = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
-    if (!query) {
-      return options;
+  const displayOptions = useMemo(
+    () =>
+      filterOptionsLocally
+        ? filterSelectOptions(options, search)
+        : options,
+    [filterOptionsLocally, options, search],
+  );
+
+  const tryLoadMore = useCallback(() => {
+    if (!onLoadMore || !hasMore || isLoadingMore) {
+      return;
     }
 
-    return options.filter((option) =>
-      option.label.toLowerCase().includes(query),
+    onLoadMore();
+  }, [hasMore, isLoadingMore, onLoadMore]);
+
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const distanceFromBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+
+    if (distanceFromBottom < 48) {
+      tryLoadMore();
+    }
+  };
+
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+
+    if (!root || !sentinel || !onLoadMore || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          tryLoadMore();
+        }
+      },
+      { root, rootMargin: "64px", threshold: 0 },
     );
-  }, [options, search]);
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    displayOptions.length,
+    hasMore,
+    isLoadingMore,
+    onLoadMore,
+    tryLoadMore,
+  ]);
 
   return (
     <ListboxOptions
       anchor={placement === "top" ? "top start" : "bottom start"}
       className={clsx(
-        "z-300 max-h-64 w-(--button-width) overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg [--anchor-gap:0.25rem] dark:border-slate-700 dark:bg-gray-800",
+        "z-300 max-h-64 w-(--button-width) overflow-hidden rounded-lg border border-slate-200 bg-white p-0 shadow-lg [--anchor-gap:0.25rem] dark:border-slate-700 dark:bg-gray-800",
         optionsClassName,
       )}
     >
-      {searchable && (
-        <div className="sticky top-0 z-10 bg-white pb-1 dark:bg-gray-800">
-          <div className="relative">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => event.stopPropagation()}
-              placeholder={searchPlaceholder}
-              className="h-9 w-full rounded border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-700 shadow-none outline-none transition placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-100 dark:placeholder:text-slate-500"
-            />
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="max-h-[inherit] overflow-auto p-1"
+      >
+        {searchable && (
+          <div className="sticky top-0 z-10 bg-white pb-1 dark:bg-gray-800">
+            <div className="relative">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => event.stopPropagation()}
+                placeholder={searchPlaceholder}
+                className="h-9 w-full rounded border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-700 shadow-none outline-none transition placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {filteredOptions.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
-          No options found
-        </div>
-      ) : (
-        filteredOptions.map((option, index) => (
-          <ListboxOption
-            key={`${String(option.value)}-${index}`}
-            value={option.value}
-            title={option.label}
-            className={({ focus }) =>
-              clsx(
-                "relative cursor-pointer select-none rounded px-4 py-2 text-sm",
-                focus
-                  ? "bg-indigo-50 text-indigo-700 dark:bg-slate-700 dark:text-indigo-300"
-                  : "text-slate-700 dark:text-gray-200",
-              )
-            }
-          >
-            {({ selected: isSelected }) => (
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  title={option.label}
-                  className={clsx("truncate", isSelected && "font-medium")}
-                >
-                  {option.label}
-                </span>
-                {isSelected && <Check size={14} className="shrink-0" />}
-              </div>
-            )}
-          </ListboxOption>
-        ))
-      )}
+        {isSearching ? (
+          <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+            Searching...
+          </div>
+        ) : displayOptions.length === 0 ? (
+          <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+            No options found
+          </div>
+        ) : (
+          displayOptions.map((option, index) => (
+            <ListboxOption
+              key={`${String(option.value)}-${index}`}
+              value={option.value}
+              title={option.label}
+              className={({ focus }) =>
+                clsx(
+                  "relative cursor-pointer select-none rounded px-4 py-2 text-sm",
+                  focus
+                    ? "bg-indigo-50 text-indigo-700 dark:bg-slate-700 dark:text-indigo-300"
+                    : "text-slate-700 dark:text-gray-200",
+                )
+              }
+            >
+              {({ selected: isSelected }) => (
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    title={option.label}
+                    className={clsx("truncate", isSelected && "font-medium")}
+                  >
+                    {option.label}
+                  </span>
+                  {isSelected && <Check size={14} className="shrink-0" />}
+                </div>
+              )}
+            </ListboxOption>
+          ))
+        )}
+
+        {hasMore && !isSearching && (
+          <div ref={loadMoreSentinelRef} className="h-px" aria-hidden="true" />
+        )}
+
+        {isLoadingMore && (
+          <div className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
+            Loading more...
+          </div>
+        )}
+      </div>
     </ListboxOptions>
   );
 }
@@ -169,6 +256,11 @@ function SelectControl({
   selected,
   setSearch,
   updatePlacement,
+  filterOptionsLocally,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  isSearching,
 }: SelectControlProps) {
   useEffect(() => {
     if (!open) {
@@ -225,6 +317,11 @@ function SelectControl({
           searchable={searchable}
           searchPlaceholder={searchPlaceholder}
           setSearch={setSearch}
+          filterOptionsLocally={filterOptionsLocally}
+          onLoadMore={onLoadMore}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          isSearching={isSearching}
         />
       )}
     </div>
@@ -244,12 +341,30 @@ export function Select({
   disabled,
   searchable = false,
   searchPlaceholder = "Search options",
+  searchValue,
+  onSearchChange,
+  filterOptionsLocally = true,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  isSearching,
 }: Props) {
   const id = useId();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [placement, setPlacement] = useState<SelectPlacement>("bottom");
-  const [search, setSearch] = useState("");
+  const [internalSearch, setInternalSearch] = useState("");
+  const search = searchValue ?? internalSearch;
   const selected = options.find((o) => String(o.value) === String(value));
+
+  const setSearch = useCallback(
+    (nextValue: string) => {
+      onSearchChange?.(nextValue);
+      if (searchValue === undefined) {
+        setInternalSearch(nextValue);
+      }
+    },
+    [onSearchChange, searchValue],
+  );
 
   const updatePlacement = useCallback(() => {
     if (typeof window === "undefined" || !buttonRef.current) {
@@ -304,6 +419,11 @@ export function Select({
             selected={selected}
             setSearch={setSearch}
             updatePlacement={updatePlacement}
+            filterOptionsLocally={filterOptionsLocally}
+            onLoadMore={onLoadMore}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            isSearching={isSearching}
           />
         )}
       </Listbox>

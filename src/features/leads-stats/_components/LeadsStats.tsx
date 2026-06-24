@@ -67,7 +67,7 @@ export function LeadsStats() {
     () => [
       {
         id: "leads-fixed",
-        label: "Leads fixed",
+        label: "Leads Fixed",
         value: effectiveStats?.leadsFixed ?? 0,
         icon: <Wrench size={18} />,
         titleClassName: "text-emerald-700 dark:text-emerald-300",
@@ -75,7 +75,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-fix",
-        label: "Leads sent to fix",
+        label: "Leads Sent To Fix",
         value: effectiveStats?.leadsSentToFix ?? 0,
         icon: <RefreshCcw size={18} />,
         titleClassName: "text-sky-700 dark:text-sky-300",
@@ -83,7 +83,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-cant-locate",
-        label: "Leads sent to can't locate",
+        label: "Leads Sent To Can't Locate",
         value: effectiveStats?.leadsSentToCantLocate ?? 0,
         icon: <Target size={18} />,
         titleClassName: "text-amber-700 dark:text-amber-300",
@@ -91,7 +91,7 @@ export function LeadsStats() {
       },
       {
         id: "new-leads-created",
-        label: "New leads created",
+        label: "New Leads Created",
         value: effectiveStats?.newLeadsCreated ?? 0,
         icon: <Wrench size={18} />,
         titleClassName: "text-violet-700 dark:text-violet-300",
@@ -99,7 +99,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-void",
-        label: "Leads sent to VOID",
+        label: "Leads Sent To VOID",
         value: effectiveStats?.leadsSentToVoid ?? 0,
         icon: <Ban size={18} />,
         titleClassName: "text-rose-700 dark:text-rose-300",
@@ -107,7 +107,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-dnc",
-        label: "Leads sent to DNC",
+        label: "Leads Sent To DNC",
         value: effectiveStats?.leadsSentToDnc ?? 0,
         icon: <CircleOff size={18} />,
         titleClassName: "text-slate-600 dark:text-slate-300",
@@ -126,22 +126,21 @@ export function LeadsStats() {
           </h1>
         </div>
 
-        <div className="flex w-full max-w-xl flex-col lg:items-end">
-          <div className="w-full lg:max-w-md">
-            <DateRangePicker
-              value={selectedRange}
-              onChange={(value) =>
-                setSelectedRange(
-                  value ?? {
-                    from: today,
-                    to: today,
-                  },
-                )
-              }
-              placeholder="Pick a date or range"
-              className="h-11 rounded-xl border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-950"
-            />
-          </div>
+        <div className="flex shrink-0">
+          <DateRangePicker
+            value={selectedRange}
+            onChange={(value) =>
+              setSelectedRange(
+                value ?? {
+                  from: today,
+                  to: today,
+                },
+              )
+            }
+            placeholder="Pick a date or range"
+            fullWidth={false}
+            className="h-11 rounded-xl border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-950"
+          />
         </div>
       </div>
 

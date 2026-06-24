@@ -438,7 +438,7 @@ export function ClosedContactDrawer({
                 </p>
               </div>
             </div>
-            <TimezoneBadge timezone={row.timezone} index={rowIndex} />
+            <TimezoneBadge timezone={row.timezone} />
           </div>
         </DetailCard>
 

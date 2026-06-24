@@ -367,10 +367,7 @@ export function AgentSmsDrawer({
                   </p>
                 </div>
               </div>
-              <TimezoneBadge
-                timezone={row.timezone}
-                index={currentIndex >= 0 ? currentIndex : 0}
-              />
+              <TimezoneBadge timezone={row.timezone} />
             </div>
           </DetailCard>
 

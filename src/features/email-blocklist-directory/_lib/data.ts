@@ -1,3 +1,4 @@
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -41,11 +42,7 @@ type EmailBlacklistResponse = {
 export function getEmailBlacklistDisplayLeadId(
   row: EmailBlocklistDirectoryRow,
 ): string {
-  if (row.leadIdExternal && row.companySymbol) {
-    return `${row.companySymbol}-${row.leadIdExternal}`;
-  }
-
-  return row.leadIdExternal || row.leadId;
+  return getLeadGridLabel(row);
 }
 
 export function getBrandLabel(brand: string): string {

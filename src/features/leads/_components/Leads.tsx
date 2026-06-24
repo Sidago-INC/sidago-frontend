@@ -3,20 +3,17 @@
 import { CompanySymbolBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
-import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  getCompanySymbolOptions,
+  getLeadGridLabel,
+  getRowCompanySymbol,
+} from "@/features/backoffice-shared/constants";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { LeadsDrawer } from "./LeadsDrawer";
-import {
-  assigneeOptions,
-  getCompanySymbol,
-  getCompanySymbolOptions,
-  getLeadId,
-  getLeadIdOptions,
-  type LeadDirectoryRow,
-} from "../_lib/data";
+import { assigneeOptions, type LeadDirectoryRow } from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
 
 export function Leads() {
@@ -40,13 +37,12 @@ export function Leads() {
           label: value,
           value,
         })),
-        render: (row) =>
-          [row.companySymbol, row.fullName].filter(Boolean).join(" - ") || "-",
+        render: (row) => getLeadGridLabel(row) || "-",
       },
       {
         title: "Company Symbol",
         key: "companySymbol",
-        getValue: (row) => getCompanySymbol(row.companyName),
+        getValue: (row) => getRowCompanySymbol(row),
         type: "select",
         options: getCompanySymbolOptions(rows).map((value) => ({
           label: value,
@@ -54,8 +50,8 @@ export function Leads() {
         })),
         render: (row) => (
           <CompanySymbolBadge
-            symbol={getCompanySymbol(row.companyName)}
-            index={rows.findIndex((item) => item.email === row.email)}
+            symbol={getRowCompanySymbol(row)}
+            index={rows.findIndex((item) => item.leadId === row.leadId)}
           />
         ),
       },
@@ -125,7 +121,7 @@ export function Leads() {
         title="Leads"
         description="All lead records across SVG, Benton, and 95RM"
         onRowClick={(row) => {
-          const index = rows.findIndex((item) => item.email === row.email);
+          const index = rows.findIndex((item) => item.leadId === row.leadId);
           setSelectedIndex(index >= 0 ? index : null);
         }}
       />

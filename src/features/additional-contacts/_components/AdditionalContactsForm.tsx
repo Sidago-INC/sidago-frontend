@@ -6,8 +6,8 @@ import {
   additionalContactValidationSchema,
   type AdditionalContactFormValues,
 } from "@/lib/validation/additional-contact";
-import { useMemo, useState } from "react";
-import { useCompanyOptions } from "@/features/companies/_lib/hooks";
+import { useState } from "react";
+import { useCompanyIdSelectSource } from "@/features/companies/_lib/hooks";
 import { useCreateAdditionalContact } from "../_lib/hooks";
 
 const blankForm: AdditionalContactFormValues = {
@@ -40,21 +40,12 @@ function splitFullName(fullName: string) {
 }
 
 export function AdditionalContactsForm() {
-  const { data: companies, isLoading: companiesLoading } = useCompanyOptions();
+  const companySelectSource = useCompanyIdSelectSource();
   const createAdditionalContact = useCreateAdditionalContact();
   const [form, setForm] = useState<AdditionalContactFormValues>(blankForm);
   const [errors, setErrors] = useState<
     Partial<Record<keyof AdditionalContactFormValues, string>>
   >({});
-
-  const companyOptions = useMemo(
-    () =>
-      (companies ?? []).map((company) => ({
-        label: `${company.name ?? "Unnamed Company"} (${company.symbol ?? "-"})`,
-        value: company.id,
-      })),
-    [companies],
-  );
 
   const updateField = (
     field: keyof AdditionalContactFormValues,
@@ -230,14 +221,28 @@ export function AdditionalContactsForm() {
                 label="Select Company"
                 value={form.companyId}
                 onChange={(value) => updateField("companyId", String(value))}
-                options={companyOptions}
+                options={companySelectSource.options}
                 placeholder={
-                  companiesLoading ? "Loading companies..." : "Search and select a company"
+                  companySelectSource.isLoading &&
+                  companySelectSource.options.length === 0
+                    ? "Loading companies..."
+                    : "Search and select a company"
                 }
                 searchable
                 searchPlaceholder="Search companies"
+                searchValue={companySelectSource.searchInput}
+                onSearchChange={companySelectSource.onSearchChange}
+                filterOptionsLocally={false}
+                onLoadMore={companySelectSource.onLoadMore}
+                hasMore={companySelectSource.hasMore}
+                isLoadingMore={companySelectSource.isLoadingMore}
+                isSearching={companySelectSource.isSearching}
                 error={errors.companyId}
-                disabled={companiesLoading || createAdditionalContact.isPending}
+                disabled={
+                  (companySelectSource.isLoading &&
+                    companySelectSource.options.length === 0) ||
+                  createAdditionalContact.isPending
+                }
                 className="h-10 rounded text-sm"
                 labelClassName="text-sm font-medium"
               />

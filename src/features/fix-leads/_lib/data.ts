@@ -7,6 +7,7 @@ import {
   getLeadIdOptions,
   timezoneOptions,
 } from "@/features/backoffice-shared/constants";
+import { resolveLeadTimezone, stripTimezonePrefix } from "@/types/timezone.types";
 
 // API response shapes — match the NestJS controllers in sidago-backend.
 //
@@ -20,6 +21,7 @@ export type FixQueueRow = {
   phone: string | null;
   email: string | null;
   timezone: string | null;
+  companyTimezone: string | null;
   companyId: string | null;
   companyName: string | null;
   companySymbol: string | null;
@@ -77,6 +79,30 @@ type FixQueueResponse = { ok: true; count: number; data: FixQueueRow[] };
 type FullLeadResponse = { ok: true; lead: FullLead; brandStates: BrandStates };
 type RelatedResponse = { ok: true; count: number; data: RelatedLead[] };
 
+type FixQueueApiRow = FixQueueRow & {
+  company_timezone?: string | null;
+};
+
+function normalizeFixQueueRow(row: FixQueueApiRow): FixQueueRow {
+  const companyTimezone = row.companyTimezone ?? row.company_timezone ?? null;
+  const timezone = row.timezone ?? companyTimezone;
+
+  return {
+    ...row,
+    timezone,
+    companyTimezone,
+  };
+}
+
+export function getFixQueueTimezone(row: FixQueueRow): string | null {
+  return resolveLeadTimezone(row.timezone, row.companyTimezone);
+}
+
+export function getFixQueueTimezoneLabel(row: FixQueueRow): string {
+  const timezone = getFixQueueTimezone(row);
+  return timezone ? stripTimezonePrefix(timezone) : "";
+}
+
 export function useFixQueue(limit: number) {
   return useQuery({
     queryKey: ["fix-queue", limit],
@@ -84,7 +110,7 @@ export function useFixQueue(limit: number) {
       const json = (await api.get(
         `/leads/fix-queue?limit=${limit}`,
       )) as FixQueueResponse;
-      return json.data;
+      return json.data.map(normalizeFixQueueRow);
     },
     staleTime: 60_000,
   });
