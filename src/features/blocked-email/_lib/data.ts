@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 
 export type BlockedEmailRow = {
   leadId: string;
@@ -17,8 +22,13 @@ export type BlockedEmailRow = {
 
 type BlockedEmailResponse = {
   ok: true;
-  count: number;
   data: BlockedEmailRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
 };
 
 type UnblockBlockedEmailResponse = {
@@ -39,14 +49,18 @@ export function getBlockedBrandLabel(brand: string): string {
   }
 }
 
-export function useBlockedEmails(limit: number) {
+export function useBlockedEmails(
+  page: number,
+  perPage = DEFAULT_PAGE_SIZE,
+) {
   return useQuery({
-    queryKey: ["blocked-email", limit],
+    queryKey: ["blocked-email", page, perPage],
     queryFn: async () => {
+      const params = buildPaginationParams(page, perPage);
       const json = (await api.get(
-        `/blocked-email?limit=${limit}`,
+        `/blocked-email?${params.toString()}`,
       )) as BlockedEmailResponse;
-      return json.data;
+      return parsePaginatedResponse<BlockedEmailRow>(json);
     },
     staleTime: 60_000,
   });

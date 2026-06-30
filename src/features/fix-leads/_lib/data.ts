@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
+import {
   getCompanySymbol,
   getCompanySymbolOptions,
   getLeadId,
@@ -75,7 +80,16 @@ export type RelatedLead = {
   role: string | null;
 };
 
-type FixQueueResponse = { ok: true; count: number; data: FixQueueRow[] };
+type FixQueueResponse = {
+  ok: true;
+  data: FixQueueRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
+};
 type FullLeadResponse = { ok: true; lead: FullLead; brandStates: BrandStates };
 type RelatedResponse = { ok: true; count: number; data: RelatedLead[] };
 
@@ -103,14 +117,19 @@ export function getFixQueueTimezoneLabel(row: FixQueueRow): string {
   return timezone ? stripTimezonePrefix(timezone) : "";
 }
 
-export function useFixQueue(limit: number) {
+export function useFixQueue(page: number, perPage = DEFAULT_PAGE_SIZE) {
   return useQuery({
-    queryKey: ["fix-queue", limit],
+    queryKey: ["fix-queue", page, perPage],
     queryFn: async () => {
+      const params = buildPaginationParams(page, perPage);
       const json = (await api.get(
-        `/leads/fix-queue?limit=${limit}`,
+        `/leads/fix-queue?${params.toString()}`,
       )) as FixQueueResponse;
-      return json.data.map(normalizeFixQueueRow);
+      const parsed = parsePaginatedResponse<FixQueueApiRow>(json);
+      return {
+        data: parsed.data.map(normalizeFixQueueRow),
+        meta: parsed.meta,
+      };
     },
     staleTime: 60_000,
   });

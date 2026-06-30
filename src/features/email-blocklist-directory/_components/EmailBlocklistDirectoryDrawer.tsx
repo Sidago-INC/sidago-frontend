@@ -9,7 +9,12 @@ import {
 } from "@/components/ui";
 import { useEffect, useState } from "react";
 import {
+  formatCallHistoryCallsText,
+  formatCallHistoryDate,
+  formatCallHistoryNotesText,
   getBrandLabel,
+  getCallHistoryLineDetail,
+  getCallHistoryNoteDetail,
   getEmailBlacklistDisplayLeadId,
   type CallHistoryEntry,
   type EmailBlocklistDirectoryRow,
@@ -65,6 +70,7 @@ export function EmailBlocklistDirectoryDrawer({
       ["Lead ID", getEmailBlacklistDisplayLeadId(row)],
       ["Company", row.companyName ?? ""],
       ["Full Name", row.fullName ?? ""],
+      ["Phone", row.phone ?? ""],
       ["Email", row.email ?? ""],
       ["Contact Type", row.contactType ?? ""],
       ["SVG Lead Type", row.leadTypeSvg ?? ""],
@@ -74,9 +80,18 @@ export function EmailBlocklistDirectoryDrawer({
         "Blacklisted Brands",
         row.blacklistedBrands.map(getBrandLabel).join(", "),
       ],
-      ["SVG History Entries", String(row.callHistory.svg.length)],
-      ["Benton History Entries", String(row.callHistory.benton.length)],
-      ["95RM History Entries", String(row.callHistory["95rm"].length)],
+      ["SVG History Calls", formatCallHistoryCallsText(row.callHistory.svg)],
+      ["SVG History Notes", formatCallHistoryNotesText(row.callHistory.svg)],
+      [
+        "Benton History Calls",
+        formatCallHistoryCallsText(row.callHistory.benton),
+      ],
+      [
+        "Benton History Notes",
+        formatCallHistoryNotesText(row.callHistory.benton),
+      ],
+      ["95RM History Calls", formatCallHistoryCallsText(row.callHistory["95rm"])],
+      ["95RM History Notes", formatCallHistoryNotesText(row.callHistory["95rm"])],
     ]
       .map(
         ([label, value]) => `
@@ -170,6 +185,22 @@ export function EmailBlocklistDirectoryDrawer({
           <DetailCard label="Personal Information">
             <AssociationDetail label="Full Name" value={row.fullName || "-"} />
             <AssociationDetail
+              label="Phone"
+              value={
+                row.phone ? (
+                  <a
+                    href={`tel:${row.phone}`}
+                    onClick={(event) => event.stopPropagation()}
+                    className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-300"
+                  >
+                    {row.phone}
+                  </a>
+                ) : (
+                  "-"
+                )
+              }
+            />
+            <AssociationDetail
               label="Email"
               value={row.email ? <EmailLink value={row.email} /> : "-"}
             />
@@ -219,15 +250,18 @@ export function EmailBlocklistDirectoryDrawer({
           </DetailCard>
 
           <DetailCard label="SVG Details">
-            <CallHistoryList entries={row.callHistory.svg} />
+            <HistoryCallsField entries={row.callHistory.svg} />
+            <HistoryNotesField entries={row.callHistory.svg} />
           </DetailCard>
 
           <DetailCard label="Benton Details">
-            <CallHistoryList entries={row.callHistory.benton} />
+            <HistoryCallsField entries={row.callHistory.benton} />
+            <HistoryNotesField entries={row.callHistory.benton} />
           </DetailCard>
 
           <DetailCard label="95RM Details">
-            <CallHistoryList entries={row.callHistory["95rm"]} />
+            <HistoryCallsField entries={row.callHistory["95rm"]} />
+            <HistoryNotesField entries={row.callHistory["95rm"]} />
           </DetailCard>
         </div>
       )}
@@ -275,34 +309,64 @@ function AssociationDetail({
   );
 }
 
-function CallHistoryList({ entries }: { entries: CallHistoryEntry[] }) {
-  if (entries.length === 0) {
-    return (
-      <span className="block whitespace-pre-line text-left text-xs font-semibold text-slate-600 dark:text-slate-200">
-        No call history found.
-      </span>
-    );
-  }
+function HistoryField({
+  label,
+  entries,
+  getDetail,
+}: {
+  label: string;
+  entries: CallHistoryEntry[];
+  getDetail: (entry: CallHistoryEntry) => string;
+}) {
+  const lines = entries
+    .map((entry) => ({
+      id: entry.id,
+      date: formatCallHistoryDate(entry.calledAt),
+      detail: getDetail(entry),
+    }))
+    .filter((line) => line.date || line.detail);
 
   return (
-    <div className="space-y-3">
-      {entries.map((entry) => (
-        <div
-          key={entry.id}
-          className="rounded border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900"
-        >
-          <div className="font-semibold text-slate-800 dark:text-slate-100">
-            {new Date(entry.calledAt).toLocaleString()}
-          </div>
-          <div className="mt-1 text-slate-600 dark:text-slate-300">
-            {entry.userName || "Unknown agent"}
-            {entry.resultCode ? ` | ${entry.resultCode}` : ""}
-          </div>
-          <div className="mt-1 whitespace-pre-line text-slate-500 dark:text-slate-400">
-            {entry.notes || "No notes"}
-          </div>
-        </div>
-      ))}
+    <div className="space-y-1 py-2">
+      <p className="text-[10px] uppercase tracking-widest text-slate-400">
+        {label}
+      </p>
+      <div className="rounded border border-gray-300 bg-white px-3 py-2 text-xs leading-5 text-slate-600 dark:border-gray-600 dark:bg-gray-800 dark:text-slate-200">
+        {lines.length === 0 ? (
+          <span className="text-slate-400">-</span>
+        ) : (
+          lines.map((line) => (
+            <div key={line.id}>
+              <span className="font-semibold text-slate-700 dark:text-slate-100">
+                {line.date}
+              </span>
+              {line.detail ? ` - ${line.detail}` : ""}
+            </div>
+          ))
+        )}
+      </div>
     </div>
+  );
+}
+
+function HistoryCallsField({ entries }: { entries: CallHistoryEntry[] }) {
+  return (
+    <HistoryField
+      label="History Calls"
+      entries={entries}
+      getDetail={getCallHistoryLineDetail}
+    />
+  );
+}
+
+function HistoryNotesField({ entries }: { entries: CallHistoryEntry[] }) {
+  const noteEntries = entries.filter((entry) => entry.notes?.trim());
+
+  return (
+    <HistoryField
+      label="History Notes"
+      entries={noteEntries}
+      getDetail={getCallHistoryNoteDetail}
+    />
   );
 }

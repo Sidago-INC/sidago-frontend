@@ -1,11 +1,17 @@
 
 
 import React from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { useEverBeenHot } from "../_lib/use-ever-been-hot";
 import { EverBeenHotTable } from "./EverBeenHotTable";
 
 export function EverBeenHotBenton() {
-  const { data, isLoading, isError, error } = useEverBeenHot("benton");
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading, isError, error } = useEverBeenHot(
+    "benton",
+    page,
+    perPage,
+  );
 
   if (isLoading) {
     return (
@@ -25,7 +31,16 @@ export function EverBeenHotBenton() {
 
   return (
     <EverBeenHotTable
-      data={data ?? []}
+      data={result?.data ?? []}
+      serverPagination={
+        result?.meta
+          ? {
+              meta: result.meta,
+              onPageChange: setPage,
+              onPerPageChange: setPerPage,
+            }
+          : undefined
+      }
       title="Ever Been Hot - Benton"
       variant="benton"
     />

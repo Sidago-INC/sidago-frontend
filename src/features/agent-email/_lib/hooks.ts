@@ -1,20 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { agentCallsApi } from "@/features/agent-calls/_lib/agentCallsApi";
+import type { LogResultBody } from "@/features/agent-calls/_lib/apiTypes";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 import type {
   EmailHistoryResponse,
   EmailLogBody,
+  EmailQueueItem,
   EmailQueueResponse,
   EmailStatePatchBody,
 } from "./apiTypes";
 
-export function useEmailQueue(agentSlug: string, limit = 500) {
+export function useEmailQueue(
+  agentSlug: string,
+  page = 1,
+  perPage = DEFAULT_PAGE_SIZE,
+) {
   return useQuery({
-    queryKey: ["email-queue", agentSlug, limit],
+    queryKey: ["email-queue", agentSlug, page, perPage],
     queryFn: async () => {
+      const params = buildPaginationParams(page, perPage, {
+        agentSlug,
+      });
       const json = (await api.get(
-        `/email/queue?agentSlug=${encodeURIComponent(agentSlug)}&limit=${limit}`,
+        `/email/queue?${params.toString()}`,
       )) as EmailQueueResponse;
-      return json;
+      const parsed = parsePaginatedResponse<EmailQueueItem>(json);
+      return {
+        ...json,
+        data: parsed.data,
+        meta: parsed.meta,
+      };
     },
     staleTime: 30_000,
   });
@@ -67,6 +87,17 @@ export function useLogEmail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["email-queue"] });
       qc.invalidateQueries({ queryKey: ["email-history"] });
+    },
+  });
+}
+
+export function useLogCallResult(agentSlug: string) {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: LogResultBody) => agentCallsApi.logResult(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["email-queue", agentSlug] });
     },
   });
 }

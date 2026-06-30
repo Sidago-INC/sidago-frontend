@@ -7,7 +7,11 @@ import {
 } from "@headlessui/react";
 import { Check, ChevronDown } from "lucide-react";
 import clsx from "clsx";
-import { TIMEZONE_OPTIONS, type TIMEZONE } from "@/types/timezone.types";
+import {
+  TIMEZONE_OPTIONS,
+  normalizeTimezoneValue,
+  type TIMEZONE,
+} from "@/types/timezone.types";
 import { TimezoneBadge } from "./Badge";
 
 type TimezoneSelectProps = {
@@ -34,7 +38,10 @@ export function TimezoneSelect({
   disabled,
 }: TimezoneSelectProps) {
   const id = useId();
-  const selected = TIMEZONE_OPTIONS.find((option) => option.value === value);
+  const normalizedValue = normalizeTimezoneValue(value);
+  const selected = TIMEZONE_OPTIONS.find(
+    (option) => option.value === normalizedValue,
+  );
 
   return (
     <div className="flex w-full flex-col gap-1">
@@ -46,7 +53,7 @@ export function TimezoneSelect({
       ) : null}
 
       <Listbox
-        value={value ?? ""}
+        value={normalizedValue}
         onChange={(nextValue) => onChange?.(nextValue as TIMEZONE)}
         disabled={disabled}
       >
@@ -63,7 +70,9 @@ export function TimezoneSelect({
             >
               <span className="flex min-w-0 flex-1 items-center pr-6">
                 {selected ? (
-                  <TimezoneBadge timezone={selected.value} />
+                  <span className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-200">
+                    {selected.label}
+                  </span>
                 ) : (
                   <span className="text-sm text-slate-400 dark:text-gray-500">
                     {placeholder}
@@ -97,8 +106,13 @@ export function TimezoneSelect({
                     }
                   >
                     {({ selected: isSelected }) => (
-                      <div className="flex items-center justify-between gap-2">
-                        <TimezoneBadge timezone={option.value} />
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <TimezoneBadge timezone={option.value} />
+                          <span className="min-w-0 text-sm leading-snug">
+                            {option.label}
+                          </span>
+                        </div>
                         {isSelected ? (
                           <Check size={14} className="shrink-0 text-indigo-600" />
                         ) : null}

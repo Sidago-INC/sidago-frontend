@@ -1,20 +1,38 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 import type {
   SmsHistoryResponse,
   SmsLogBody,
+  SmsQueueItem,
   SmsQueueResponse,
   SmsStatePatchBody,
 } from "./apiTypes";
 
-export function useSmsQueue(agentSlug: string, limit = 500) {
+export function useSmsQueue(
+  agentSlug: string,
+  page = 1,
+  perPage = DEFAULT_PAGE_SIZE,
+) {
   return useQuery({
-    queryKey: ["sms-queue", agentSlug, limit],
+    queryKey: ["sms-queue", agentSlug, page, perPage],
     queryFn: async () => {
+      const params = buildPaginationParams(page, perPage, {
+        agentSlug,
+      });
       const json = (await api.get(
-        `/sms/queue?agentSlug=${encodeURIComponent(agentSlug)}&limit=${limit}`,
+        `/sms/queue?${params.toString()}`,
       )) as SmsQueueResponse;
-      return json;
+      const parsed = parsePaginatedResponse<SmsQueueItem>(json);
+      return {
+        ...json,
+        data: parsed.data,
+        meta: parsed.meta,
+      };
     },
     staleTime: 30_000,
   });

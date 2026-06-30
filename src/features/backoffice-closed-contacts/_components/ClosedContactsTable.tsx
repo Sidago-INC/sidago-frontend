@@ -1,7 +1,7 @@
 
 
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
-import { Table, type Column } from "@/components/ui/Table";
+import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
 import React, { useMemo } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import {
@@ -22,12 +22,14 @@ type ClosedContactsTableProps = {
   data: ClosedContactRow[];
   tabKey: ClosedContactsTabKey;
   title: string;
+  serverPagination?: ServerPaginationConfig;
 };
 
 export function ClosedContactsTable({
   data,
   tabKey,
   title,
+  serverPagination,
 }: ClosedContactsTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -78,7 +80,7 @@ export function ClosedContactsTable({
         title: "Timezone",
         key: "timezone",
         type: "select",
-        options: timezoneOptions.map((value) => ({ label: value, value })),
+        options: timezoneOptions,
         render: (row) => (
           <TimezoneBadge timezone={row.timezone} />
         ),
@@ -128,6 +130,7 @@ export function ClosedContactsTable({
         data={data}
         columns={columns}
         title={title}
+        serverPagination={serverPagination}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);

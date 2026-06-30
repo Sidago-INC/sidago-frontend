@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import React, { useMemo } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { closedContactsTabs, type ClosedContactsTabKey } from "../_lib/data";
 import { useClosedContracts } from "../_lib/use-closed-contacts";
 import { ClosedContactsTable } from "./ClosedContactsTable";
@@ -29,9 +30,13 @@ export function ClosedContacts() {
     [activeTab],
   );
 
-  const { data, isLoading, isError, error } = useClosedContracts(
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+
+  const { data: result, isLoading, isError, error } = useClosedContracts(
     activeView.category,
     activeView.brand,
+    page,
+    perPage,
   );
 
   const updateTab = (tabKey: ClosedContactsTabKey) => {
@@ -81,7 +86,16 @@ export function ClosedContacts() {
         </div>
       ) : (
         <ClosedContactsTable
-          data={data ?? []}
+          data={result?.data ?? []}
+          serverPagination={
+            result?.meta
+              ? {
+                  meta: result.meta,
+                  onPageChange: setPage,
+                  onPerPageChange: setPerPage,
+                }
+              : undefined
+          }
           tabKey={activeView.key}
           title={activeView.title}
         />

@@ -6,7 +6,7 @@ import {
   TimezoneBadge,
   TypeBadge,
 } from "@/components/ui";
-import { Table, type Column } from "@/components/ui/Table";
+import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 import {
@@ -28,12 +28,14 @@ type UnassignedHotLeadsTableProps = {
   data: UnassignedHotLeadRow[];
   title: string;
   variant: "svg" | "95rm" | "benton";
+  serverPagination?: ServerPaginationConfig;
 };
 
 export function UnassignedHotTable({
   data,
   title,
   variant,
+  serverPagination,
 }: UnassignedHotLeadsTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -89,7 +91,7 @@ export function UnassignedHotTable({
         title: "Time zone",
         key: "timezone",
         type: "select",
-        options: timezoneOptions.map((value) => ({ label: value, value })),
+        options: timezoneOptions,
         render: (row) => (
           <TimezoneBadge timezone={row.timezone} />
         ),
@@ -267,6 +269,7 @@ export function UnassignedHotTable({
         data={data}
         columns={columns}
         title={title}
+        serverPagination={serverPagination}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);

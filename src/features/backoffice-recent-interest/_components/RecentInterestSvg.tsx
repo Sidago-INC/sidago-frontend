@@ -1,11 +1,17 @@
 
 
 import React from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { useRecentInterest } from "../_lib/use-recent-interest";
 import { RecentInterestTable } from "./RecentInterestTable";
 
 export function RecentInterestSvg() {
-  const { data, isLoading, isError, error } = useRecentInterest("svg");
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading, isError, error } = useRecentInterest(
+    "svg",
+    page,
+    perPage,
+  );
 
   if (isLoading) {
     return (
@@ -24,6 +30,19 @@ export function RecentInterestSvg() {
   }
 
   return (
-    <RecentInterestTable data={data ?? []} title="Recent Interest - SVG" brand="svg" />
+    <RecentInterestTable
+      data={result?.data ?? []}
+      serverPagination={
+        result?.meta
+          ? {
+              meta: result.meta,
+              onPageChange: setPage,
+              onPerPageChange: setPerPage,
+            }
+          : undefined
+      }
+      title="Recent Interest - SVG"
+      brand="svg"
+    />
   );
 }

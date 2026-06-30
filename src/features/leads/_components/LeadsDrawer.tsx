@@ -8,7 +8,6 @@ import {
   Textarea,
   TextInput,
   TypeBadge,
-  Wave,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -22,10 +21,6 @@ import {
   type LeadPatchBody,
 } from "@/features/backoffice-shared/use-update-lead";
 import {
-  useLeadFull,
-  useRelatedLeads,
-} from "@/features/fix-leads/_lib/data";
-import {
   getCallBackDateError,
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
@@ -36,8 +31,7 @@ import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import {
-  leadDetailToDirectoryRow,
-  leadDetailToFormState,
+  directoryRowToFormState,
   type LeadDrawerFormState,
 } from "../_lib/lead-detail";
 import { type LeadDirectoryRow } from "../_lib/data";
@@ -119,21 +113,12 @@ export function LeadsDrawer({
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.leadId ?? row?.email ?? "";
   const drawerOpen = row !== null && selectedIndex !== null;
-  const leadDetailQuery = useLeadFull(drawerOpen ? row?.leadId : undefined);
-  const relatedQuery = useRelatedLeads(drawerOpen ? row?.leadId : undefined);
-  const displayRow = useMemo(() => {
-    if (!row) return null;
-    if (!leadDetailQuery.data) return row;
-    return leadDetailToDirectoryRow(leadDetailQuery.data, row);
-  }, [leadDetailQuery.data, row]);
+  const displayRow = row;
   const isEditMode = rowKey !== "" && editModeKey === rowKey;
-  const initialForm = useMemo(() => {
-    if (!leadDetailQuery.data) return null;
-    return leadDetailToFormState(
-      leadDetailQuery.data,
-      relatedQuery.data ?? [],
-    );
-  }, [leadDetailQuery.data, relatedQuery.data]);
+  const initialForm = useMemo(
+    () => (row ? directoryRowToFormState(row) : null),
+    [row],
+  );
   const form = formState?.key === rowKey ? formState.value : initialForm;
 
   const updateForm = <Key extends keyof LeadDrawerFormState>(
@@ -218,10 +203,7 @@ export function LeadsDrawer({
     setRm95ToBeCalledOnError(undefined);
   }, [rowKey]);
 
-  if (!row || selectedIndex === null) return null;
-
-  const isDetailLoading = leadDetailQuery.isLoading;
-  const isDetailError = leadDetailQuery.isError;
+  if (!row || selectedIndex === null || !form || !displayRow) return null;
 
   const handleCopyUrl = async () => {
     if (!drawerUrl) return;
@@ -289,52 +271,6 @@ export function LeadsDrawer({
       ) : null}
     </div>
   );
-
-  if (isDetailLoading) {
-    return (
-      <Drawer
-        isOpen={selectedIndex !== null}
-        onClose={onClose}
-        direction="right"
-        size="560px"
-        header={renderDrawerHeader(
-          {
-            companySymbol: displayRow?.companySymbol,
-            companyName: displayRow?.companyName,
-            fullName: displayRow?.fullName,
-          },
-          false,
-        )}
-      >
-        <div className="flex justify-center py-16">
-          <Wave />
-        </div>
-      </Drawer>
-    );
-  }
-
-  if (isDetailError || !form || !displayRow) {
-    return (
-      <Drawer
-        isOpen={selectedIndex !== null}
-        onClose={onClose}
-        direction="right"
-        size="560px"
-        header={renderDrawerHeader(
-          {
-            companySymbol: displayRow?.companySymbol,
-            companyName: displayRow?.companyName,
-            fullName: displayRow?.fullName,
-          },
-          false,
-        )}
-      >
-        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-          Could not load lead details. Please close and try again.
-        </div>
-      </Drawer>
-    );
-  }
 
   const handleSvgToBeCalledOnChange = (value: string) => {
     const error = getCallBackDateError(value, displayRow.svgLastCallDate ?? "");
@@ -436,8 +372,6 @@ export function LeadsDrawer({
     try {
       await updateLead.mutateAsync({ leadId: row.leadId, body });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["lead-full", row.leadId] }),
-        queryClient.invalidateQueries({ queryKey: ["lead-related", row.leadId] }),
         queryClient.invalidateQueries({ queryKey: ["leads", "directory"] }),
       ]);
       showSuccessToast("Lead changes saved successfully.");

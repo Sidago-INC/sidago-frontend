@@ -268,14 +268,18 @@ export function BulkCompanyImport() {
     [result],
   );
 
-  const handleForceImportAll = useCallback(async () => {
-    if (!result || result.invalidRows.length === 0) return;
+  const handleForceImportAll = useCallback(
+    async (rowsToImport?: CompanyImportRow[]) => {
+      if (!result) return;
 
-    let imported = 0;
-    let duplicates = 0;
-    let failed = 0;
+      const targets = rowsToImport ?? result.invalidRows;
+      if (targets.length === 0) return;
 
-    for (const row of [...result.invalidRows]) {
+      let imported = 0;
+      let duplicates = 0;
+      let failed = 0;
+
+      for (const row of [...targets]) {
       try {
         const response = await forceImportRow(row);
 
@@ -318,14 +322,19 @@ export function BulkCompanyImport() {
       }
     }
 
-    const parts: string[] = [];
-    if (imported > 0) parts.push(`${imported} imported`);
-    if (duplicates > 0) parts.push(`${duplicates} duplicate`);
-    if (failed > 0) parts.push(`${failed} failed`);
+      const parts: string[] = [];
+      if (imported > 0) parts.push(`${imported} imported`);
+      if (duplicates > 0) parts.push(`${duplicates} duplicate`);
+      if (failed > 0) parts.push(`${failed} failed`);
 
-    if (imported > 0) showSuccessToast(`Force import complete: ${parts.join(", ")}`);
-    else showErrorToast(`Force import: ${parts.join(", ")}`);
-  }, [result]);
+      if (imported > 0) {
+        showSuccessToast(`Force import complete: ${parts.join(", ")}`);
+      } else {
+        showErrorToast(`Force import: ${parts.join(", ")}`);
+      }
+    },
+    [result],
+  );
 
   const handleDoneImport = useCallback(() => {
     clearStoredResult();
@@ -509,8 +518,8 @@ export function BulkCompanyImport() {
 
   return (
     <div className="mx-auto flex min-h-full w-full flex-col gap-5 px-4 py-6 lg:px-6">
-      <Card className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <CardContent className="p-0">
+      <Card className="flex-1 rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <CardContent className="min-w-0 p-0">
           {/* Header */}
           <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -535,7 +544,7 @@ export function BulkCompanyImport() {
             </div>
           </div>
 
-          <div className="grid gap-5 px-5 py-5 sm:px-6 sm:py-6">
+          <div className="grid min-w-0 gap-5 px-5 py-5 sm:px-6 sm:py-6">
             {/* Upload area */}
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-950/40">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

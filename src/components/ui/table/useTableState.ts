@@ -1,6 +1,6 @@
 
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type {
   Column,
   FilterCondition,
@@ -22,12 +22,19 @@ import {
   parseDateRangeFilterValue,
   updateFilterGroup,
 } from "./utils";
+import {
+  DEFAULT_PAGE_SIZE,
+  getPageNumbers,
+  getPaginationRange,
+} from "@/lib/pagination";
+import type { ServerPaginationConfig } from "./types";
 
 interface UseTableStateOptions<T> {
   data: T[];
   columns: Column<T>[];
   title: string;
   initialRowsPerPage?: number;
+  serverPagination?: ServerPaginationConfig;
 }
 
 export interface UseTableStateReturn<T> {
@@ -63,6 +70,7 @@ export interface UseTableStateReturn<T> {
   paginatedData: T[];
   paginationStart: number;
   paginationEnd: number;
+  totalCount: number;
   activeFilterConditionCount: number;
   paginationContextKey: string;
   closeSearch: () => void;
@@ -77,7 +85,8 @@ export function useTableState<T>({
   data,
   columns,
   title,
-  initialRowsPerPage = 10,
+  initialRowsPerPage = DEFAULT_PAGE_SIZE,
+  serverPagination,
 }: UseTableStateOptions<T>): UseTableStateReturn<T> {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableElementRef = useRef<HTMLTableElement | null>(null);
@@ -92,15 +101,22 @@ export function useTableState<T>({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [rootFilterGate, setRootFilterGate] = useState<FilterGate>("AND");
   const [filterItems, setFilterItems] = useState<FilterItem[]>([]);
-  const [rowsPerPage, setRowsPerPage] = useState(initialRowsPerPage);
+  const [rowsPerPage, setRowsPerPageState] = useState(
+    serverPagination?.meta.per_page ?? initialRowsPerPage,
+  );
   const [pageState, setPageState] = useState<PageState>({
     page: 1,
     contextKey: "",
   });
 
   useEffect(() => {
-    setRowsPerPage(initialRowsPerPage);
-  }, [initialRowsPerPage]);
+    if (serverPagination) {
+      setRowsPerPageState(serverPagination.meta.per_page);
+      return;
+    }
+
+    setRowsPerPageState(initialRowsPerPage);
+  }, [initialRowsPerPage, serverPagination]);
 
   const selectableColumns = useMemo(
     () =>
@@ -285,36 +301,70 @@ export function useTableState<T>({
     ],
   );
 
-  const totalPages = Math.max(1, Math.ceil(processedData.length / rowsPerPage));
-  const currentPage =
-    pageState.contextKey === paginationContextKey ? pageState.page : 1;
-  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const totalPages = serverPagination
+    ? serverPagination.meta.total_pages
+    : Math.max(1, Math.ceil(processedData.length / rowsPerPage));
+  const currentPage = serverPagination
+    ? serverPagination.meta.current_page
+    : pageState.contextKey === paginationContextKey
+      ? pageState.page
+      : 1;
+  const safeCurrentPage = serverPagination
+    ? currentPage
+    : Math.min(currentPage, totalPages);
 
-  const pageNumbers = useMemo(() => {
-    const pages = new Set<number>([
-      1,
-      totalPages,
-      safeCurrentPage - 1,
-      safeCurrentPage,
-      safeCurrentPage + 1,
-    ]);
-    return Array.from(pages)
-      .filter((page) => page >= 1 && page <= totalPages)
-      .sort((left, right) => left - right);
-  }, [safeCurrentPage, totalPages]);
+  const pageNumbers = useMemo(
+    () => getPageNumbers(safeCurrentPage, totalPages),
+    [safeCurrentPage, totalPages],
+  );
 
   const paginatedData = useMemo(() => {
+    if (serverPagination) {
+      return processedData;
+    }
+
     const startIndex = (safeCurrentPage - 1) * rowsPerPage;
     return processedData.slice(startIndex, startIndex + rowsPerPage);
-  }, [processedData, rowsPerPage, safeCurrentPage]);
+  }, [processedData, rowsPerPage, safeCurrentPage, serverPagination]);
 
-  const paginationStart = processedData.length
-    ? (safeCurrentPage - 1) * rowsPerPage + 1
-    : 0;
-  const paginationEnd = Math.min(
-    safeCurrentPage * rowsPerPage,
-    processedData.length,
-  );
+  const paginationRange = serverPagination
+    ? getPaginationRange(serverPagination.meta, processedData.length)
+    : {
+        start: processedData.length ? (safeCurrentPage - 1) * rowsPerPage + 1 : 0,
+        end: Math.min(safeCurrentPage * rowsPerPage, processedData.length),
+      };
+  const paginationStart = paginationRange.start;
+  const paginationEnd = paginationRange.end;
+  const totalCount = serverPagination
+    ? serverPagination.meta.total_count
+    : processedData.length;
+
+  const setRowsPerPage: Dispatch<SetStateAction<number>> = (value) => {
+    if (serverPagination) {
+      const nextValue =
+        typeof value === "function" ? value(serverPagination.meta.per_page) : value;
+      serverPagination.onPerPageChange(nextValue);
+      return;
+    }
+
+    setRowsPerPageState(value);
+  };
+
+  const handleSetPageState: Dispatch<SetStateAction<PageState>> = (value) => {
+    if (serverPagination) {
+      const nextState =
+        typeof value === "function"
+          ? value({
+              page: serverPagination.meta.current_page,
+              contextKey: paginationContextKey,
+            })
+          : value;
+      serverPagination.onPageChange(nextState.page);
+      return;
+    }
+
+    setPageState(value);
+  };
 
   const activeFilterConditionCount =
     countActiveFilterItems(filterItems) + Number(Boolean(filterSearch.trim()));
@@ -450,13 +500,14 @@ export function useTableState<T>({
     paginatedData,
     paginationStart,
     paginationEnd,
+    totalCount,
     activeFilterConditionCount,
     paginationContextKey,
     closeSearch,
     handlePrintPage,
     handlePrintData,
     handleExportSvg,
-    setPageState,
+    setPageState: handleSetPageState,
     appendFilterItemToGroup,
   };
 }

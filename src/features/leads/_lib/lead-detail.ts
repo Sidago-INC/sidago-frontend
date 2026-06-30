@@ -135,6 +135,37 @@ function getCallHistory(
   return state?.callHistory ?? state?.history;
 }
 
+export function directoryRowToFormState(row: LeadDirectoryRow): LeadDrawerFormState {
+  return {
+    companyName: row.companyName,
+    contactType: row.contactType,
+    fullName: row.fullName,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    role: row.role ?? "",
+    email: row.email,
+    phone: row.phone,
+    phoneExtension: row.phoneExtension,
+    notWorked: row.notWorked ?? false,
+    otherContacts: "",
+    svgLeadType: row.svgLeadType,
+    svgToBeCalledBy: row.svgToBeCalledBy,
+    svgHistoryCalls: "",
+    svgHistoryNotes: "",
+    svgToBeCalledOn: "",
+    bentonLeadType: row.bentonLeadType,
+    bentonToBeCalledBy: row.bentonToBeCalledBy,
+    bentonHistoryCalls: "",
+    bentonHistoryNotes: "",
+    bentonToBeCalledOn: "",
+    rm95LeadType: row.rm95LeadType,
+    rm95ToBeCalledBy: row.rm95ToBeCalledBy,
+    rm95HistoryCalls: "",
+    rm95HistoryNotes: "",
+    rm95ToBeCalledOn: "",
+  };
+}
+
 export function leadDetailToDirectoryRow(
   detail: LeadDetailPayload,
   fallback?: LeadDirectoryRow | null,

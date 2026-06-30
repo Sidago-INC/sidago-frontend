@@ -9,24 +9,9 @@ import { TableBody } from "./table/TableBody";
 import { TablePagination } from "./table/TablePagination";
 import { useTableState } from "./table/useTableState";
 
-export type { Column } from "./table/types";
-export type { TableProps } from "./table/types";
+export type { Column, ServerPaginationConfig, TableProps } from "./table/types";
 
-type Props<T> = {
-  data: T[];
-  columns: import("./table/types").Column<T>[];
-  isLoading?: boolean;
-  rowsPerPage?: number;
-  onRowsPerPageChange?: (rowsPerPage: number) => void;
-  emptyText?: string;
-  emptyState?: React.ReactNode;
-  showTableWhenEmpty?: boolean;
-  showToolbarTitle?: boolean;
-  headerContent?: React.ReactNode;
-  onRowClick?: (row: T) => void;
-  title: string;
-  description?: string;
-};
+type Props<T> = import("./table/types").TableProps<T>;
 
 const TOOLBAR_BUTTON_CLASS =
   "flex h-9 cursor-pointer items-center justify-center rounded-xl px-3 text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900";
@@ -40,6 +25,7 @@ export function Table<T>({
   isLoading,
   rowsPerPage: initialRowsPerPage,
   onRowsPerPageChange,
+  serverPagination,
   title,
   description,
   emptyText = "No data found",
@@ -54,6 +40,7 @@ export function Table<T>({
     columns,
     title,
     initialRowsPerPage,
+    serverPagination,
   });
 
   const {
@@ -87,6 +74,7 @@ export function Table<T>({
     paginatedData,
     paginationStart,
     paginationEnd,
+    totalCount,
     activeFilterConditionCount,
     paginationContextKey,
     closeSearch,
@@ -319,11 +307,11 @@ export function Table<T>({
         </table>
       </div>
 
-      {!groupedData && processedData.length > 0 && (
+      {!groupedData && (processedData.length > 0 || serverPagination) && (
         <TablePagination
           paginationStart={paginationStart}
           paginationEnd={paginationEnd}
-          totalCount={processedData.length}
+          totalCount={totalCount}
           rowsPerPage={rowsPerPage}
           setRowsPerPage={setRowsPerPage}
           pageNumbers={pageNumbers}

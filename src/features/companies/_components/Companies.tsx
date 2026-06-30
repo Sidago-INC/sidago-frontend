@@ -10,15 +10,13 @@ import { type COMPANY } from "@/types/company.types";
 import { TIMEZONE_OPTIONS, type TIMEZONE } from "@/types/timezone.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { CompanyDrawer } from "./CompanyDrawer";
 import {
   useCompanyOptions,
   useUpdateCompany,
   type CompanyRow,
 } from "../_lib/hooks";
-
-const DEFAULT_ROWS_PER_PAGE = 10;
-const COMPANY_GRID_FETCH_LIMIT = 500;
 
 type DrawerState = {
   isOpen: boolean;
@@ -93,9 +91,16 @@ const EMPTY_COMPANY: COMPANY = {
 
 export function Companies() {
   const [searchParams] = useSearchParams();
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data: rows, isLoading } = useCompanyOptions(COMPANY_GRID_FETCH_LIMIT);
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading } = useCompanyOptions(page, perPage);
   const updateCompany = useUpdateCompany();
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
 
   const [drawerState, setDrawerState] = useState<DrawerState>({
     isOpen: false,
@@ -106,7 +111,7 @@ export function Companies() {
     errors: {},
   });
 
-  const companies = useMemo(() => rows ?? [], [rows]);
+  const companies = useMemo(() => result?.data ?? [], [result?.data]);
 
   // ?company=<symbol> deep-link opens that company's drawer once data lands.
   useEffect(() => {
@@ -299,8 +304,7 @@ export function Companies() {
       <Table
         data={companies}
         columns={columns}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={setRowsPerPage}
+        serverPagination={serverPagination}
         title="Companies"
         description="Company market and contact profile"
         isLoading={isLoading}
@@ -314,7 +318,7 @@ export function Companies() {
         isOpen={drawerState.isOpen}
         mode="edit"
         currentIndex={currentIndex}
-        rowCount={companies.length}
+        rowCount={result?.meta.total_count ?? companies.length}
         errors={drawerState.errors}
         isSaving={updateCompany.isPending}
         onCancel={closeDrawer}

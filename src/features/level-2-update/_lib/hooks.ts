@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 import { usePaginatedSelectSource } from "@/lib/use-paginated-select-source";
 import { formatLeadDisplayTitle } from "@/features/agent-calls/_lib/utils";
 
@@ -27,10 +32,19 @@ export type BrandStatesResponse = {
   };
 };
 
-type LeadsResponse = { ok: true; count: number; data: LeadPickerRow[] };
+type LeadsResponse = {
+  ok: true;
+  data: LeadPickerRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
+};
 type AgentsResponse = { ok: true; count: number; data: AgentUser[] };
 
-const LEAD_PAGE_SIZE = 50;
+const LEAD_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 export async function fetchLeadsPage({
   limit = LEAD_PAGE_SIZE,
@@ -41,20 +55,15 @@ export async function fetchLeadsPage({
   page?: number;
   search?: string;
 }) {
-  const params = new URLSearchParams({
-    limit: String(limit),
-  });
-
-  if (page > 1) {
-    params.set("page", String(page));
-  }
+  const params = buildPaginationParams(page, limit);
 
   if (search?.trim()) {
     params.set("search", search.trim());
   }
 
   const json = (await api.get(`/leads?${params}`)) as LeadsResponse;
-  return { data: json.data, count: json.count };
+  const parsed = parsePaginatedResponse<LeadPickerRow>(json);
+  return { data: parsed.data, meta: parsed.meta };
 }
 
 function buildLeadSelectOptions(leads: LeadPickerRow[]) {
@@ -86,8 +95,9 @@ export function useLeadOptions() {
   return useQuery({
     queryKey: ["leads", "picker"],
     queryFn: async () => {
-      const json = (await api.get("/leads?limit=500")) as LeadsResponse;
-      return json.data;
+      const params = buildPaginationParams(1, DEFAULT_PAGE_SIZE);
+      const json = (await api.get(`/leads?${params}`)) as LeadsResponse;
+      return parsePaginatedResponse<LeadPickerRow>(json).data;
     },
     staleTime: 5 * 60_000,
   });

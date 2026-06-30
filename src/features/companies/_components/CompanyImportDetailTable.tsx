@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   CompanyImportResult,
   InvalidCompanyRow,
@@ -6,6 +6,7 @@ import type {
   DuplicateCompanyRow,
   CompanyImportRow,
 } from "@/types/company-import.types";
+import { isCompanyImportRowValid } from "@/lib/validation/company-import";
 import { ChevronDown, ChevronUp, Loader2, Save, Zap } from "lucide-react";
 
 type CompanyImportDetailTableProps = {
@@ -19,7 +20,7 @@ type CompanyImportDetailTableProps = {
     row: CompanyImportRow,
     sourceTab: string,
   ) => Promise<void>;
-  onForceImportAll?: () => Promise<void>;
+  onForceImportAll?: (rows: CompanyImportRow[]) => Promise<void>;
 };
 
 const FIELDS: { key: keyof CompanyImportRow; label: string }[] = [
@@ -42,6 +43,8 @@ const EDITABLE_FIELDS = FIELDS.filter((f) => f.key !== "rowNumber");
 
 function ExpandableRow({
   row,
+  draft,
+  onDraftChange,
   showReason,
   reason,
   editable,
@@ -51,6 +54,8 @@ function ExpandableRow({
   tab,
 }: {
   row: CompanyImportRow;
+  draft: CompanyImportRow;
+  onDraftChange: (row: CompanyImportRow) => void;
   showReason: boolean;
   reason: string;
   editable: boolean;
@@ -60,12 +65,12 @@ function ExpandableRow({
   tab: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [draft, setDraft] = useState<CompanyImportRow>({ ...row });
   const [saving, setSaving] = useState(false);
   const [forcing, setForcing] = useState(false);
+  const canForceImport = isCompanyImportRowValid(draft);
 
   const handleFieldChange = (key: keyof CompanyImportRow, value: string) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+    onDraftChange({ ...draft, [key]: value });
   };
 
   const handleUpdate = async (e: React.MouseEvent) => {
@@ -169,8 +174,8 @@ function ExpandableRow({
                   <button
                     type="button"
                     onClick={handleForce}
-                    disabled={saving || forcing}
-                    className="cursor-pointer inline-flex h-9 items-center gap-2 rounded bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                    disabled={!canForceImport || saving || forcing}
+                    className="cursor-pointer inline-flex h-9 items-center gap-2 rounded bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {forcing ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -307,17 +312,36 @@ export function CompanyImportDetailTable({
   onForceImportAll,
 }: CompanyImportDetailTableProps) {
   const [forcingAll, setForcingAll] = useState(false);
-  if (activeTab === "all") {
+  const [rowDrafts, setRowDrafts] = useState<Record<number, CompanyImportRow>>(
+    {},
+  );
+
+  const config = activeTab !== "all" ? tabConfig[activeTab] : null;
+  const rows = config ? getRowsForTab(result, activeTab) : [];
+
+  useEffect(() => {
+    if (rows.length === 0) {
+      setRowDrafts({});
+      return;
+    }
+
+    setRowDrafts(
+      Object.fromEntries(rows.map((row) => [row.rowNumber, { ...row }])),
+    );
+  }, [rows]);
+
+  if (activeTab === "all" || !config) {
     return null;
   }
 
-  const config = tabConfig[activeTab];
-  if (!config) return null;
-
-  const rows = getRowsForTab(result, activeTab);
   const showReason = activeTab !== "valid";
   const editable = activeTab === "invalid" || activeTab === "incomplete";
   const showForce = activeTab === "invalid";
+
+  const getDraft = (row: CompanyImportRow) => rowDrafts[row.rowNumber] ?? row;
+  const allRowsValid =
+    rows.length > 0 &&
+    rows.every((row) => isCompanyImportRowValid(getDraft(row)));
 
   if (rows.length === 0) {
     return (
@@ -336,7 +360,7 @@ export function CompanyImportDetailTable({
 
   return (
     <div
-      className={`overflow-x-auto rounded-xl border ${config.borderColor} ${config.bgColor}`}
+      className={`min-w-0 overflow-x-auto rounded-xl border ${config.borderColor} ${config.bgColor}`}
     >
       <div className="p-5 pb-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -355,16 +379,16 @@ export function CompanyImportDetailTable({
           {showForce && onForceImportAll && rows.length > 0 && (
             <button
               type="button"
-              disabled={forcingAll}
+              disabled={!allRowsValid || forcingAll}
               onClick={async () => {
                 setForcingAll(true);
                 try {
-                  await onForceImportAll();
+                  await onForceImportAll(rows.map((row) => getDraft(row)));
                 } finally {
                   setForcingAll(false);
                 }
               }}
-              className="cursor-pointer inline-flex h-9 shrink-0 items-center gap-2 rounded bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+              className="cursor-pointer inline-flex h-9 shrink-0 items-center gap-2 rounded bg-red-600 px-4 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {forcingAll ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -401,6 +425,13 @@ export function CompanyImportDetailTable({
               <ExpandableRow
                 key={row.rowNumber}
                 row={row}
+                draft={getDraft(row)}
+                onDraftChange={(updatedRow) =>
+                  setRowDrafts((current) => ({
+                    ...current,
+                    [row.rowNumber]: updatedRow,
+                  }))
+                }
                 showReason={showReason}
                 reason={getReasonForRow(activeTab, row)}
                 editable={editable}

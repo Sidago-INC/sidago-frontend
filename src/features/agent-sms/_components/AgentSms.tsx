@@ -6,6 +6,7 @@ import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   AgentSmsEditableTrigger,
   AgentSmsInlineTextCell,
@@ -97,7 +98,15 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     agentName: agentSlug,
     brand: "Sidago" as const,
   };
-  const { data: queueData, isLoading } = useSmsQueue(agentSlug);
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: queueData, isLoading } = useSmsQueue(agentSlug, page, perPage);
+  const serverPagination = queueData?.meta
+    ? {
+        meta: queueData.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
   const updateSmsState = useUpdateSmsState();
   const logSms = useLogSms();
   const apiRows = useMemo(
@@ -413,6 +422,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         data={rows}
         columns={columns}
         isLoading={isLoading}
+        serverPagination={serverPagination}
         title={`SMS - ${agentName}`}
         description="SMS activity and logs tied to assigned leads"
         emptyText="No SMS activity found for this agent."

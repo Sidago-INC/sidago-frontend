@@ -207,3 +207,61 @@ button[data-headlessui-state~="active"] {
 .react-datepicker-popper .react-datepicker {
   line-height: initial;
 }
+
+.dark .phone-input-field .form-control {
+  background-color: #1f2937;
+  border-color: #4b5563;
+  color: #e2e8f0;
+}
+
+.dark .phone-input-field .flag-dropdown {
+  background-color: #1f2937;
+  border-color: #4b5563;
+}
+
+.dark .phone-input-field .flag-dropdown.open,
+.dark .phone-input-field .flag-dropdown.open .selected-flag {
+  background-color: #1f2937;
+}
+
+.dark .phone-input-field .selected-flag:hover,
+.dark .phone-input-field .selected-flag:focus {
+  background-color: #334155;
+}
+
+.dark .phone-input-field .country-list {
+  background-color: #1f2937;
+  color: #e2e8f0;
+}
+
+.dark .phone-input-field .country-list .country:hover,
+.dark .phone-input-field .country-list .country.highlight {
+  background-color: #334155;
+}
+
+.dark .phone-input-field .country-list .search {
+  background-color: #1f2937;
+}
+
+.dark .phone-input-field .country-list .search-box {
+  background-color: #111827;
+  border-color: #4b5563;
+  color: #e2e8f0;
+}
+
+.dark .phone-input-field .country-list .country .dial-code {
+  color: #94a3b8;
+}
+
+.dark .phone-input-field .selected-flag .arrow {
+  border-top-color: #94a3b8;
+}
+
+.dark .phone-input-field .selected-flag .arrow.up {
+  border-bottom-color: #94a3b8;
+}
+
+.phone-input-field--error .form-control,
+.phone-input-field--error .flag-dropdown {
+  border-color: #ef4444;
+}

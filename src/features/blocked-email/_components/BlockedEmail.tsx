@@ -15,6 +15,7 @@ import {
 } from "@/lib/toast";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { BlockedEmailDrawer } from "./BlockedEmailDrawer";
 import {
   BlockedEmailRow,
@@ -23,12 +24,22 @@ import {
   useUnblockBlockedEmail,
 } from "../_lib/data";
 
-const DEFAULT_ROWS_PER_PAGE = 10;
+const DEFAULT_ROWS_PER_PAGE = 500;
 
 export function BlockedEmail() {
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data = [], isLoading, isError, error, refetch } =
-    useBlockedEmails(rowsPerPage);
+  const { page, perPage, setPage, setPerPage } = useServerPagination(
+    DEFAULT_ROWS_PER_PAGE,
+  );
+  const { data: result, isLoading, isError, error, refetch } =
+    useBlockedEmails(page, perPage);
+  const data = result?.data ?? [];
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
   const unblockMutation = useUnblockBlockedEmail();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
@@ -160,8 +171,7 @@ export function BlockedEmail() {
         data={data}
         columns={columns}
         isLoading={isLoading}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={setRowsPerPage}
+        serverPagination={serverPagination}
         title="Blocked Email"
         description="Review blocked email leads across all brands and unblock them when needed"
         emptyText="No blocked emails found."

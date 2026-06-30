@@ -1,6 +1,6 @@
 
 
-import { Card, CardContent, Select, TextInput } from "@/components/ui";
+import { Card, CardContent, PhoneInputField, Select, TextInput } from "@/components/ui";
 import { createLead } from "../_lib/hooks";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
@@ -11,7 +11,6 @@ import {
 import { useCompanyIdSelectSource } from "@/features/companies/_lib/hooks";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import PhoneInput from "react-phone-input-2";
 
 const blankForm: LeadCreateFormValues = {
   companyId: "",
@@ -175,40 +174,11 @@ export function AddLeadForm() {
                 error={errors.lastName}
                 className={inputClassName}
               />
-              <div className="flex w-full flex-col gap-1">
-                <label className="text-sm font-medium">Phone</label>
-                <PhoneInput
-                  country="us"
-                  enableSearch
-                  value={form.phone}
-                  onChange={(value) => updateField("phone", value ?? "")}
-                  inputClass={errors.phone ? "phone-error" : ""}
-                  inputStyle={{
-                    width: "100%",
-                    height: "40px",
-                    borderRadius: "0.375rem",
-                    borderColor: errors.phone ? "#ef4444" : "#d1d5db",
-                    fontSize: "0.875rem",
-                    color: "#334155",
-                    paddingLeft: "48px",
-                  }}
-                  buttonStyle={{
-                    borderTopLeftRadius: "0.375rem",
-                    borderBottomLeftRadius: "0.375rem",
-                    borderColor: errors.phone ? "#ef4444" : "#d1d5db",
-                    backgroundColor: "#ffffff",
-                  }}
-                  dropdownStyle={{
-                    color: "#0f172a",
-                  }}
-                  searchStyle={{
-                    width: "90%",
-                  }}
-                />
-                {errors.phone ? (
-                  <span className="text-xs text-red-500">{errors.phone}</span>
-                ) : null}
-              </div>
+              <PhoneInputField
+                value={form.phone}
+                onChange={(value) => updateField("phone", value)}
+                error={errors.phone}
+              />
               <TextInput
                 label="Phone Extension (optional)"
                 value={form.phoneExtension}

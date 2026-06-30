@@ -12,6 +12,7 @@ import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { LeadsDrawer } from "./LeadsDrawer";
 import { assigneeOptions, type LeadDirectoryRow } from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
@@ -19,7 +20,16 @@ import { useLeadsDirectory } from "../_lib/hooks";
 export function Leads() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
-  const { data: rows = [], isLoading } = useLeadsDirectory();
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading } = useLeadsDirectory(page, perPage);
+  const rows = result?.data ?? [];
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -118,6 +128,7 @@ export function Leads() {
         data={rows}
         columns={columns}
         isLoading={isLoading}
+        serverPagination={serverPagination}
         title="Leads"
         description="All lead records across SVG, Benton, and 95RM"
         onRowClick={(row) => {

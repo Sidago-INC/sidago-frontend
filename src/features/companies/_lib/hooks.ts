@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 import { usePaginatedSelectSource } from "@/lib/use-paginated-select-source";
 
 // Picker shape used by the Add Lead form's Company dropdown — the only
@@ -27,7 +32,16 @@ export type CompanyRow = CompanyPickerRow & {
   updatedAt: string | null;
 };
 
-type CompaniesResponse = { ok: true; count: number; data: CompanyRow[] };
+type CompaniesResponse = {
+  ok: true;
+  data: CompanyRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
+};
 
 type RawCompanyRow = Record<string, unknown> & {
   id?: string;
@@ -82,7 +96,7 @@ function normalizeCompaniesResponse(data: unknown[]) {
   return data.map((row) => normalizeCompanyRow(row as RawCompanyRow));
 }
 
-const COMPANY_PAGE_SIZE = 50;
+const COMPANY_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 const COMPANY_SEARCH_LIMIT = 20;
 
 export async function fetchCompaniesPage({
@@ -94,20 +108,18 @@ export async function fetchCompaniesPage({
   page?: number;
   search?: string;
 }) {
-  const params = new URLSearchParams({
-    limit: String(limit),
-  });
-
-  if (page > 1) {
-    params.set("page", String(page));
-  }
+  const params = buildPaginationParams(page, limit);
 
   if (search?.trim()) {
     params.set("search", search.trim());
   }
 
   const json = (await api.get(`/companies?${params}`)) as CompaniesResponse;
-  return { data: normalizeCompaniesResponse(json.data), count: json.count };
+  const parsed = parsePaginatedResponse<RawCompanyRow>(json);
+  return {
+    data: normalizeCompaniesResponse(parsed.data),
+    meta: parsed.meta,
+  };
 }
 
 export async function fetchCompaniesSearch({
@@ -129,7 +141,11 @@ export async function fetchCompaniesSearch({
   }
 
   const json = (await api.get(`/companies/search?${params}`)) as CompaniesResponse;
-  return { data: normalizeCompaniesResponse(json.data), count: json.count };
+  const parsed = parsePaginatedResponse<RawCompanyRow>(json);
+  return {
+    data: normalizeCompaniesResponse(parsed.data),
+    meta: parsed.meta,
+  };
 }
 
 export function parseCompanySymbolFromLabel(label: string): string | null {
@@ -218,7 +234,8 @@ export async function fetchCompanyBySymbol(
     limit: "20",
   });
   const json = (await api.get(`/companies/search?${params}`)) as CompaniesResponse;
-  const searchRows = normalizeCompaniesResponse(json.data);
+  const parsed = parsePaginatedResponse<RawCompanyRow>(json);
+  const searchRows = normalizeCompaniesResponse(parsed.data);
   const match = findCompanyBySymbol(symbol, searchRows);
 
   return match ?? null;
@@ -306,14 +323,19 @@ export function useCompanyIdSelectSource(
 // Companies list for picker dropdowns + the Companies directory. 5-min stale
 // time matches the lead picker — the company roster doesn't churn during a
 // working session.
-export function useCompanyOptions(limit = 2000) {
+export function useCompanyOptions(page: number, perPage = DEFAULT_PAGE_SIZE) {
   return useQuery({
-    queryKey: ["companies", "picker", limit],
+    queryKey: ["companies", "picker", page, perPage],
     queryFn: async () => {
+      const params = buildPaginationParams(page, perPage);
       const json = (await api.get(
-        `/companies?limit=${limit}`,
+        `/companies?${params.toString()}`,
       )) as CompaniesResponse;
-      return normalizeCompaniesResponse(json.data);
+      const parsed = parsePaginatedResponse<RawCompanyRow>(json);
+      return {
+        data: normalizeCompaniesResponse(parsed.data),
+        meta: parsed.meta,
+      };
     },
     staleTime: 5 * 60_000,
   });

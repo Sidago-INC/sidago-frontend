@@ -198,7 +198,7 @@ export function BulkLeadImport() {
             role: "Operations Manager",
             companySymbol: "NASDAQ:EXAMPLE",
             companyName: "Example Corp",
-            timezone: "EST",
+            timezone: "1-EST",
             country: "United States",
           },
         ],
@@ -207,10 +207,10 @@ export function BulkLeadImport() {
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full flex-col gap-5 px-4 py-6 lg:px-6">
-      <Card className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <CardContent className="p-0">
-          <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700 sm:px-6">
+    <div className="mx-auto flex h-full min-h-0 w-full flex-col px-4 py-6 lg:px-6">
+      <Card className="flex min-h-0 flex-1 flex-col rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+          <div className="shrink-0 border-b border-slate-200 px-5 py-4 dark:border-slate-700 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-2xl">
                 <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
@@ -232,7 +232,8 @@ export function BulkLeadImport() {
             </div>
           </div>
 
-          <div className="grid gap-5 px-5 py-5 sm:px-6 sm:py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="grid min-w-0 gap-5 px-5 py-5 sm:px-6 sm:py-6">
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 dark:border-slate-700 dark:bg-slate-950/40">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2">
@@ -308,6 +309,7 @@ export function BulkLeadImport() {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </CardContent>
       </Card>

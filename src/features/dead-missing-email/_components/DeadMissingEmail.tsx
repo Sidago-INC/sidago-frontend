@@ -1,7 +1,6 @@
 
 import {
   Badge,
-  BooleanCheckBadge,
   EmailLink,
   ErrorState,
   Table,
@@ -16,6 +15,7 @@ import {
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   getDeadEmailBrandLabel,
   getDeadEmailDisplayLeadId,
@@ -25,13 +25,23 @@ import {
 } from "../_lib/data";
 import { DeadMissingEmailDrawer } from "./DeadMissingEmailDrawer";
 
-const DEFAULT_ROWS_PER_PAGE = 10;
+const DEFAULT_ROWS_PER_PAGE = 500;
 
 export function DeadMissingEmail() {
   const [searchParams] = useSearchParams();
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data = [], isLoading, isError, error, refetch } =
-    useDeadMissingEmails(rowsPerPage);
+  const { page, perPage, setPage, setPerPage } = useServerPagination(
+    DEFAULT_ROWS_PER_PAGE,
+  );
+  const { data: result, isLoading, isError, error, refetch } =
+    useDeadMissingEmails(page, perPage);
+  const data = result?.data ?? [];
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
   const clearMutation = useClearDeadMissingEmail();
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
@@ -114,15 +124,6 @@ export function DeadMissingEmail() {
           ),
       },
       {
-        title: "Missing/Dead Email",
-        key: "missingDeadBrands",
-        getValue: (row) =>
-          row.missingDeadBrands.length > 0 ? "Yes" : "No",
-        render: (row) => (
-          <BooleanCheckBadge checked={row.missingDeadBrands.length > 0} />
-        ),
-      },
-      {
         title: "Flagged Brands",
         key: "flaggedBrands",
         getValue: (row) =>
@@ -177,8 +178,7 @@ export function DeadMissingEmail() {
         data={data}
         columns={columns}
         isLoading={isLoading}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={setRowsPerPage}
+        serverPagination={serverPagination}
         title="Dead/Missing Email"
         description="Review leads flagged with missing or dead emails across all brands"
         emptyText="No leads with dead or missing emails found."

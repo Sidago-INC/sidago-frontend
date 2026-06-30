@@ -1,4 +1,11 @@
 import type React from "react";
+import type { PaginationMeta } from "@/lib/pagination";
+
+export type ServerPaginationConfig = {
+  meta: PaginationMeta;
+  onPageChange: (page: number) => void;
+  onPerPageChange: (perPage: number) => void;
+};
 
 export type Column<T> = {
   key: keyof T | string;
@@ -15,6 +22,7 @@ export type TableProps<T> = {
   isLoading?: boolean;
   rowsPerPage?: number;
   onRowsPerPageChange?: (rowsPerPage: number) => void;
+  serverPagination?: ServerPaginationConfig;
   emptyText?: string;
   emptyState?: React.ReactNode;
   showTableWhenEmpty?: boolean;

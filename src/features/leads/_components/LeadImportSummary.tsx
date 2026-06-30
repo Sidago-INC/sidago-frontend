@@ -68,7 +68,7 @@ function SummaryCard({ label, count, color, icon, active, onClick }: SummaryCard
     <button
       type="button"
       onClick={onClick}
-      className={`min-w-[150px] shrink-0 flex-1 cursor-pointer rounded-lg border p-4 text-left transition ${c.border} ${active ? c.activeBg : c.bg}`}
+      className={`min-w-[150px] shrink-0 cursor-pointer rounded-lg border p-4 text-left transition ${c.border} ${active ? c.activeBg : c.bg}`}
     >
       <div className="flex items-center gap-2">
         {icon}
@@ -94,8 +94,8 @@ export function LeadImportSummary({ result, activeTab, onTabChange }: LeadImport
           {result.totalRows} total rows uploaded &middot; {result.importedCount} successfully imported
         </p>
       </div>
-      <div className="overflow-x-auto pb-2">
-        <div className="flex gap-3" style={{ minWidth: "1050px" }}>
+      <div className="min-w-0 overflow-x-auto pb-2">
+        <div className="flex w-max gap-3">
           <SummaryCard label="Total" count={result.totalRows} color="slate" icon={<Copy size={14} className="text-slate-500" />} active={activeTab === "all"} onClick={() => onTabChange("all")} />
           <SummaryCard label="Invalid" count={result.invalidCount} color="red" icon={<XCircle size={14} className="text-red-500" />} active={activeTab === "invalid"} onClick={() => onTabChange("invalid")} />
           <SummaryCard label="Incomplete" count={result.incompleteCount} color="amber" icon={<FileWarning size={14} className="text-amber-500" />} active={activeTab === "incomplete"} onClick={() => onTabChange("incomplete")} />

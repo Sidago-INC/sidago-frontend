@@ -231,7 +231,9 @@ export function LeadImportDetailTable({ result, activeTab, onUpdateRow, onForceI
   }
 
   return (
-    <div className={`overflow-x-auto rounded-xl border ${config.borderColor} ${config.bgColor}`}>
+    <div
+      className={`min-w-0 overflow-x-auto rounded-xl border ${config.borderColor} ${config.bgColor}`}
+    >
       <div className="p-5 pb-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -256,7 +258,7 @@ export function LeadImportDetailTable({ result, activeTab, onUpdateRow, onForceI
           )}
         </div>
       </div>
-      <div className="mt-4 px-5 pb-5">
+      <div className="mt-4 min-w-0 overflow-x-auto px-5 pb-5">
         <table className="w-max min-w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-700">

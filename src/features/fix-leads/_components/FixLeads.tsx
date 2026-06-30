@@ -1,13 +1,18 @@
 import { Wave } from "@/components/ui";
-import { useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { useFixQueue } from "../_lib/data";
 import { FixLeadsTable } from "./FixLeadsTable";
 
-const DEFAULT_ROWS_PER_PAGE = 10;
-
 export function FixLeads() {
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data, isLoading, isError, error } = useFixQueue(rowsPerPage);
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading, isError, error } = useFixQueue(page, perPage);
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -29,10 +34,9 @@ export function FixLeads() {
         </div>
       ) : (
         <FixLeadsTable
-          data={data ?? []}
+          data={result?.data ?? []}
           title="Fix Queue"
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={setRowsPerPage}
+          serverPagination={serverPagination}
         />
       )}
     </div>

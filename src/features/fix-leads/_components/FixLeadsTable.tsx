@@ -7,7 +7,7 @@ import {
   TypeBadge,
   Wave,
 } from "@/components/ui";
-import { type Column } from "@/components/ui/Table";
+import { type Column, type ServerPaginationConfig } from "@/components/ui/Table";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,8 +23,7 @@ import {
 type FixLeadsTableProps = {
   data: FixQueueRow[];
   title: string;
-  rowsPerPage: number;
-  onRowsPerPageChange: (rowsPerPage: number) => void;
+  serverPagination?: ServerPaginationConfig;
 };
 
 // "Fix" is a brand-scoped lead_type — covered by the existing LEAD_TYPE
@@ -48,8 +47,7 @@ function displaySymbol(row: FixQueueRow): string {
 export function FixLeadsTable({
   data,
   title,
-  rowsPerPage,
-  onRowsPerPageChange,
+  serverPagination,
 }: FixLeadsTableProps) {
   const navigate = useNavigate();
   const [contactsModalRow, setContactsModalRow] = useState<FixQueueRow | null>(
@@ -181,8 +179,7 @@ export function FixLeadsTable({
       <Table
         data={data}
         columns={columns}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={onRowsPerPageChange}
+        serverPagination={serverPagination}
         title={title}
         showToolbarTitle={false}
         description=""

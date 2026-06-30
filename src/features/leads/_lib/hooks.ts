@@ -3,6 +3,11 @@ import { parseCompanySymbolFromLabel } from "@/features/companies/_lib/hooks";
 import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
 import { createLeadDirectoryRow } from "@/features/leads/_lib/data";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 
 export type LeadPickerRow = {
   id: string;
@@ -12,7 +17,16 @@ export type LeadPickerRow = {
   label: string;
 };
 
-type LeadsResponse = { ok: true; count: number; data: LeadPickerRow[] };
+type LeadsResponse = {
+  ok: true;
+  data: LeadPickerRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
+};
 
 function pickerToDirectoryRow(row: LeadPickerRow): LeadDirectoryRow {
   const companyName = row.label.includes(" - ")
@@ -59,18 +73,26 @@ function pickerToDirectoryRow(row: LeadPickerRow): LeadDirectoryRow {
   );
 }
 
-export function useLeadsDirectory(limit = 500, search?: string) {
+export function useLeadsDirectory(
+  page: number,
+  perPage = DEFAULT_PAGE_SIZE,
+  search?: string,
+) {
   return useQuery({
-    queryKey: ["leads", "directory", limit, search ?? ""],
+    queryKey: ["leads", "directory", page, perPage, search ?? ""],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: String(limit) });
+      const params = buildPaginationParams(page, perPage);
       if (search?.trim()) {
         params.set("search", search.trim());
       }
       const json = (await api.get(
         `/leads?${params.toString()}`,
       )) as LeadsResponse;
-      return json.data.map(pickerToDirectoryRow);
+      const parsed = parsePaginatedResponse<LeadPickerRow>(json);
+      return {
+        data: parsed.data.map(pickerToDirectoryRow),
+        meta: parsed.meta,
+      };
     },
     staleTime: 60_000,
   });

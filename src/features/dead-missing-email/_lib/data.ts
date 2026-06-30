@@ -1,6 +1,11 @@
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 
 export type DeadMissingEmailRow = {
   leadId: string;
@@ -18,8 +23,13 @@ export type DeadMissingEmailRow = {
 
 type DeadEmailResponse = {
   ok: true;
-  count: number;
   data: DeadMissingEmailRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
 };
 
 type ClearDeadEmailResponse = {
@@ -44,14 +54,18 @@ export function getDeadEmailBrandLabel(brand: string): string {
   }
 }
 
-export function useDeadMissingEmails(limit: number) {
+export function useDeadMissingEmails(
+  page: number,
+  perPage = DEFAULT_PAGE_SIZE,
+) {
   return useQuery({
-    queryKey: ["dead-missing-email", limit],
+    queryKey: ["dead-missing-email", page, perPage],
     queryFn: async () => {
+      const params = buildPaginationParams(page, perPage);
       const json = (await api.get(
-        `/dead-email?limit=${limit}`,
+        `/dead-email?${params.toString()}`,
       )) as DeadEmailResponse;
-      return json.data;
+      return parsePaginatedResponse<DeadMissingEmailRow>(json);
     },
     staleTime: 60_000,
   });

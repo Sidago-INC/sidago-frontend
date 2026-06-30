@@ -48,7 +48,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "ZCL",
     name: "ZenithCore Labs",
-    timezone: "3-MST",
+    timezone: "5-INTL",
     country: "Canada",
     description: "Applied research lab focused on customer intelligence.",
     estimatedMarketCap: "$920M",
@@ -76,7 +76,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "SBI",
     name: "SkyBridge Innovations",
-    timezone: "5-GMT",
+    timezone: "5-INTL",
     country: "United Kingdom",
     description: "Cross-border payment and compliance products.",
     estimatedMarketCap: "$3.1B",
@@ -90,7 +90,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "PFT",
     name: "PixelForge Technologies",
-    timezone: "6-UTC",
+    timezone: "5-INTL",
     country: "Ireland",
     description: "Creative operations software for distributed media teams.",
     estimatedMarketCap: "$760M",
@@ -104,7 +104,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "QLS",
     name: "QuantumLeaf Systems",
-    timezone: "8-IST",
+    timezone: "5-INTL",
     country: "India",
     description: "Supply chain planning tools for food and retail brands.",
     estimatedMarketCap: "$1.2B",
@@ -118,7 +118,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "HPW",
     name: "Hyperion Works",
-    timezone: "9-JST",
+    timezone: "5-INTL",
     country: "Japan",
     description: "Robotics coordination software for logistics networks.",
     estimatedMarketCap: "$5.6B",
@@ -132,7 +132,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "CBC",
     name: "CrystalByte Corp",
-    timezone: "10-AEST",
+    timezone: "5-INTL",
     country: "Australia",
     description: "Secure storage and backup products for small businesses.",
     estimatedMarketCap: "$640M",

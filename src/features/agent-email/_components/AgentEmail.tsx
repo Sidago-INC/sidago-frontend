@@ -3,9 +3,11 @@
 import { EmailPriorityBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { getCallBackDateError } from "@/features/agent-calls/_lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { AgentEmailDrawer } from "./AgentEmailDrawer";
 import {
   AgentEmailBooleanEditor,
@@ -25,6 +27,7 @@ import {
   useLogEmail,
   useEmailQueue,
   useUpdateEmailState,
+  useLogCallResult,
 } from "../_lib/hooks";
 
 type AgentEmailProps = {
@@ -98,9 +101,18 @@ function LeadButton({
 
 export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
   const [searchParams] = useSearchParams();
-  const { data: queueData, isLoading } = useEmailQueue(agentSlug);
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: queueData, isLoading } = useEmailQueue(agentSlug, page, perPage);
+  const serverPagination = queueData?.meta
+    ? {
+        meta: queueData.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
   const updateEmailState = useUpdateEmailState();
   const logEmail = useLogEmail();
+  const logCallResult = useLogCallResult(agentSlug);
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
@@ -415,6 +427,48 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     }));
   };
 
+  const handleOutcome = async (resultCode: string) => {
+    if (!drawerState.draft || logCallResult.isPending) {
+      return;
+    }
+
+    const row = drawerState.draft;
+    const callbackError = getCallBackDateError(
+      row.callBackDate,
+      row.lastActionDate ?? "",
+    );
+    if (callbackError) {
+      showErrorToast(callbackError);
+      return;
+    }
+
+    try {
+      await logCallResult.mutateAsync({
+        agentSlug,
+        leadId: row.leadId,
+        resultCode,
+        notes: row.notes || undefined,
+        followUpDate: row.callBackDate || undefined,
+        source: "manual",
+      });
+
+      showSuccessToast("Call outcome logged successfully.");
+
+      const rowIndex = rows.findIndex((item) => item.id === row.id);
+      const nextRows = rows.filter((item) => item.id !== row.id);
+      setRows(nextRows);
+
+      if (nextRows.length === 0) {
+        closeDrawer();
+        return;
+      }
+
+      openDrawerAtIndex(Math.min(rowIndex, nextRows.length - 1));
+    } catch (error) {
+      showErrorToast(error);
+    }
+  };
+
   const saveDraft = async () => {
     if (!drawerState.draft) {
       return;
@@ -461,6 +515,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         data={rows}
         columns={columns}
         isLoading={isLoading}
+        serverPagination={serverPagination}
         title={`Email - ${agentName}`}
         description="Prioritized emails to be sent by agent"
         emptyText="No emails are queued for this agent."
@@ -476,6 +531,8 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         onNavigate={openDrawerAtIndex}
         onReset={resetDraft}
         onSave={saveDraft}
+        onOutcomeSelect={handleOutcome}
+        outcomeLoading={logCallResult.isPending}
       />
     </div>
   );

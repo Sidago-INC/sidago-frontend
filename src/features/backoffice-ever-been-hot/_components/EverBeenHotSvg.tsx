@@ -1,11 +1,17 @@
 
 
 import React from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { useEverBeenHot } from "../_lib/use-ever-been-hot";
 import { EverBeenHotTable } from "./EverBeenHotTable";
 
 export function EverBeenHotSvg() {
-  const { data, isLoading, isError, error } = useEverBeenHot("svg");
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading, isError, error } = useEverBeenHot(
+    "svg",
+    page,
+    perPage,
+  );
 
   if (isLoading) {
     return (
@@ -25,7 +31,16 @@ export function EverBeenHotSvg() {
 
   return (
     <EverBeenHotTable
-      data={data ?? []}
+      data={result?.data ?? []}
+      serverPagination={
+        result?.meta
+          ? {
+              meta: result.meta,
+              onPageChange: setPage,
+              onPerPageChange: setPerPage,
+            }
+          : undefined
+      }
       title="Ever Been Hot - SVG"
       variant="svg"
     />

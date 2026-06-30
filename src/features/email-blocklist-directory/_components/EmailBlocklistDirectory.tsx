@@ -7,6 +7,7 @@ import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 import {
   getBrandLabel,
@@ -16,7 +17,7 @@ import {
 } from "../_lib/data";
 import { EmailBlocklistDirectoryDrawer } from "./EmailBlocklistDirectoryDrawer";
 
-const DEFAULT_ROWS_PER_PAGE = 10;
+const DEFAULT_ROWS_PER_PAGE = 500;
 
 function HistoryCell({ count }: { count: number }) {
   return (
@@ -32,9 +33,19 @@ function HistoryCell({ count }: { count: number }) {
 export function EmailBlocklistDirectory() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data = [], isLoading, isError, error, refetch } =
-    useEmailBlacklistDirectory(rowsPerPage);
+  const { page, perPage, setPage, setPerPage } = useServerPagination(
+    DEFAULT_ROWS_PER_PAGE,
+  );
+  const { data: result, isLoading, isError, error, refetch } =
+    useEmailBlacklistDirectory(page, perPage);
+  const data = result?.data ?? [];
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
   const [filters, setFilters] = useState({
     svgLeadType: "",
     bentonLeadType: "",
@@ -196,8 +207,7 @@ export function EmailBlocklistDirectory() {
         isLoading={isLoading}
         data={filteredRows}
         columns={columns}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={setRowsPerPage}
+        serverPagination={serverPagination}
         title="Email Blocklist Directory"
         description="Review leads blacklisted by terminal lead type across all brands"
         emptyText={

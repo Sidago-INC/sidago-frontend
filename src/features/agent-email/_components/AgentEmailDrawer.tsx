@@ -48,6 +48,8 @@ type AgentEmailDrawerProps = {
   onNavigate: (index: number) => void;
   onReset: () => void;
   onSave: () => void;
+  onOutcomeSelect: (resultCode: string) => void;
+  outcomeLoading?: boolean;
 };
 
 function escapeHtml(value: string) {
@@ -188,6 +190,8 @@ export function AgentEmailDrawer({
   onNavigate,
   onReset,
   onSave,
+  onOutcomeSelect,
+  outcomeLoading = false,
 }: AgentEmailDrawerProps) {
   const [copied, setCopied] = useState(false);
   const [callBackDateError, setCallBackDateError] = useState<string>();
@@ -531,8 +535,9 @@ export function AgentEmailDrawer({
                   key={outcome.label}
                   label={outcome.label}
                   icon={outcome.icon}
-                  onClick={() => onChange("selectedOutcome", outcome.label)}
+                  onClick={() => onOutcomeSelect(outcome.label)}
                   className={outcome.className}
+                  disabled={outcomeLoading}
                 />
               ))}
             </div>

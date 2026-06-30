@@ -1,16 +1,22 @@
 
-
 import { CampaignBadge, Table, TypeBadge } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
-import { useMemo, useState } from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
+import { useMemo } from "react";
 import type { Level2HistoryRow } from "../_lib/data";
 import { useLevel2History } from "../_lib/hooks";
 
-const DEFAULT_ROWS_PER_PAGE = 10;
-
 export function Level2History() {
-  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
-  const { data, isLoading } = useLevel2History(rowsPerPage);
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading } = useLevel2History(page, perPage);
+  const data = result?.data ?? [];
+  const serverPagination = result?.meta
+    ? {
+        meta: result.meta,
+        onPageChange: setPage,
+        onPerPageChange: setPerPage,
+      }
+    : undefined;
 
   const columns = useMemo<Column<Level2HistoryRow>[]>(
     () => [
@@ -47,13 +53,12 @@ export function Level2History() {
   return (
     <div className="min-h-full">
       <Table
-        data={data ?? []}
+        data={data}
         columns={columns}
         isLoading={isLoading}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={setRowsPerPage}
+        serverPagination={serverPagination}
         title="Level 2 History"
-        description="Review historical Level 2 updates and lead type changes"
+        description="Previously logged Level 2 updates"
       />
     </div>
   );

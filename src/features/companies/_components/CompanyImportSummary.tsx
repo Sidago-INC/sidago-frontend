@@ -72,7 +72,7 @@ function SummaryCard({
     <button
       type="button"
       onClick={onClick}
-      className={`min-w-[180px] shrink-0 flex-1 cursor-pointer rounded-lg border p-4 text-left transition ${c.border} ${active ? c.activeBg : c.bg}`}
+      className={`min-w-[180px] shrink-0 cursor-pointer rounded-lg border p-4 text-left transition ${c.border} ${active ? c.activeBg : c.bg}`}
     >
       <div className="flex items-center gap-2">
         {icon}
@@ -110,8 +110,8 @@ export function CompanyImportSummary({
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="flex gap-3" style={{ minWidth: "900px" }}>
+      <div className="min-w-0 overflow-x-auto pb-2">
+        <div className="flex w-max gap-3">
         <SummaryCard
           label="Total Rows"
           count={result.totalRows}

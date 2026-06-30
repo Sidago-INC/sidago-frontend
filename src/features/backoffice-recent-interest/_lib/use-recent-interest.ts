@@ -2,6 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import {
+  buildPaginationParams,
+  DEFAULT_PAGE_SIZE,
+  parsePaginatedResponse,
+} from "@/lib/pagination";
 import { resolveLeadTimezone, stripTimezonePrefix } from "@/types/timezone.types";
 import type { RecentInterestRow } from "./data";
 
@@ -22,7 +27,16 @@ type ApiRecentInterestRow = RecentInterestRow & {
   } | null;
 };
 
-type ApiResponse = { ok: true; count: number; data: ApiRecentInterestRow[] };
+type ApiResponse = {
+  ok: true;
+  data: ApiRecentInterestRow[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+  };
+};
 
 function normalizeRecentInterestRow(raw: ApiRecentInterestRow): RecentInterestRow {
   const companyName =
@@ -59,15 +73,30 @@ function normalizeRecentInterestRow(raw: ApiRecentInterestRow): RecentInterestRo
   };
 }
 
-async function fetchRecentInterest(brand: Brand): Promise<RecentInterestRow[]> {
-  const json = (await api.get(`/reports/recent-interest?brand=${brand}`)) as ApiResponse;
-  return json.data.map(normalizeRecentInterestRow);
+async function fetchRecentInterest(
+  brand: Brand,
+  page: number,
+  perPage: number,
+) {
+  const params = buildPaginationParams(page, perPage, { brand });
+  const json = (await api.get(
+    `/reports/recent-interest?${params.toString()}`,
+  )) as ApiResponse;
+  const parsed = parsePaginatedResponse<ApiRecentInterestRow>(json);
+  return {
+    data: parsed.data.map(normalizeRecentInterestRow),
+    meta: parsed.meta,
+  };
 }
 
-export function useRecentInterest(brand: Brand) {
+export function useRecentInterest(
+  brand: Brand,
+  page: number,
+  perPage = DEFAULT_PAGE_SIZE,
+) {
   return useQuery({
-    queryKey: ["recent-interest", brand],
-    queryFn: () => fetchRecentInterest(brand),
+    queryKey: ["recent-interest", brand, page, perPage],
+    queryFn: () => fetchRecentInterest(brand, page, perPage),
     staleTime: 30_000,
   });
 }

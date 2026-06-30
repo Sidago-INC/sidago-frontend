@@ -4,9 +4,11 @@ import { useMemo } from "react";
 import ReactSelect, {
   type FilterOptionOption,
   type SingleValue,
+  type StylesConfig,
 } from "react-select";
 import countryList from "react-select-country-list";
 import { optionMatchesSelectSearch } from "@/lib/select-search";
+import { useTheme } from "@/providers/ThemeProvider";
 
 type CountryOption = {
   label: string;
@@ -21,6 +23,98 @@ type CountryPickerProps = {
   onChange: (value: string) => void;
 };
 
+function getCountryPickerStyles(
+  isDark: boolean,
+  error?: string,
+): StylesConfig<CountryOption, false> {
+  const colors = isDark
+    ? {
+        controlBg: "#1f2937",
+        controlBorder: error ? "#ef4444" : "#4b5563",
+        text: "#e2e8f0",
+        placeholder: "#64748b",
+        menuBg: "#1f2937",
+        optionText: "#e2e8f0",
+        optionFocusedBg: "#334155",
+        optionDefaultBg: "#1f2937",
+        indicator: "#94a3b8",
+        separator: "#4b5563",
+      }
+    : {
+        controlBg: "#ffffff",
+        controlBorder: error ? "#ef4444" : "#d1d5db",
+        text: "#334155",
+        placeholder: "#94a3b8",
+        menuBg: "#ffffff",
+        optionText: "#0f172a",
+        optionFocusedBg: "#eff6ff",
+        optionDefaultBg: "#ffffff",
+        indicator: "#64748b",
+        separator: "#e2e8f0",
+      };
+
+  return {
+    control: (base) => ({
+      ...base,
+      minHeight: 40,
+      borderRadius: 6,
+      backgroundColor: colors.controlBg,
+      borderColor: colors.controlBorder,
+      boxShadow: "none",
+      "&:hover": {
+        borderColor: colors.controlBorder,
+      },
+    }),
+    valueContainer: (base) => ({
+      ...base,
+      paddingTop: 0,
+      paddingBottom: 0,
+    }),
+    input: (base) => ({
+      ...base,
+      margin: 0,
+      padding: 0,
+      color: colors.text,
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: colors.text,
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: colors.placeholder,
+    }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: colors.menuBg,
+      color: colors.text,
+      zIndex: 50,
+    }),
+    menuList: (base) => ({
+      ...base,
+      padding: 4,
+    }),
+    option: (base, state) => ({
+      ...base,
+      color: state.isSelected ? "#ffffff" : colors.optionText,
+      backgroundColor: state.isSelected
+        ? "#2563eb"
+        : state.isFocused
+          ? colors.optionFocusedBg
+          : colors.optionDefaultBg,
+      cursor: "pointer",
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      color: colors.indicator,
+    }),
+    indicatorSeparator: (base) => ({
+      ...base,
+      backgroundColor: colors.separator,
+    }),
+  };
+}
+
 // react-select inherits text colour from the parent. Inside the dark-themed
 // app shell the cascading `text-slate-200` rule was making the menu options
 // nearly invisible on the white menu background in light mode. We pin every
@@ -33,6 +127,9 @@ export function CountryPicker({
   value,
   onChange,
 }: CountryPickerProps) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   const countryOptions = useMemo<CountryOption[]>(
     () =>
       countryList()
@@ -46,6 +143,11 @@ export function CountryPicker({
 
   const selectedCountry =
     countryOptions.find((option) => option.value === value) ?? null;
+
+  const styles = useMemo(
+    () => getCountryPickerStyles(isDark, error),
+    [isDark, error],
+  );
 
   return (
     <div className="flex w-full flex-col gap-1">
@@ -70,63 +172,7 @@ export function CountryPicker({
         }
         className="text-sm"
         menuPlacement="auto"
-        styles={{
-          control: (base, _state) => ({
-            ...base,
-            minHeight: 40,
-            borderRadius: 6,
-            backgroundColor: "#ffffff",
-            borderColor: error ? "#ef4444" : "#d1d5db",
-            boxShadow: "none",
-          }),
-          valueContainer: (base) => ({
-            ...base,
-            paddingTop: 0,
-            paddingBottom: 0,
-          }),
-          input: (base) => ({
-            ...base,
-            margin: 0,
-            padding: 0,
-            color: "#0f172a",
-          }),
-          singleValue: (base) => ({
-            ...base,
-            color: "#0f172a",
-          }),
-          placeholder: (base) => ({
-            ...base,
-            color: "#94a3b8",
-          }),
-          menu: (base) => ({
-            ...base,
-            backgroundColor: "#ffffff",
-            color: "#0f172a",
-            zIndex: 50,
-          }),
-          menuList: (base) => ({
-            ...base,
-            padding: 4,
-          }),
-          option: (base, state) => ({
-            ...base,
-            color: state.isSelected ? "#ffffff" : "#0f172a",
-            backgroundColor: state.isSelected
-              ? "#2563eb"
-              : state.isFocused
-                ? "#eff6ff"
-                : "#ffffff",
-            cursor: "pointer",
-          }),
-          dropdownIndicator: (base) => ({
-            ...base,
-            color: "#64748b",
-          }),
-          indicatorSeparator: (base) => ({
-            ...base,
-            backgroundColor: "#e2e8f0",
-          }),
-        }}
+        styles={styles}
       />
       {error ? <span className="text-xs text-red-500">{error}</span> : null}
     </div>

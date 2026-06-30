@@ -232,7 +232,8 @@ export function CurrentlyHotDrawer({
     extraCompanyOptions,
     drawerOpen,
   );
-  const { data: allCompanies = [] } = useCompanyOptions();
+  const { data: companyResult } = useCompanyOptions(1);
+  const allCompanies = companyResult?.data ?? [];
   const companyOptions = useMemo(() => {
     const currentName = form?.companyName?.trim();
     if (!currentName || !pinnedCompanyOption) {

@@ -1,11 +1,17 @@
 
 
 import React from "react";
+import { useServerPagination } from "@/lib/use-server-pagination";
 import { useRecentInterest } from "../_lib/use-recent-interest";
 import { RecentInterestTable } from "./RecentInterestTable";
 
 export function RecentInterest95rm() {
-  const { data, isLoading, isError, error } = useRecentInterest("95rm");
+  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const { data: result, isLoading, isError, error } = useRecentInterest(
+    "95rm",
+    page,
+    perPage,
+  );
 
   if (isLoading) {
     return (
@@ -24,6 +30,19 @@ export function RecentInterest95rm() {
   }
 
   return (
-    <RecentInterestTable data={data ?? []} title="Recent Interest - 95RM" brand="95rm" />
+    <RecentInterestTable
+      data={result?.data ?? []}
+      serverPagination={
+        result?.meta
+          ? {
+              meta: result.meta,
+              onPageChange: setPage,
+              onPerPageChange: setPerPage,
+            }
+          : undefined
+      }
+      title="Recent Interest - 95RM"
+      brand="95rm"
+    />
   );
 }

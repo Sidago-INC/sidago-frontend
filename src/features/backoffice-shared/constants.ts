@@ -24,9 +24,7 @@ export const assigneeOptions = [
   "Tanvir",
 ];
 
-export const timezoneOptions = TIMEZONE_OPTIONS.map((option) =>
-  option.value.replace(/^\d+-/, ""),
-);
+export const timezoneOptions = TIMEZONE_OPTIONS;
 
 export function getCompanySymbol(companyName: string): string {
   const words = companyName

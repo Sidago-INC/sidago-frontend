@@ -1,11 +1,15 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
+import {
+  DEFAULT_PAGE_SIZE,
+  type PaginationMeta,
+} from "@/lib/pagination";
 import { filterSelectOptions } from "@/lib/select-search";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 type PaginatedFetchResult<T> = {
   data: T[];
-  count: number;
+  meta: PaginationMeta;
 };
 
 type UsePaginatedSelectSourceOptions<
@@ -35,7 +39,7 @@ export function usePaginatedSelectSource<
   O extends { label: string; value: string | number },
 >({
   queryKeyPrefix,
-  pageSize = 50,
+  pageSize = DEFAULT_PAGE_SIZE,
   fetchPage,
   fetchSearchPage,
   searchPageSize,
@@ -54,7 +58,7 @@ export function usePaginatedSelectSource<
         0,
       );
 
-      if (lastPage.count > 0 && loaded < lastPage.count) {
+      if (lastPage.meta.total_count > 0 && loaded < lastPage.meta.total_count) {
         return allPages.length + 1;
       }
 
@@ -74,7 +78,7 @@ export function usePaginatedSelectSource<
         0,
       );
 
-      if (lastPage.count > 0 && loaded < lastPage.count) {
+      if (lastPage.meta.total_count > 0 && loaded < lastPage.meta.total_count) {
         return allPages.length + 1;
       }
 
