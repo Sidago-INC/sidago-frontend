@@ -30,11 +30,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { useRelatedLeads } from "@/features/fix-leads/_lib/data";
+import { AssociatedContactsSection } from "./AssociatedContacts";
 import {
   directoryRowToFormState,
+  relatedLeadToDirectoryRow,
   type LeadDrawerFormState,
 } from "../_lib/lead-detail";
 import { type LeadDirectoryRow } from "../_lib/data";
+import type { RelatedLead } from "@/features/fix-leads/_lib/data";
+
+const NESTED_DRAWER_Z = 210;
 
 type LeadsDrawerProps = {
   data: LeadDirectoryRow[];
@@ -42,6 +48,10 @@ type LeadsDrawerProps = {
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number | null) => void;
   onClose: () => void;
+  nested?: boolean;
+  zIndex?: number;
+  onAssociatedContactSelect?: (contact: RelatedLead) => void;
+  activeAssociatedContactId?: string | null;
 };
 
 const iconClass = "w-4 h-4 stroke-[2]";
@@ -91,6 +101,10 @@ export function LeadsDrawer({
   selectedIndex,
   onSelectedIndexChange,
   onClose,
+  nested = false,
+  zIndex,
+  onAssociatedContactSelect,
+  activeAssociatedContactId,
 }: LeadsDrawerProps) {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
@@ -100,6 +114,7 @@ export function LeadsDrawer({
   const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
     useState<string>();
   const [rm95ToBeCalledOnError, setRm95ToBeCalledOnError] = useState<string>();
+  const [nestedContact, setNestedContact] = useState<RelatedLead | null>(null);
   const [editModeKey, setEditModeKey] = useState<string | null>(null);
   const [formState, setFormState] = useState<{
     key: string;
@@ -114,6 +129,7 @@ export function LeadsDrawer({
   const rowKey = row?.leadId ?? row?.email ?? "";
   const drawerOpen = row !== null && selectedIndex !== null;
   const displayRow = row;
+  const relatedQuery = useRelatedLeads(drawerOpen ? row?.leadId : null);
   const isEditMode = rowKey !== "" && editModeKey === rowKey;
   const initialForm = useMemo(
     () => (row ? directoryRowToFormState(row) : null),
@@ -201,6 +217,7 @@ export function LeadsDrawer({
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
     setRm95ToBeCalledOnError(undefined);
+    setNestedContact(null);
   }, [rowKey]);
 
   if (!row || selectedIndex === null || !form || !displayRow) return null;
@@ -221,37 +238,41 @@ export function LeadsDrawer({
   ) => (
     <div className="flex w-full items-center justify-between gap-4">
       <div className="flex items-center gap-2">
-        <button
-          onClick={() =>
-            onSelectedIndexChange(Math.max(0, selectedIndex - 1))
-          }
-          disabled={selectedIndex <= 0}
-          className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <ChevronUp
-            className={`${iconClass} group-hover:-translate-y-0.5 transition`}
-          />
-        </button>
-        <button
-          onClick={() =>
-            onSelectedIndexChange(
-              Math.min(data.length - 1, selectedIndex + 1),
-            )
-          }
-          disabled={selectedIndex >= data.length - 1}
-          className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-        >
-          <ChevronDown
-            className={`${iconClass} group-hover:translate-y-0.5 transition`}
-          />
-        </button>
+        {!nested ? (
+          <>
+            <button
+              onClick={() =>
+                onSelectedIndexChange(Math.max(0, selectedIndex - 1))
+              }
+              disabled={selectedIndex <= 0}
+              className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <ChevronUp
+                className={`${iconClass} group-hover:-translate-y-0.5 transition`}
+              />
+            </button>
+            <button
+              onClick={() =>
+                onSelectedIndexChange(
+                  Math.min(data.length - 1, selectedIndex + 1),
+                )
+              }
+              disabled={selectedIndex >= data.length - 1}
+              className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <ChevronDown
+                className={`${iconClass} group-hover:translate-y-0.5 transition`}
+              />
+            </button>
+          </>
+        ) : null}
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
             {getLeadGridLabel(title)}
           </p>
         </div>
       </div>
-      {actionsEnabled ? (
+      {actionsEnabled && !nested ? (
         <div className="flex items-center gap-2">
           <button
             onClick={handlePrint}
@@ -304,6 +325,15 @@ export function LeadsDrawer({
     setBentonToBeCalledOnError(undefined);
     setRm95ToBeCalledOnError(undefined);
   };
+
+  const handleAssociatedContactClick = (contact: RelatedLead) => {
+    if (nested) {
+      onAssociatedContactSelect?.(contact);
+      return;
+    }
+    setNestedContact(contact);
+  };
+
   const handleSave = async () => {
     if (!row || !form || !initialForm) return;
 
@@ -424,11 +454,13 @@ export function LeadsDrawer({
   };
 
   return (
+    <>
     <Drawer
       isOpen={selectedIndex !== null}
       onClose={onClose}
       direction="right"
       size="560px"
+      zIndex={zIndex}
       header={renderDrawerHeader({
         companySymbol: displayCompanySymbol,
         companyName: form.companyName,
@@ -610,28 +642,31 @@ export function LeadsDrawer({
           agentsLoading={rm95AgentsQuery.isLoading}
         />
 
-        <DetailCard label="Associated Contacts">
-          <DetailCard label={form.companyName}>
-            <AssociationDetail
-              label="Contact Type"
-              value={<TypeBadge value={form.contactType} kind="contact" />}
-            />
-            <AssociationDetail
-              label="SVG Lead Type"
-              value={<TypeBadge value={form.svgLeadType} kind="lead" />}
-            />
-            <AssociationDetail
-              label="Benton Lead Type"
-              value={<TypeBadge value={form.bentonLeadType} kind="lead" />}
-            />
-            <AssociationDetail
-              label="95RM Lead Type"
-              value={<TypeBadge value={form.rm95LeadType} kind="lead" />}
-            />
-          </DetailCard>
-        </DetailCard>
+        <AssociatedContactsSection
+          key={rowKey}
+          isLoading={relatedQuery.isLoading}
+          isError={relatedQuery.isError}
+          contacts={relatedQuery.data ?? []}
+          onContactClick={handleAssociatedContactClick}
+          activeContactId={activeAssociatedContactId ?? (nested ? row.leadId : null)}
+        />
       </div>
     </Drawer>
+
+    {!nested && nestedContact ? (
+      <LeadsDrawer
+        key={nestedContact.id}
+        nested
+        zIndex={NESTED_DRAWER_Z}
+        data={[relatedLeadToDirectoryRow(nestedContact)]}
+        selectedIndex={0}
+        onSelectedIndexChange={() => {}}
+        onClose={() => setNestedContact(null)}
+        onAssociatedContactSelect={(contact) => setNestedContact(contact)}
+        activeAssociatedContactId={nestedContact.id}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -761,25 +796,6 @@ function EditableField({
       </p>
       <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
         {children}
-      </div>
-    </div>
-  );
-}
-
-function AssociationDetail({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-1">
-      <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
-        {label}
-      </p>
-      <div className="min-w-0 text-right text-xs font-semibold text-slate-600 dark:text-slate-200">
-        {value}
       </div>
     </div>
   );

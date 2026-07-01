@@ -59,25 +59,49 @@ export type BrandStates = {
     leadType: string | null;
     followUpDate: string | null;
     lastCalledDate: string | null;
+    toBeCalledBy?: string | null;
   };
   benton: {
     leadType: string | null;
     followUpDate: string | null;
     lastCalledDate: string | null;
+    toBeCalledBy?: string | null;
   };
   "95rm": {
     leadType: string | null;
     followUpDate: string | null;
     lastCalledDate: string | null;
+    toBeCalledBy?: string | null;
   };
+};
+
+export type RelatedLeadBrandState = {
+  leadType: string | null;
+  followUpDate: string | null;
+  lastCalledDate: string | null;
+  toBeCalledBy: string | null;
 };
 
 export type RelatedLead = {
   id: string;
+  leadIdExternal?: string | null;
   fullName: string | null;
   email: string | null;
   phone: string | null;
+  phoneExtension?: string | null;
   role: string | null;
+  timezone?: string | null;
+  contactType?: string | null;
+  notWorkAnymore?: boolean;
+  companyId?: string | null;
+  companyName?: string | null;
+  companySymbol?: string | null;
+  companyTimezone?: string | null;
+  brandStates?: {
+    svg: RelatedLeadBrandState;
+    benton: RelatedLeadBrandState;
+    "95rm": RelatedLeadBrandState;
+  };
 };
 
 type FixQueueResponse = {

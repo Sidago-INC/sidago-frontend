@@ -5,25 +5,20 @@ import {
   Select,
   TextInput,
   TimezoneBadge,
-  TypeBadge,
   Wave,
 } from "@/components/ui";
 import { resolveLeadTimezone } from "@/types/timezone.types";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { useUpdateLead } from "@/features/backoffice-shared/use-update-lead";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useLeadFull, type BrandStates, type FullLead } from "../_lib/data";
+import { useLeadFull, type FullLead } from "../_lib/data";
 
 const inputClassName = "h-10 rounded text-sm";
-
-const LEAD_TYPE_OPTIONS = Array.from(
-  new Set(["Fix", ...LEAD_TYPE_VALUES]),
-).map((value) => ({ label: value, value }));
+const readOnlyInputClassName = `${inputClassName} bg-slate-100 dark:bg-slate-800`;
 
 const CONTACT_TYPE_OPTIONS = CONTACT_TYPE_VALUES.map((value) => ({
   label: value,
@@ -37,12 +32,9 @@ type FormState = {
   role: string;
   contactType: string;
   notWorkAnymore: boolean;
-  svgLeadType: string;
-  bentonLeadType: string;
-  rm95LeadType: string;
 };
 
-function toFormState(lead: FullLead, brandStates: BrandStates): FormState {
+function toFormState(lead: FullLead): FormState {
   return {
     fullName: lead.fullName ?? "",
     phone: lead.phone ?? "",
@@ -50,9 +42,6 @@ function toFormState(lead: FullLead, brandStates: BrandStates): FormState {
     role: lead.role ?? "",
     contactType: lead.contactType ?? "",
     notWorkAnymore: lead.notWorkAnymore,
-    svgLeadType: brandStates.svg.leadType ?? "",
-    bentonLeadType: brandStates.benton.leadType ?? "",
-    rm95LeadType: brandStates["95rm"].leadType ?? "",
   };
 }
 
@@ -65,7 +54,7 @@ export function FixLeadEditForm() {
 
   const [form, setForm] = useState<FormState | null>(null);
   const initialForm = useMemo(
-    () => (data ? toFormState(data.lead, data.brandStates) : null),
+    () => (data ? toFormState(data.lead) : null),
     [data],
   );
 
@@ -134,22 +123,10 @@ export function FixLeadEditForm() {
     if (form.notWorkAnymore !== baseline.notWorkAnymore)
       leadPatch.not_work_anymore = form.notWorkAnymore;
 
-    const brandStates: Record<string, { lead_type?: string }> = {};
-    if (form.svgLeadType !== baseline.svgLeadType)
-      brandStates.svg = { lead_type: form.svgLeadType };
-    if (form.bentonLeadType !== baseline.bentonLeadType)
-      brandStates.benton = { lead_type: form.bentonLeadType };
-    if (form.rm95LeadType !== baseline.rm95LeadType)
-      brandStates["95rm"] = { lead_type: form.rm95LeadType };
-
-    const body: Parameters<typeof updateLead.mutateAsync>[0]["body"] = {};
+    const body: Parameters<typeof updateLead.mutateAsync>[0]["body"] = {
+      fix_submit: true,
+    };
     if (Object.keys(leadPatch).length > 0) body.lead = leadPatch;
-    if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
-
-    if (!body.lead && !body.brandStates) {
-      showSuccessToast("No changes to save.");
-      return;
-    }
 
     try {
       await updateLead.mutateAsync({ leadId, body });
@@ -259,59 +236,32 @@ export function FixLeadEditForm() {
                 onChange={(event) =>
                   updateField("notWorkAnymore", event.target.checked)
                 }
-                wrapperClassName="h-10 rounded border border-slate-200 px-4 dark:border-slate-700 md:self-end"
+                wrapperClassName="h-10 justify-center rounded border border-slate-200 px-4 dark:border-slate-700 md:self-end"
               />
             </section>
 
             <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Per-Brand Lead Type
-                </p>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  Current:
-                  {data.brandStates.svg.leadType ? (
-                    <TypeBadge value={data.brandStates.svg.leadType} kind="lead" />
-                  ) : (
-                    <span>—</span>
-                  )}
-                  {data.brandStates.benton.leadType ? (
-                    <TypeBadge value={data.brandStates.benton.leadType} kind="lead" />
-                  ) : (
-                    <span>—</span>
-                  )}
-                  {data.brandStates["95rm"].leadType ? (
-                    <TypeBadge value={data.brandStates["95rm"].leadType} kind="lead" />
-                  ) : (
-                    <span>—</span>
-                  )}
-                </div>
-              </div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Per-Brand Lead Type
+              </p>
               <div className="grid gap-4 md:grid-cols-3">
-                <Select
+                <TextInput
                   label="SVG Lead Type"
-                  value={form.svgLeadType}
-                  options={LEAD_TYPE_OPTIONS}
-                  onChange={(value) => updateField("svgLeadType", String(value))}
-                  className="h-10 rounded text-sm"
+                  value={data.brandStates.svg.leadType ?? ""}
+                  readOnly
+                  className={readOnlyInputClassName}
                 />
-                <Select
+                <TextInput
                   label="Benton Lead Type"
-                  value={form.bentonLeadType}
-                  options={LEAD_TYPE_OPTIONS}
-                  onChange={(value) =>
-                    updateField("bentonLeadType", String(value))
-                  }
-                  className="h-10 rounded text-sm"
+                  value={data.brandStates.benton.leadType ?? ""}
+                  readOnly
+                  className={readOnlyInputClassName}
                 />
-                <Select
+                <TextInput
                   label="95RM Lead Type"
-                  value={form.rm95LeadType}
-                  options={LEAD_TYPE_OPTIONS}
-                  onChange={(value) =>
-                    updateField("rm95LeadType", String(value))
-                  }
-                  className="h-10 rounded text-sm"
+                  value={data.brandStates["95rm"].leadType ?? ""}
+                  readOnly
+                  className={readOnlyInputClassName}
                 />
               </div>
             </section>

@@ -9,12 +9,11 @@ import {
   getRowCompanySymbol,
 } from "@/features/backoffice-shared/constants";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
-import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { LeadsDrawer } from "./LeadsDrawer";
-import { assigneeOptions, type LeadDirectoryRow } from "../_lib/data";
+import { type LeadDirectoryRow } from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
 
 export function Leads() {
@@ -73,45 +72,6 @@ export function Leads() {
         type: "select",
         options: CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
         render: (row) => <TypeBadge value={row.contactType} kind="contact" />,
-      },
-      {
-        title: "SVG - Lead Type",
-        key: "svgLeadType",
-        type: "select",
-        options: LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
-        render: (row) => <TypeBadge value={row.svgLeadType} kind="lead" />,
-      },
-      {
-        title: "SVG - To Be Called By",
-        key: "svgToBeCalledBy",
-        type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
-      },
-      {
-        title: "BENTON - Lead Type",
-        key: "bentonLeadType",
-        type: "select",
-        options: LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
-        render: (row) => <TypeBadge value={row.bentonLeadType} kind="lead" />,
-      },
-      {
-        title: "BENTON - To Be Called By",
-        key: "bentonToBeCalledBy",
-        type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
-      },
-      {
-        title: "95rm - Lead Type",
-        key: "rm95LeadType",
-        type: "select",
-        options: LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
-        render: (row) => <TypeBadge value={row.rm95LeadType} kind="lead" />,
-      },
-      {
-        title: "95rm - To Be Called By",
-        key: "rm95ToBeCalledBy",
-        type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
       },
       { title: "Phone", key: "phone" },
       {

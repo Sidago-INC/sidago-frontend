@@ -16,6 +16,12 @@ import type { CallsFormState, CallsModalState } from "@/types";
 import { getAgentKeyFromCookie, getCallBackDateError } from "./_lib/utils";
 import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
+import {
+  formatCallsHistory,
+  formatNotesHistory,
+  formatRelatedContacts,
+} from "@/features/agent-call-logs/_lib/format";
+import { getHistoryEntries } from "./_lib/history";
 import { MessageSquare, NotebookText, Users } from "lucide-react";
 
 const QUEUE_REFETCH_MS = 90_000;
@@ -32,51 +38,15 @@ function emptyForm(): CallsFormState {
 }
 
 function formFromDetail(d: LeadDetailResponse): CallsFormState {
+  const history = getHistoryEntries(d.history, d.brandState.brandCode);
   return {
     email: d.lead.email,
-    notes: d.history[0]?.notes ?? "",
+    notes: history.find((entry) => entry.notes)?.notes ?? "",
     callBackDate: d.brandState.followUpDate ?? "",
     leadType: d.brandState.leadType,
     contactType: d.lead.contactType,
     notWorkAnymore: d.lead.notWorkAnymore,
   };
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatNotesHistory(history: LeadDetailResponse["history"]): string {
-  return history
-    .filter((h) => h.notes)
-    .map((h) => [formatDate(h.calledAt), h.agentName, h.notes].filter(Boolean).join(" - "))
-    .join("\n");
-}
-
-function formatCallsHistory(history: LeadDetailResponse["history"]): string {
-  return history
-    .map((h) => [formatDate(h.calledAt), h.agentName, h.resultCode].filter(Boolean).join(" - "))
-    .join("\n");
-}
-
-function formatRelatedContacts(
-  contacts: LeadDetailResponse["relatedContacts"],
-): string {
-  return contacts
-    .map((c) => {
-      return [
-        c.role ? `${c.role}: ${c.fullName}` : c.fullName,
-        c.phone,
-        c.email,
-      ]
-        .filter(Boolean)
-        .join(", ");
-    })
-    .join("\n");
 }
 
 function errMessage(err: unknown): string {
@@ -361,12 +331,26 @@ export function AgentCalls() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <HistoryCard
                 title="Notes History"
-                value={detail ? formatNotesHistory(detail.history) : ""}
+                value={
+                  detail
+                    ? formatNotesHistory(
+                        detail.history,
+                        detail.brandState.brandCode,
+                      )
+                    : ""
+                }
                 icon={NotebookText}
               />
               <HistoryCard
                 title="Calls History"
-                value={detail ? formatCallsHistory(detail.history) : ""}
+                value={
+                  detail
+                    ? formatCallsHistory(
+                        detail.history,
+                        detail.brandState.brandCode,
+                      )
+                    : ""
+                }
                 icon={MessageSquare}
               />
               <HistoryCard

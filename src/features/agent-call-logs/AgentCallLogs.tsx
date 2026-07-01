@@ -191,8 +191,14 @@ function formFromDetail(detail: LeadDetailResponse): EditableCallLogState {
     additionalContacts: formatRelatedContacts(detail.relatedContacts),
     doesNotWorkAnymore: detail.lead.notWorkAnymore,
     callBackDate: detail.brandState.followUpDate ?? "",
-    historyCalls: formatCallsHistory(detail.history),
-    historyNotes: formatNotesHistory(detail.history),
+    historyCalls: formatCallsHistory(
+      detail.history,
+      detail.brandState.brandCode,
+    ),
+    historyNotes: formatNotesHistory(
+      detail.history,
+      detail.brandState.brandCode,
+    ),
   };
 }
 

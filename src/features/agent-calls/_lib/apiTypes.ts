@@ -39,6 +39,8 @@ export type CallsLogResponse = {
   };
 };
 
+export type HistoryByBrand = Record<string, HistoryEntry[]>;
+
 export type HistoryEntry = {
   id: string;
   calledAt: string;
@@ -98,7 +100,7 @@ export type LeadDetailResponse = {
   };
   brandState: BrandState;
   peerBrandStates: BrandState[];
-  history: HistoryEntry[];
+  history: HistoryEntry[] | HistoryByBrand;
   relatedContacts: RelatedContact[];
 };
 

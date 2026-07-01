@@ -129,10 +129,62 @@ function getToBeCalledBy(state: ExtendedBrandState | undefined): string {
   return state?.toBeCalledBy?.trim() || state?.to_be_called_by?.trim() || "";
 }
 
+function isoToDateInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
 function getCallHistory(
   state: ExtendedBrandState | undefined,
 ): CallHistoryEntry[] | undefined {
   return state?.callHistory ?? state?.history;
+}
+
+export function relatedLeadToDirectoryRow(contact: RelatedLead): LeadDirectoryRow {
+  const timezone =
+    resolveLeadTimezone(contact.timezone, contact.companyTimezone) ?? "";
+  const { firstName, lastName } = splitName(contact.fullName ?? "");
+
+  return createLeadDirectoryRow(
+    {
+      leadId: contact.id,
+      lead: contact.leadIdExternal ?? contact.id,
+      companyName: contact.companyName ?? "",
+      companySymbol: contact.companySymbol ?? "",
+      fullName: contact.fullName ?? "",
+      phone: contact.phone ?? "",
+      role: contact.role ?? "",
+      email: contact.email ?? "",
+      timezone: timezone ? stripTimezonePrefix(timezone) : "",
+      contactType: contact.contactType ?? "",
+      svgLeadType: contact.brandStates?.svg?.leadType ?? "",
+      svgToBeCalledBy: contact.brandStates?.svg?.toBeCalledBy ?? "",
+      svgLastCallDate: isoToDateInput(contact.brandStates?.svg?.lastCalledDate),
+      bentonLeadType: contact.brandStates?.benton?.leadType ?? "",
+      bentonToBeCalledBy: contact.brandStates?.benton?.toBeCalledBy ?? "",
+      bentonLastCallDate: isoToDateInput(
+        contact.brandStates?.benton?.lastCalledDate,
+      ),
+      rm95LeadType: contact.brandStates?.["95rm"]?.leadType ?? "",
+      rm95ToBeCalledBy: contact.brandStates?.["95rm"]?.toBeCalledBy ?? "",
+      rm95LastCallDate: isoToDateInput(
+        contact.brandStates?.["95rm"]?.lastCalledDate,
+      ),
+      svgDateBecomeHot: "",
+      bentonDateBecomeHot: "",
+      rm95DateBecomeHot: "",
+      lastActionDate: "",
+      lastFixedDate: "",
+      notWorked: contact.notWorkAnymore ?? false,
+    },
+    {
+      firstName,
+      lastName,
+      phoneExtension: contact.phoneExtension ?? "",
+    },
+  );
 }
 
 export function directoryRowToFormState(row: LeadDirectoryRow): LeadDrawerFormState {

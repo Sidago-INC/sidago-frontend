@@ -1,3 +1,4 @@
+import { getHistoryEntries } from "@/features/agent-calls/_lib/history";
 import type { LeadDetailResponse } from "@/features/agent-calls/_lib/apiTypes";
 
 export function formatCallLogDate(dateStr: string): string {
@@ -10,8 +11,9 @@ export function formatCallLogDate(dateStr: string): string {
 
 export function formatNotesHistory(
   history: LeadDetailResponse["history"],
+  brandCode?: string,
 ): string {
-  return history
+  return getHistoryEntries(history, brandCode)
     .filter((entry) => entry.notes)
     .map((entry) =>
       [formatCallLogDate(entry.calledAt), entry.agentName, entry.notes]
@@ -23,8 +25,9 @@ export function formatNotesHistory(
 
 export function formatCallsHistory(
   history: LeadDetailResponse["history"],
+  brandCode?: string,
 ): string {
-  return history
+  return getHistoryEntries(history, brandCode)
     .map((entry) =>
       [formatCallLogDate(entry.calledAt), entry.agentName, entry.resultCode]
         .filter(Boolean)

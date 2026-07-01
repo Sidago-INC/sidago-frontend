@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 type Brand = "svg" | "95rm" | "benton";
 
 export type LeadPatchBody = {
+  fix_submit?: boolean;
   lead?: {
     full_name?: string;
     phone?: string;
