@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { agentCallsApi } from "@/features/agent-calls/_lib/agentCallsApi";
 import { parseCompanySymbolFromLabel } from "@/features/companies/_lib/hooks";
 import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
 import { createLeadDirectoryRow } from "@/features/leads/_lib/data";
@@ -98,6 +99,22 @@ export function useLeadsDirectory(
       };
     },
     staleTime: 60_000,
+  });
+}
+
+export const LEAD_DETAIL_HISTORY_LIMIT = 50;
+
+export function useLeadCallDetail(
+  leadId: string | null | undefined,
+  agentSlug: string | null | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["lead-call-detail", leadId, agentSlug],
+    enabled: enabled && Boolean(leadId && agentSlug),
+    queryFn: () =>
+      agentCallsApi.detail(leadId!, agentSlug!, LEAD_DETAIL_HISTORY_LIMIT),
+    staleTime: 15_000,
   });
 }
 

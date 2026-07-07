@@ -26,9 +26,13 @@ export const agentCallsApi = {
       `/agent-calls/calls-log?agentSlug=${encodeURIComponent(agentSlug)}`,
     ),
 
-  detail: (leadId: string, agentSlug: string): Promise<LeadDetailResponse> =>
+  detail: (
+    leadId: string,
+    agentSlug: string,
+    historyLimit = 50,
+  ): Promise<LeadDetailResponse> =>
     api.get(
-      `/agent-calls/lead/${leadId}/detail?agentSlug=${agentSlug}&historyLimit=50`,
+      `/agent-calls/lead/${leadId}/detail?agentSlug=${encodeURIComponent(agentSlug)}&historyLimit=${historyLimit}`,
     ),
 
   skip: (agentSlug: string, leadId: string) =>

@@ -1,5 +1,15 @@
 import { formatRelatedContacts } from "@/features/agent-call-logs/_lib/format";
 import type {
+  BrandState,
+  HistoryEntry,
+  LeadDetailResponse,
+  RelatedContact,
+} from "@/features/agent-calls/_lib/apiTypes";
+import { getHistoryEntries } from "@/features/agent-calls/_lib/history";
+import {
+  normalizeBrandCode,
+} from "@/lib/navigation-agents";
+import type {
   BrandStates,
   FullLead,
   RelatedLead,
@@ -115,6 +125,97 @@ function formatBrandNotesHistory(
         .join(" - "),
     )
     .join("\n");
+}
+
+function emptyBrandState() {
+  return {
+    leadType: null,
+    followUpDate: null,
+    lastCalledDate: null,
+  };
+}
+
+function toBrandStatesKey(
+  brandCode: string,
+): keyof ExtendedBrandStates | null {
+  const normalized = normalizeBrandCode(brandCode);
+  if (normalized === "svg" || normalized === "benton" || normalized === "95rm") {
+    return normalized;
+  }
+  return null;
+}
+
+function mapHistoryEntry(entry: HistoryEntry): CallHistoryEntry {
+  return {
+    calledAt: entry.calledAt,
+    agentName: entry.agentName,
+    resultCode: entry.resultCode,
+    notes: entry.notes,
+  };
+}
+
+function mapBrandState(
+  state: BrandState,
+  history: LeadDetailResponse["history"],
+): ExtendedBrandState {
+  return {
+    leadType: state.leadType,
+    followUpDate: state.followUpDate,
+    lastCalledDate: state.lastCalledDate,
+    callHistory: getHistoryEntries(history, state.brandCode).map(mapHistoryEntry),
+  };
+}
+
+export function mapLeadDetailResponseToPayload(
+  response: LeadDetailResponse,
+): LeadDetailPayload {
+  const { lead, company, brandState, peerBrandStates, history } = response;
+  const brandStates: BrandStates & ExtendedBrandStates = {
+    svg: emptyBrandState(),
+    benton: emptyBrandState(),
+    "95rm": emptyBrandState(),
+  };
+
+  for (const state of [brandState, ...peerBrandStates]) {
+    const key = toBrandStatesKey(state.brandCode);
+    if (!key) continue;
+    brandStates[key] = {
+      ...brandStates[key],
+      ...mapBrandState(state, history),
+    };
+  }
+
+  return {
+    lead: {
+      id: lead.id,
+      leadIdExternal: lead.leadIdExternal,
+      fullName: lead.fullName,
+      phone: lead.phone,
+      phoneExtension: lead.phoneExtension,
+      email: lead.email,
+      role: lead.role,
+      timezone: lead.timezone,
+      contactType: lead.contactType,
+      notWorkAnymore: lead.notWorkAnymore,
+      companyId: company.id,
+      companyName: company.companyName,
+      companySymbol: company.companySymbol,
+      companyTimezone: company.timezone,
+    },
+    brandStates,
+  };
+}
+
+export function relatedContactToRelatedLead(
+  contact: RelatedContact,
+): RelatedLead {
+  return {
+    id: contact.id,
+    fullName: contact.fullName,
+    email: contact.email,
+    phone: contact.phone,
+    role: contact.role,
+  };
 }
 
 function splitName(fullName: string) {

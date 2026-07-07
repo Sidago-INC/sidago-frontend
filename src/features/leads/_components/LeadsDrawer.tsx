@@ -8,6 +8,7 @@ import {
   Textarea,
   TextInput,
   TypeBadge,
+  Wave,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -33,19 +34,23 @@ import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
+import { useLeadCallDetail } from "../_lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
-import { useRelatedLeads } from "@/features/fix-leads/_lib/data";
 import { AssociatedContactsSection } from "./AssociatedContacts";
 import {
   directoryRowToFormState,
+  leadDetailToDirectoryRow,
+  leadDetailToFormState,
+  mapLeadDetailResponseToPayload,
   relatedLeadToDirectoryRow,
   type LeadDrawerFormState,
 } from "../_lib/lead-detail";
 import { type LeadDirectoryRow } from "../_lib/data";
 import type { RelatedLead } from "@/features/fix-leads/_lib/data";
+import { useRelatedLeads } from "@/features/fix-leads/_lib/data";
 
 const NESTED_DRAWER_Z = 210;
 
@@ -116,7 +121,8 @@ export function LeadsDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
+  const { data: brandsWithAgents, isLoading: brandsWithAgentsLoading } =
+    useBrandsWithAgents(user?.role);
   const brandParam = searchParams.get("brand");
   const brandCode = isBrandAgentSlug(brandParam) ? brandParam : "svg";
   const queryClient = useQueryClient();
@@ -139,14 +145,64 @@ export function LeadsDrawer({
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
   const rowKey = row?.leadId ?? row?.email ?? "";
   const drawerOpen = row !== null && selectedIndex !== null;
-  const displayRow = row;
-  const relatedQuery = useRelatedLeads(drawerOpen ? row?.leadId : null);
-  const isEditMode = rowKey !== "" && editModeKey === rowKey;
-  const initialForm = useMemo(
-    () => (row ? directoryRowToFormState(row) : null),
-    [row],
+
+  const assigneeNameForBrand = useMemo(() => {
+    if (!row) return undefined;
+    if (brandCode === "svg") return row.svgToBeCalledBy;
+    if (brandCode === "benton") return row.bentonToBeCalledBy;
+    return row.rm95ToBeCalledBy;
+  }, [row, brandCode]);
+
+  const detailAgentSlug = useMemo(
+    () =>
+      resolveMarkVoidAgentSlug(
+        brandsWithAgents,
+        brandCode,
+        assigneeNameForBrand,
+      ),
+    [brandsWithAgents, brandCode, assigneeNameForBrand],
   );
+
+  const detailQuery = useLeadCallDetail(
+    row?.leadId,
+    detailAgentSlug,
+    drawerOpen && !brandsWithAgentsLoading,
+  );
+
+  const relatedQuery = useRelatedLeads(drawerOpen ? row?.leadId : null);
+
+  const detailPayload = useMemo(
+    () =>
+      detailQuery.data
+        ? mapLeadDetailResponseToPayload(detailQuery.data)
+        : null,
+    [detailQuery.data],
+  );
+
+  const relatedContacts = relatedQuery.data ?? [];
+
+  const displayRow = useMemo(
+    () =>
+      detailPayload ? leadDetailToDirectoryRow(detailPayload, row) : row,
+    [detailPayload, row],
+  );
+
+  const isEditMode = rowKey !== "" && editModeKey === rowKey;
+  const initialForm = useMemo(() => {
+    if (detailPayload) {
+      return leadDetailToFormState(detailPayload, relatedContacts);
+    }
+    return row ? directoryRowToFormState(row) : null;
+  }, [detailPayload, relatedContacts, row]);
   const form = formState?.key === rowKey ? formState.value : initialForm;
+  const detailLoading =
+    drawerOpen &&
+    (brandsWithAgentsLoading ||
+      detailQuery.isLoading ||
+      (Boolean(detailAgentSlug) && detailQuery.isFetching && !detailPayload));
+  const detailUnavailable =
+    drawerOpen && !brandsWithAgentsLoading && !detailAgentSlug;
+  const detailError = drawerOpen && detailQuery.isError && !detailPayload;
 
   const updateForm = <Key extends keyof LeadDrawerFormState>(
     key: Key,
@@ -448,6 +504,12 @@ export function LeadsDrawer({
       await updateLead.mutateAsync({ leadId: row.leadId, body });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["leads", "directory"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["lead-call-detail", row.leadId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["lead-related", row.leadId],
+        }),
       ]);
       showSuccessToast("Lead changes saved successfully.");
       setEditModeKey(null);
@@ -526,6 +588,22 @@ export function LeadsDrawer({
         )
       }
     >
+      {detailUnavailable ? (
+        <p className="py-4 text-sm text-red-600 dark:text-red-400">
+          Cannot load lead detail: no agent is configured for the{" "}
+          {brandCode.toUpperCase()} brand.
+        </p>
+      ) : detailLoading ? (
+        <div className="flex justify-center py-12">
+          <Wave />
+        </div>
+      ) : (
+        <>
+          {detailError ? (
+            <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">
+              Failed to load lead detail. Showing grid data.
+            </p>
+          ) : null}
       <div className="space-y-5" onFocus={handleEditStart}>
         <DetailCard>
           <DrawerCompanyField
@@ -691,11 +769,13 @@ export function LeadsDrawer({
           key={rowKey}
           isLoading={relatedQuery.isLoading}
           isError={relatedQuery.isError}
-          contacts={relatedQuery.data ?? []}
+          contacts={relatedContacts}
           onContactClick={handleAssociatedContactClick}
           activeContactId={activeAssociatedContactId ?? (nested ? row.leadId : null)}
         />
       </div>
+        </>
+      )}
     </Drawer>
 
     {!nested && nestedContact ? (

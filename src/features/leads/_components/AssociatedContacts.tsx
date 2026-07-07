@@ -2,32 +2,117 @@ import { TypeBadge, Wave } from "@/components/ui";
 import type { RelatedLead } from "@/features/fix-leads/_lib/data";
 import { type ReactNode } from "react";
 
+type ContactsSectionProps = {
+  isLoading: boolean;
+  isError: boolean;
+  contacts: RelatedLead[];
+  onContactClick?: (contact: RelatedLead) => void;
+  activeContactId?: string | null;
+};
+
 export function AssociatedContactsSection({
   isLoading,
   isError,
   contacts,
   onContactClick,
   activeContactId,
-}: {
-  isLoading: boolean;
-  isError: boolean;
-  contacts: RelatedLead[];
-  onContactClick?: (contact: RelatedLead) => void;
-  activeContactId?: string | null;
+}: ContactsSectionProps) {
+  return (
+    <ContactsSectionShell
+      label="Associated Contacts"
+      isLoading={isLoading}
+      isError={isError}
+      emptyMessage="No associated contacts available."
+      errorMessage="Failed to load associated contacts."
+      contacts={contacts}
+      onContactClick={onContactClick}
+      activeContactId={activeContactId}
+      renderDetails={(contact) => (
+        <>
+          <AssociationDetail
+            label="Contact Type"
+            value={
+              contact.contactType ? (
+                <TypeBadge value={contact.contactType} kind="contact" />
+              ) : (
+                "-"
+              )
+            }
+          />
+          <AssociationDetail
+            label="SVG Lead Type"
+            value={
+              contact.brandStates?.svg?.leadType ? (
+                <TypeBadge
+                  value={contact.brandStates.svg.leadType}
+                  kind="lead"
+                />
+              ) : (
+                "-"
+              )
+            }
+          />
+          <AssociationDetail
+            label="Benton Lead Type"
+            value={
+              contact.brandStates?.benton?.leadType ? (
+                <TypeBadge
+                  value={contact.brandStates.benton.leadType}
+                  kind="lead"
+                />
+              ) : (
+                "-"
+              )
+            }
+          />
+          <AssociationDetail
+            label="95RM Lead Type"
+            value={
+              contact.brandStates?.["95rm"]?.leadType ? (
+                <TypeBadge
+                  value={contact.brandStates["95rm"].leadType}
+                  kind="lead"
+                />
+              ) : (
+                "-"
+              )
+            }
+          />
+        </>
+      )}
+    />
+  );
+}
+
+function ContactsSectionShell({
+  label,
+  isLoading,
+  isError,
+  emptyMessage,
+  errorMessage,
+  contacts,
+  onContactClick,
+  activeContactId,
+  renderDetails,
+}: ContactsSectionProps & {
+  label: string;
+  emptyMessage: string;
+  errorMessage: string;
+  renderDetails: (contact: RelatedLead) => ReactNode;
 }) {
   return (
-    <DetailCard label="Associated Contacts">
+    <DetailCard label={label}>
       {isLoading ? (
         <div className="flex justify-center py-4">
           <Wave />
         </div>
       ) : isError ? (
         <p className="py-2 text-sm text-red-600 dark:text-red-400">
-          Failed to load related contacts.
+          {errorMessage}
         </p>
       ) : contacts.length === 0 ? (
         <p className="py-2 text-sm text-slate-500 dark:text-slate-400">
-          No related contacts available.
+          {emptyMessage}
         </p>
       ) : (
         <div className="space-y-3">
@@ -42,55 +127,7 @@ export function AssociatedContactsSection({
                     : undefined
                 }
               >
-                <AssociationDetail
-                  label="Contact Type"
-                  value={
-                    contact.contactType ? (
-                      <TypeBadge value={contact.contactType} kind="contact" />
-                    ) : (
-                      "-"
-                    )
-                  }
-                />
-                <AssociationDetail
-                  label="SVG Lead Type"
-                  value={
-                    contact.brandStates?.svg?.leadType ? (
-                      <TypeBadge
-                        value={contact.brandStates.svg.leadType}
-                        kind="lead"
-                      />
-                    ) : (
-                      "-"
-                    )
-                  }
-                />
-                <AssociationDetail
-                  label="Benton Lead Type"
-                  value={
-                    contact.brandStates?.benton?.leadType ? (
-                      <TypeBadge
-                        value={contact.brandStates.benton.leadType}
-                        kind="lead"
-                      />
-                    ) : (
-                      "-"
-                    )
-                  }
-                />
-                <AssociationDetail
-                  label="95RM Lead Type"
-                  value={
-                    contact.brandStates?.["95rm"]?.leadType ? (
-                      <TypeBadge
-                        value={contact.brandStates["95rm"].leadType}
-                        kind="lead"
-                      />
-                    ) : (
-                      "-"
-                    )
-                  }
-                />
+                {renderDetails(contact)}
               </DetailCard>
             );
 
