@@ -8,5 +8,7 @@ export function useMe() {
     queryKey: ["me"],
     queryFn: () => api.get("/auth/me"),
     retry: false,
+    staleTime: 0,
+    gcTime: 0,
   });
 }

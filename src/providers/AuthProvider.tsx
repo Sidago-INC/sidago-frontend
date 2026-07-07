@@ -13,6 +13,7 @@ type AuthUser = {
   email: string;
   name: string;
   role: UserRole;
+  slug?: string | null;
 };
 
 type AuthContextType = {

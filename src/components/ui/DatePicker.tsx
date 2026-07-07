@@ -1,5 +1,3 @@
-
-
 import clsx from "clsx";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { CalendarDays, X } from "lucide-react";
@@ -58,42 +56,52 @@ export function DatePicker({
         anchor="bottom start"
         className="z-[320] mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
       >
-        {hasValue ? (
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => onChange(undefined)}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </button>
-          </div>
-        ) : null}
-        <DayPicker
-          mode="single"
-          selected={value}
-          onSelect={onChange}
-          showOutsideDays
-          className="rdp-custom"
-          classNames={{
-            month: "space-y-4",
-            month_caption:
-              "flex items-center justify-center pb-1 text-sm font-semibold text-slate-900 dark:text-slate-100",
-            weekdays: "grid grid-cols-7 gap-1",
-            weekday:
-              "flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500",
-            week: "grid grid-cols-7 gap-1",
-            day: "h-9 w-9 text-xs",
-            day_button:
-              "h-9 w-9 cursor-pointer rounded-xl text-xs text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
-            today: "font-semibold text-indigo-700 dark:text-indigo-300",
-            selected:
-              "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500 dark:text-white dark:hover:bg-indigo-500",
-            outside: "text-slate-300 dark:text-slate-700",
-            chevron: "fill-slate-500 dark:fill-slate-400",
-          }}
-        />
+        {({ close }) => (
+          <>
+            {hasValue ? (
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(undefined);
+                    close();
+                  }}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear
+                </button>
+              </div>
+            ) : null}
+            <DayPicker
+              mode="single"
+              selected={value}
+              onSelect={(date) => {
+                onChange(date);
+                if (date) close();
+              }}
+              showOutsideDays
+              className="rdp-custom"
+              classNames={{
+                month: "space-y-4",
+                month_caption:
+                  "flex items-center justify-center pb-1 text-sm font-semibold text-slate-900 dark:text-slate-100",
+                weekdays: "grid grid-cols-7 gap-1",
+                weekday:
+                  "flex h-8 items-center justify-center text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500",
+                week: "grid grid-cols-7 gap-1",
+                day: "h-9 w-9 text-xs",
+                day_button:
+                  "h-9 w-9 cursor-pointer rounded-xl text-xs text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
+                today: "font-semibold text-indigo-700 dark:text-indigo-300",
+                selected:
+                  "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500 dark:text-white dark:hover:bg-indigo-500",
+                outside: "text-slate-300 dark:text-slate-700",
+                chevron: "fill-slate-500 dark:fill-slate-400",
+              }}
+            />
+          </>
+        )}
       </PopoverPanel>
     </Popover>
   );
