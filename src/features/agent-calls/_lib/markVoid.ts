@@ -1,5 +1,10 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { closedContactsTabs, type ClosedContactsTabKey } from "@/features/backoffice-closed-contacts/_lib/data";
+import {
+  normalizeBrandCode,
+  resolveAgentSlugForBrand,
+  type BrandWithAgents,
+} from "@/lib/navigation-agents";
 import { agentCallsApi } from "./agentCallsApi";
 
 type MarkVoidOptions = {
@@ -13,20 +18,34 @@ export function isBrandAgentSlug(value: string | null | undefined): value is Bra
   return value === "svg" || value === "benton" || value === "95rm";
 }
 
-export function resolveAgentSlugForClosedContacts(
+export function resolveClosedContactsBrandCode(
   tabKey: ClosedContactsTabKey,
   rowBrand?: string,
 ): BrandAgentSlug | null {
   const tab = closedContactsTabs.find((entry) => entry.key === tabKey);
-  if (tab?.brand) return tab.brand;
+  const fromTab = normalizeBrandCode(tab?.brand);
+  if (fromTab && isBrandAgentSlug(fromTab)) return fromTab;
 
-  const normalized = rowBrand?.trim().toLowerCase();
-  if (normalized === "svg" || normalized === "benton" || normalized === "95rm") {
-    return normalized;
-  }
-  if (normalized === "rm95") return "95rm";
+  const fromRow = normalizeBrandCode(rowBrand);
+  if (fromRow && isBrandAgentSlug(fromRow)) return fromRow;
 
   return null;
+}
+
+export function resolveMarkVoidAgentSlug(
+  brands: BrandWithAgents[] | undefined,
+  brandCode: string | null | undefined,
+  assigneeName?: string | null,
+): string | null {
+  return resolveAgentSlugForBrand(brands, brandCode, assigneeName);
+}
+
+/** @deprecated Use resolveClosedContactsBrandCode */
+export function resolveAgentSlugForClosedContacts(
+  tabKey: ClosedContactsTabKey,
+  rowBrand?: string,
+): BrandAgentSlug | null {
+  return resolveClosedContactsBrandCode(tabKey, rowBrand);
 }
 
 export function jsonEqualIgnoringKeys<T extends object>(

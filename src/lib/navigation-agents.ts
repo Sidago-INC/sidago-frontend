@@ -25,6 +25,44 @@ export type BrandsWithAgentsResponse = {
   data: BrandWithAgents[];
 };
 
+export function normalizeBrandCode(
+  value: string | null | undefined,
+): string | null {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "rm95") return "95rm";
+  if (normalized === "svg" || normalized === "benton" || normalized === "95rm") {
+    return normalized;
+  }
+  return null;
+}
+
+export function resolveAgentSlugForBrand(
+  brands: BrandWithAgents[] | undefined,
+  brandCode: string | null | undefined,
+  assigneeName?: string | null,
+): string | null {
+  const code = normalizeBrandCode(brandCode);
+  if (!code || !brands?.length) return null;
+
+  const brand = brands.find(
+    (entry) => normalizeBrandCode(entry.brandCode) === code,
+  );
+  const agents = brand?.agents ?? [];
+  if (!agents.length) return null;
+
+  const trimmedAssignee = assigneeName?.trim();
+  if (trimmedAssignee) {
+    const lowered = trimmedAssignee.toLowerCase();
+    const matched = agents.find(
+      (agent) => agent.name.trim().toLowerCase() === lowered,
+    );
+    if (matched) return matched.slug;
+  }
+
+  return agents[0]?.slug ?? null;
+}
+
 const AGENT_PAGE_CONFIG: Record<
   string,
   { label: string; path: string; icon: LucideIcon }

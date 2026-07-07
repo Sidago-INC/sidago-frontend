@@ -26,10 +26,13 @@ import {
 } from "@/features/agent-calls/_lib/utils";
 import {
   isBrandAgentSlug,
+  resolveMarkVoidAgentSlug,
   toggleMarkVoid,
 } from "@/features/agent-calls/_lib/markVoid";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
+import { useAuth } from "@/providers/AuthProvider";
+import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -112,8 +115,10 @@ export function LeadsDrawer({
 }: LeadsDrawerProps) {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
   const brandParam = searchParams.get("brand");
-  const agentSlug = isBrandAgentSlug(brandParam) ? brandParam : "svg";
+  const brandCode = isBrandAgentSlug(brandParam) ? brandParam : "svg";
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
@@ -161,6 +166,26 @@ export function LeadsDrawer({
   const handleNotWorkedChange = async (checked: boolean) => {
     if (!row?.leadId) {
       showErrorToast(new Error("Cannot update: this row has no leadId."));
+      return;
+    }
+
+    const assigneeName =
+      brandCode === "svg"
+        ? form?.svgToBeCalledBy
+        : brandCode === "benton"
+          ? form?.bentonToBeCalledBy
+          : form?.rm95ToBeCalledBy;
+    const agentSlug = resolveMarkVoidAgentSlug(
+      brandsWithAgents,
+      brandCode,
+      assigneeName,
+    );
+    if (!agentSlug) {
+      showErrorToast(
+        new Error(
+          `Cannot mark void: no agent is configured for the ${brandCode.toUpperCase()} brand.`,
+        ),
+      );
       return;
     }
 

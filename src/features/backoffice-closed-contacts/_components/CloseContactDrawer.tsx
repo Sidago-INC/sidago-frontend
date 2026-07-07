@@ -38,9 +38,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import {
-  resolveAgentSlugForClosedContacts,
+  resolveClosedContactsBrandCode,
+  resolveMarkVoidAgentSlug,
   toggleMarkVoid,
 } from "@/features/agent-calls/_lib/markVoid";
+import { useAuth } from "@/providers/AuthProvider";
+import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
   useUpdateLead,
@@ -159,6 +162,8 @@ export function ClosedContactDrawer({
 }: ClosedContactDrawerProps) {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
   const [copied, setCopied] = useState(false);
   const [formState, setFormState] = useState<{
     key: string;
@@ -243,11 +248,31 @@ export function ClosedContactDrawer({
       return;
     }
 
-    const agentSlug = resolveAgentSlugForClosedContacts(tabKey, row.brand);
-    if (!agentSlug) {
+    const brandCode = resolveClosedContactsBrandCode(tabKey, row.brand);
+    if (!brandCode) {
       showErrorToast(
         new Error(
           "Cannot mark void: no brand context. Switch to a brand tab or ensure the row has a brand.",
+        ),
+      );
+      return;
+    }
+
+    const assigneeName =
+      brandCode === "svg"
+        ? row.svgToBeCalledBy
+        : brandCode === "benton"
+          ? row.bentonToBeCalledBy
+          : row.rm95ToBeCalledBy;
+    const agentSlug = resolveMarkVoidAgentSlug(
+      brandsWithAgents,
+      brandCode,
+      assigneeName,
+    );
+    if (!agentSlug) {
+      showErrorToast(
+        new Error(
+          `Cannot mark void: no agent is configured for the ${brandCode.toUpperCase()} brand.`,
         ),
       );
       return;
