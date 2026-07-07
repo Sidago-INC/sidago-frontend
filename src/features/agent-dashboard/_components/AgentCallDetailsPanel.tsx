@@ -1,16 +1,24 @@
 import { useState } from "react";
-import { DatePicker } from "@/components/ui";
+import type { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Panel } from "./Panel";
 import { useAgentCallDetails } from "../_lib/hooks";
 
 const PAGE_LIMIT = 50;
 
-function formatDateParam(date: Date): string {
+function localDate(date: Date): string {
   const y = date.getFullYear();
   const m = `${date.getMonth() + 1}`.padStart(2, "0");
   const d = `${date.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function rangeToParams(range: DateRange | undefined): { startDate: string; endDate: string } {
+  const today = new Date();
+  const from = range?.from ?? today;
+  const to = range?.to ?? from;
+  return { startDate: localDate(from), endDate: localDate(to) };
 }
 
 function formatTime(ts: string): string {
@@ -32,14 +40,16 @@ export function AgentCallDetailsPanel({
 }: {
   agentSlug: string | null;
 }) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
-  );
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(),
+    to: new Date(),
+  });
   const [page, setPage] = useState(1);
-  const dateParam = formatDateParam(selectedDate ?? new Date());
+  const { startDate, endDate } = rangeToParams(dateRange);
   const { data, isLoading } = useAgentCallDetails(
     agentSlug,
-    dateParam,
+    startDate,
+    endDate,
     page,
     PAGE_LIMIT,
   );
@@ -47,21 +57,21 @@ export function AgentCallDetailsPanel({
   const rows = data?.data ?? [];
   const totalPages = data?.meta?.totalPages ?? 1;
 
-  const handleDateChange = (d: Date | undefined) => {
-    setSelectedDate(d);
+  const handleRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
     setPage(1);
   };
 
   return (
     <Panel
       title="Call Details"
-      subtitle="Individual call records for the selected date"
+      subtitle="Individual call records for the selected date range"
       action={
-        <div className="w-44">
-          <DatePicker
-            value={selectedDate}
-            onChange={handleDateChange}
-            placeholder="Select date"
+        <div className="w-64">
+          <DateRangePicker
+            value={dateRange}
+            onChange={handleRangeChange}
+            placeholder="Select date range"
           />
         </div>
       }
@@ -73,7 +83,7 @@ export function AgentCallDetailsPanel({
           </div>
         ) : rows.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-            No calls logged for this date.
+            No calls logged for this date range.
           </div>
         ) : (
           <table className="w-full text-sm">

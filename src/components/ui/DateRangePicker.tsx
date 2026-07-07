@@ -70,13 +70,15 @@ export function DateRangePicker({
 
       <PopoverPanel
         anchor="bottom start"
-        className="z-320 mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
+        className="z-[320] mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-slate-700 dark:bg-slate-950"
       >
+        {({ close }) => (
+          <>
         {hasValue ? (
           <div className="mb-3 flex justify-end">
             <button
               type="button"
-              onClick={() => onChange(undefined)}
+              onClick={() => { onChange(undefined); close(); }}
               className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >
               <X className="h-3.5 w-3.5" />
@@ -87,7 +89,10 @@ export function DateRangePicker({
         <DayPicker
           mode="range"
           selected={value}
-          onSelect={onChange}
+          onSelect={(range) => {
+            onChange(range);
+            if (range?.to) close();
+          }}
           numberOfMonths={2}
           showOutsideDays
           className="rdp-custom"
@@ -116,6 +121,8 @@ export function DateRangePicker({
             chevron: "fill-slate-500 dark:fill-slate-400",
           }}
         />
+          </>
+        )}
       </PopoverPanel>
     </Popover>
   );

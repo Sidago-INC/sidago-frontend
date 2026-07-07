@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { DatePicker } from "@/components/ui";
+import type { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/ui";
 import { Panel } from "./Panel";
 import { useAgentCallReport } from "../_lib/hooks";
 
@@ -25,11 +26,18 @@ const RESULT_CODE_COLORS: Record<string, string> = {
 const DEFAULT_COLOR =
   "bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300";
 
-function formatDateParam(date: Date): string {
+function localDate(date: Date): string {
   const y = date.getFullYear();
   const m = `${date.getMonth() + 1}`.padStart(2, "0");
   const d = `${date.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function rangeToParams(range: DateRange | undefined): { startDate: string; endDate: string } {
+  const today = new Date();
+  const from = range?.from ?? today;
+  const to = range?.to ?? from;
+  return { startDate: localDate(from), endDate: localDate(to) };
 }
 
 export function AgentCallReportPanel({
@@ -37,11 +45,12 @@ export function AgentCallReportPanel({
 }: {
   agentSlug: string | null;
 }) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
-  );
-  const dateParam = formatDateParam(selectedDate ?? new Date());
-  const { data, isLoading } = useAgentCallReport(agentSlug, dateParam);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(),
+    to: new Date(),
+  });
+  const { startDate, endDate } = rangeToParams(dateRange);
+  const { data, isLoading } = useAgentCallReport(agentSlug, startDate, endDate);
 
   const byResult = data?.byResult ?? {};
   const totalCalls = data?.totalCalls ?? 0;
@@ -50,13 +59,13 @@ export function AgentCallReportPanel({
   return (
     <Panel
       title="Call Report"
-      subtitle="Your calls by outcome for the selected date"
+      subtitle="Your calls by outcome for the selected date range"
       action={
-        <div className="w-44">
-          <DatePicker
-            value={selectedDate}
-            onChange={setSelectedDate}
-            placeholder="Select date"
+        <div className="w-64">
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            placeholder="Select date range"
           />
         </div>
       }
@@ -82,7 +91,7 @@ export function AgentCallReportPanel({
           </div>
         ) : entries.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-            No calls logged for this date.
+            No calls logged for this date range.
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

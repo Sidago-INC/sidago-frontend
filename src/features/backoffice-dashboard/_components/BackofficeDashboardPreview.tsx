@@ -3,6 +3,7 @@ import { Button, CompanySymbolBadge, StatusCard } from "@/components/ui";
 import { WinnerBadge } from "@/features/agent-dashboard/_components/WinnerBadge";
 import { AdminTodayStatsCards } from "@/features/admin-dashboard/AdminTodayStatsCards";
 import { useAdminTodayAgentCards } from "@/features/admin-dashboard/_lib/hooks";
+import { AgentCallInspector } from "./AgentCallInspector";
 import clsx from "clsx";
 import { ArrowRight } from "lucide-react";
 
@@ -91,6 +92,13 @@ export function BackofficeDashboardPreview({
       )}
 
       <AdminTodayStatsCards selectedDate={today} />
+
+      <div>
+        <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Agent Call Inspection
+        </p>
+        <AgentCallInspector />
+      </div>
     </div>
   );
 }

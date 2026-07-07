@@ -189,7 +189,8 @@ function mergeDashboardScores(params: {
 
 type CallReportResponse = {
   ok: true;
-  date: string;
+  startDate: string;
+  endDate: string;
   agentSlug: string;
   brandCode: string;
   totalCalls: number;
@@ -198,13 +199,14 @@ type CallReportResponse = {
 
 export function useAgentCallReport(
   agentSlug: string | null | undefined,
-  date: string,
+  startDate: string,
+  endDate: string,
 ) {
   return useQuery({
-    queryKey: ["agent-dashboard", "call-report", agentSlug, date],
+    queryKey: ["agent-dashboard", "call-report", agentSlug, startDate, endDate],
     queryFn: async () =>
       api.get(
-        `/dashboard/call-report?agentSlug=${agentSlug}&date=${date}`,
+        `/dashboard/call-report?agentSlug=${agentSlug}&startDate=${startDate}&endDate=${endDate}`,
       ) as Promise<CallReportResponse>,
     enabled: Boolean(agentSlug),
     staleTime: 60_000,
@@ -229,7 +231,8 @@ export type CallDetailRow = {
 
 type CallDetailsResponse = {
   ok: true;
-  date: string;
+  startDate: string;
+  endDate: string;
   agentSlug: string;
   brandCode: string;
   data: CallDetailRow[];
@@ -238,15 +241,16 @@ type CallDetailsResponse = {
 
 export function useAgentCallDetails(
   agentSlug: string | null | undefined,
-  date: string,
+  startDate: string,
+  endDate: string,
   page: number,
   limit: number,
 ) {
   return useQuery({
-    queryKey: ["agent-dashboard", "call-details", agentSlug, date, page, limit],
+    queryKey: ["agent-dashboard", "call-details", agentSlug, startDate, endDate, page, limit],
     queryFn: async () =>
       api.get(
-        `/dashboard/call-details?agentSlug=${agentSlug}&date=${date}&page=${page}&limit=${limit}`,
+        `/dashboard/call-details?agentSlug=${agentSlug}&startDate=${startDate}&endDate=${endDate}&page=${page}&limit=${limit}`,
       ) as Promise<CallDetailsResponse>,
     enabled: Boolean(agentSlug),
     staleTime: 60_000,
