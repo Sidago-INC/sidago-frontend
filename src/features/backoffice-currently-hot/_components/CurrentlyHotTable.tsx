@@ -243,6 +243,7 @@ export function CurrentlyHotTable({
       <CurrentlyHotDrawer
         data={data}
         columns={columns}
+        variant={variant}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         onClose={() => setSelectedIndex(null)}

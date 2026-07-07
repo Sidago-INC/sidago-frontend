@@ -21,6 +21,7 @@ import {
   getCallBackDateError,
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
+import { toggleMarkVoid, jsonEqualIgnoringKeys } from "@/features/agent-calls/_lib/markVoid";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
@@ -161,7 +162,7 @@ export function EverBeenHotDrawer({
   const bentonAgentsQuery = useAgentSelectOptions("benton");
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
-    return JSON.stringify(form) !== JSON.stringify(initialForm);
+    return !jsonEqualIgnoringKeys(form, initialForm, ["notWorked"]);
   }, [form, initialForm]);
 
   const updateForm = <Key extends keyof EditableDrawerState>(
@@ -177,6 +178,23 @@ export function EverBeenHotDrawer({
         [key]: value,
       },
     });
+  };
+
+  const handleNotWorkedChange = async (checked: boolean) => {
+    if (!row?.leadId) {
+      showErrorToast(new Error("Cannot update: this row has no leadId."));
+      return;
+    }
+
+    updateForm("notWorked", checked);
+    if (!checked) return;
+
+    const ok = await toggleMarkVoid(variant, row.leadId, checked, {
+      successMessage: "Lead marked as no longer working at the company.",
+    });
+    if (!ok) {
+      updateForm("notWorked", false);
+    }
   };
 
   const {
@@ -287,9 +305,6 @@ export function EverBeenHotDrawer({
     if (form.role !== initialForm.role) leadDiff.role = form.role;
     if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
-    }
-    if (form.notWorked !== initialForm.notWorked) {
-      leadDiff.not_work_anymore = form.notWorked;
     }
     if (form.companyName !== initialForm.companyName) {
       leadDiff.company_name = form.companyName;
@@ -535,7 +550,7 @@ export function EverBeenHotDrawer({
             <ToggleField
               label="Not Work Anymore"
               checked={form.notWorked}
-              onChange={(checked) => updateForm("notWorked", checked)}
+              onChange={handleNotWorkedChange}
             />
           </div>
         </DetailCard>

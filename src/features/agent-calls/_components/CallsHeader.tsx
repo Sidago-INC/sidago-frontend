@@ -21,7 +21,7 @@ export function CallsHeader({
 }: Props) {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <div className="mx-auto flex min-h-14 max-w-5xl items-center gap-2 px-3 py-2 sm:gap-4 sm:px-4">
+      <div className="flex min-h-14 items-center gap-2 px-4 py-2 sm:gap-4">
         <CallsLogo className="hidden sm:flex" />
 
         <div className="hidden h-5 w-px shrink-0 bg-slate-200 sm:block dark:bg-gray-700" />

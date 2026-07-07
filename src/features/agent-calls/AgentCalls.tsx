@@ -13,7 +13,7 @@ import { HeroCard } from "./_components/HeroCard";
 import { PhoneCard } from "./_components/PhoneCard";
 import { WorkToggleRow } from "./_components/WorkToggleRow";
 import type { CallsFormState, CallsModalState } from "@/types";
-import { getAgentKeyFromCookie, getCallBackDateError } from "./_lib/utils";
+import { getAgentKeyFromCookie, getCallBackDateError, getDialErrorMessage } from "./_lib/utils";
 import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
 import {
@@ -70,6 +70,8 @@ export function AgentCalls() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
+  const [dialLoading, setDialLoading] = useState(false);
+  const [hasCalledCurrentLead, setHasCalledCurrentLead] = useState(false);
   const [callBackDateError, setCallBackDateError] = useState<string>();
   const stopAutoCallRef = useRef(false);
 
@@ -132,6 +134,10 @@ export function AgentCalls() {
     };
   }, [currentLead?.leadId, agentSlug]);
 
+  useEffect(() => {
+    setHasCalledCurrentLead(false);
+  }, [currentLead?.leadId]);
+
   const handleSelectLead = (index: number) => setCurrentIndex(index);
 
   const handleSkip = async () => {
@@ -173,9 +179,31 @@ export function AgentCalls() {
         followUpDate: form.callBackDate || undefined,
         source: "manual",
       });
-      const newLeads = leads.filter((_, i) => i !== currentIndex);
-      setLeads(newLeads);
-      setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
+      setHasCalledCurrentLead(false);
+
+      const [detailRes, queueRes] = await Promise.all([
+        agentCallsApi.detail(currentLead.leadId, agentSlug),
+        agentCallsApi.queue(agentSlug),
+      ]);
+      setDetail(detailRes);
+      const nextForm = formFromDetail(detailRes);
+      setForm(nextForm);
+      setCallBackDateError(
+        getCallBackDateError(
+          nextForm.callBackDate,
+          detailRes.brandState.lastCalledDate ?? "",
+        ),
+      );
+
+      setLeads(queueRes.data);
+      const preservedIndex = queueRes.data.findIndex(
+        (lead) => lead.leadId === currentLead.leadId,
+      );
+      if (preservedIndex >= 0) {
+        setCurrentIndex(preservedIndex);
+      } else if (currentIndex >= queueRes.data.length) {
+        setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+      }
     } catch (err) {
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
     } finally {
@@ -187,11 +215,7 @@ export function AgentCalls() {
     setForm((prev) => ({ ...prev, notWorkAnymore: value }));
     if (!value || !currentLead) return;
     try {
-      await agentCallsApi.markVoid(
-        agentSlug,
-        currentLead.leadId,
-        form.notWorkAnymore,
-      );
+      await agentCallsApi.markVoid(agentSlug, currentLead.leadId, value);
       const newLeads = leads.filter((_, i) => i !== currentIndex);
       setLeads(newLeads);
       setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
@@ -216,6 +240,25 @@ export function AgentCalls() {
     }
   };
 
+  const handleCallCurrentLead = async () => {
+    if (!currentLead || dialLoading || isAutoCalling) return;
+
+    setDialLoading(true);
+    try {
+      const res = await agentCallsApi.dial(agentSlug, currentLead.leadId);
+      setTestMode(res.testMode);
+      setHasCalledCurrentLead(true);
+    } catch (err) {
+      setModal({
+        title: "Dial Error",
+        message: getDialErrorMessage(err),
+        direction: "top",
+      });
+    } finally {
+      setDialLoading(false);
+    }
+  };
+
   const handleDial = async () => {
     if (leads.length === 0) return;
     stopAutoCallRef.current = false;
@@ -228,19 +271,13 @@ export function AgentCalls() {
       try {
         const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
         setTestMode(res.testMode);
+        if (snapshot[i].leadId === currentLead?.leadId) {
+          setHasCalledCurrentLead(true);
+        }
       } catch (err) {
-        const status = (err as { status?: number })?.status;
-        const dialErrors: Record<number, string> = {
-          404: "Lead not found",
-          412: "Dialer not configured for this agent",
-          422: "No phone number on file",
-          502: "Dialer unavailable, try again",
-        };
         setModal({
           title: "Dial Error",
-          message:
-            (status !== undefined ? dialErrors[status] : undefined) ??
-            "Failed to place call",
+          message: getDialErrorMessage(err),
           direction: "top",
         });
         break;
@@ -287,8 +324,13 @@ export function AgentCalls() {
         onStop={handleStopAutoCalling}
       />
 
-      <main className="mx-auto max-w-5xl space-y-3 px-3 py-4 sm:space-y-4 sm:px-4 sm:py-6">
-        <HeroCard currentLead={currentLead} />
+      <main className="space-y-3 px-4 py-4 sm:space-y-4 sm:px-4 sm:py-6">
+        <HeroCard
+          currentLead={currentLead}
+          onCall={handleCallCurrentLead}
+          callLoading={dialLoading}
+          callDisabled={isAutoCalling}
+        />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-1">
@@ -325,7 +367,9 @@ export function AgentCalls() {
             />
             <CallOutcomeCard
               onSelect={handleOutcome}
-              disabled={outcomeLoading || detailLoading}
+              disabled={
+                outcomeLoading || detailLoading || !hasCalledCurrentLead
+              }
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

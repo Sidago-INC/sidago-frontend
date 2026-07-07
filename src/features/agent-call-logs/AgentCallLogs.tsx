@@ -94,7 +94,6 @@ type SavableFormFields = Pick<
   | "email"
   | "contactType"
   | "svgLeadType"
-  | "doesNotWorkAnymore"
   | "callBackDate"
 >;
 
@@ -106,7 +105,6 @@ function pickSavableFields(form: EditableCallLogState): SavableFormFields {
     email: form.email,
     contactType: form.contactType,
     svgLeadType: form.svgLeadType,
-    doesNotWorkAnymore: form.doesNotWorkAnymore,
     callBackDate: form.callBackDate,
   };
 }
@@ -225,10 +223,6 @@ function buildLeadPatchBody(
   if (form.contactType !== detail.lead.contactType) {
     leadPatch.contact_type = form.contactType;
   }
-  if (form.doesNotWorkAnymore !== detail.lead.notWorkAnymore) {
-    leadPatch.not_work_anymore = form.doesNotWorkAnymore;
-  }
-
   const brandPatch: NonNullable<LeadPatchBody["brandStates"]> = {};
   if (form.svgLeadType !== detail.brandState.leadType) {
     brandPatch[brandKey] = { lead_type: form.svgLeadType };
@@ -621,8 +615,20 @@ export function AgentCallLogs() {
     }
   };
 
-  const handleMarkVoid = (checked: boolean) => {
+  const handleMarkVoid = async (checked: boolean) => {
     updateForm("doesNotWorkAnymore", checked);
+    if (!checked || !selectedLead) return;
+
+    try {
+      await markVoid.mutateAsync({
+        leadId: selectedLead.leadId,
+        notWorkAnymore: checked,
+      });
+      showSuccessToast("Lead marked as no longer working at the company.");
+    } catch (error) {
+      updateForm("doesNotWorkAnymore", false);
+      showErrorToast(error);
+    }
   };
 
   const handleCallBackDateChange = (date: string) => {

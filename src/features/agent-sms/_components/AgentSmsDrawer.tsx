@@ -41,6 +41,7 @@ type AgentSmsDrawerProps = {
   rowCount: number;
   onCancel: () => void;
   onChange: (field: keyof AgentSmsRow, value: string | boolean) => void;
+  onNotWorkedChange: (checked: boolean) => void;
   onNavigate: (index: number) => void;
   onReset: () => void;
   onSave: () => void;
@@ -181,6 +182,7 @@ export function AgentSmsDrawer({
   rowCount,
   onCancel,
   onChange,
+  onNotWorkedChange,
   onNavigate,
   onReset,
   onSave,
@@ -442,7 +444,7 @@ export function AgentSmsDrawer({
               <CheckboxInput
                 checked={row.notWorked}
                 onChange={(event) =>
-                  onChange("notWorked", event.target.checked)
+                  onNotWorkedChange(event.target.checked)
                 }
                 labelClassName="justify-end"
               />

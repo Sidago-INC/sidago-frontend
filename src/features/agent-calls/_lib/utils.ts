@@ -27,6 +27,21 @@ export function displayOptionalText(
   return trimmed || placeholder;
 }
 
+const DIAL_ERRORS: Record<number, string> = {
+  404: "Lead not found",
+  412: "Dialer not configured for this agent",
+  422: "No phone number on file",
+  502: "Dialer unavailable, try again",
+};
+
+export function getDialErrorMessage(err: unknown): string {
+  const status = (err as { status?: number })?.status;
+  return (
+    (status !== undefined ? DIAL_ERRORS[status] : undefined) ??
+    "Failed to place call"
+  );
+}
+
 export function parseLocalDateString(value: string): Date | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

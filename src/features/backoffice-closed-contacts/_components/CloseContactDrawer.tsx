@@ -37,6 +37,10 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import {
+  resolveAgentSlugForClosedContacts,
+  toggleMarkVoid,
+} from "@/features/agent-calls/_lib/markVoid";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
   useUpdateLead,
@@ -177,8 +181,7 @@ export function ClosedContactDrawer({
       form.phone !== initialForm.phone ||
       form.email !== initialForm.email ||
       form.contactType !== initialForm.contactType ||
-      form.bentonLeadType !== initialForm.bentonLeadType ||
-      form.doesNotWorkAnymore !== initialForm.doesNotWorkAnymore
+      form.bentonLeadType !== initialForm.bentonLeadType
     );
   }, [form, initialForm]);
 
@@ -234,6 +237,33 @@ export function ClosedContactDrawer({
     }));
   };
 
+  const handleDoesNotWorkChange = async (checked: boolean) => {
+    if (!row?.leadId) {
+      showErrorToast(new Error("Cannot update: this row has no leadId."));
+      return;
+    }
+
+    const agentSlug = resolveAgentSlugForClosedContacts(tabKey, row.brand);
+    if (!agentSlug) {
+      showErrorToast(
+        new Error(
+          "Cannot mark void: no brand context. Switch to a brand tab or ensure the row has a brand.",
+        ),
+      );
+      return;
+    }
+
+    updateForm("doesNotWorkAnymore", checked);
+    if (!checked) return;
+
+    const ok = await toggleMarkVoid(agentSlug, row.leadId, checked, {
+      successMessage: "Lead marked as no longer working at the company.",
+    });
+    if (!ok) {
+      updateForm("doesNotWorkAnymore", false);
+    }
+  };
+
   const handleReset = () => {
     setFormState(null);
   };
@@ -258,9 +288,6 @@ export function ClosedContactDrawer({
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
-    }
-    if (form.doesNotWorkAnymore !== initialForm.doesNotWorkAnymore) {
-      leadDiff.not_work_anymore = form.doesNotWorkAnymore;
     }
 
     if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
@@ -506,7 +533,7 @@ export function ClosedContactDrawer({
             <CheckboxInput
               checked={form.doesNotWorkAnymore}
               onChange={(event) =>
-                updateForm("doesNotWorkAnymore", event.target.checked)
+                handleDoesNotWorkChange(event.target.checked)
               }
               labelClassName="justify-end"
             />

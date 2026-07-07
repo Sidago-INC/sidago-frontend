@@ -15,6 +15,9 @@ export type LeadPickerRow = {
   fullName: string | null;
   companySymbol: string | null;
   label: string;
+  email?: string | null;
+  phone?: string | null;
+  contactType?: string | null;
 };
 
 type LeadsResponse = {
@@ -44,11 +47,11 @@ function pickerToDirectoryRow(row: LeadPickerRow): LeadDirectoryRow {
       companyName,
       companySymbol,
       fullName: row.fullName ?? "",
-      phone: "",
+      phone: row.phone ?? "",
       role: "",
-      email: "",
+      email: row.email ?? "",
       timezone: "",
-      contactType: "",
+      contactType: row.contactType ?? "",
       svgLeadType: "",
       svgToBeCalledBy: "",
       svgLastCallDate: "",

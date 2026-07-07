@@ -25,7 +25,7 @@ export function LeadSelector({ leads, currentIndex, onSelect }: Props) {
         searchable
         searchPlaceholder="Search leads..."
         onChange={(value) => onSelect(Number(value))}
-        className="min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700 transition focus:outline-none focus:ring-0 sm:max-w-55 sm:px-3 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+        className="min-w-0 flex-1 cursor-pointer rounded-lg border border-slate-300 bg-slate-50 py-1.5 pl-2.5 pr-9 text-sm text-slate-700 transition focus:outline-none focus:ring-0 sm:max-w-xs sm:pl-3 sm:pr-10 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
       />
       <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-600 sm:text-sm dark:text-gray-300">
         {currentIndex + 1}/{leads.length}

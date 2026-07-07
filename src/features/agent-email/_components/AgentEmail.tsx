@@ -4,6 +4,7 @@ import { EmailPriorityBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { getCallBackDateError } from "@/features/agent-calls/_lib/utils";
+import { toggleMarkVoid } from "@/features/agent-calls/_lib/markVoid";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -420,6 +421,21 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     );
   };
 
+  const handleNotWorkedChange = async (checked: boolean) => {
+    const row = drawerState.draft;
+    if (!row) return;
+
+    updateDraft("notWorked", checked);
+    if (!checked) return;
+
+    const ok = await toggleMarkVoid(agentSlug, row.leadId, checked, {
+      successMessage: "Lead marked as no longer working at the company.",
+    });
+    if (!ok) {
+      updateDraft("notWorked", false);
+    }
+  };
+
   const resetDraft = () => {
     setDrawerState((current) => ({
       ...current,
@@ -528,6 +544,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         rowCount={rows.length}
         onCancel={closeDrawer}
         onChange={updateDraft}
+        onNotWorkedChange={handleNotWorkedChange}
         onNavigate={openDrawerAtIndex}
         onReset={resetDraft}
         onSave={saveDraft}

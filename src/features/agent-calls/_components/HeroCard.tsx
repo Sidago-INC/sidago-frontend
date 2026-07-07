@@ -4,7 +4,17 @@ import { TypeBadge, TimezoneBadge } from "@/components/ui";
 import { Building2, BriefcaseBusiness, Phone } from "lucide-react";
 import { LeadStatBox } from "./LeadStatBox";
 
-export function HeroCard({ currentLead }: { currentLead: QueueLead }) {
+export function HeroCard({
+  currentLead,
+  onCall,
+  callLoading = false,
+  callDisabled = false,
+}: {
+  currentLead: QueueLead;
+  onCall: () => void;
+  callLoading?: boolean;
+  callDisabled?: boolean;
+}) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/60 shadow-sm dark:border-gray-700 dark:bg-white/10">
       <div className="flex flex-col gap-3 p-4 sm:gap-4 sm:p-6">
@@ -14,13 +24,15 @@ export function HeroCard({ currentLead }: { currentLead: QueueLead }) {
               {formatLeadDisplayTitle(currentLead)}
             </h1>
 
-            <a
-              href={`tel:${currentLead.phone}`}
-              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-500 dark:bg-sky-500 dark:hover:bg-sky-400"
+            <button
+              type="button"
+              onClick={onCall}
+              disabled={callDisabled || callLoading}
+              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 self-start rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-sky-500 dark:hover:bg-sky-400"
             >
               <Phone className="h-4 w-4 shrink-0" />
-              Call
-            </a>
+              {callLoading ? "Calling..." : "Call"}
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

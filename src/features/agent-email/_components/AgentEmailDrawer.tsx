@@ -45,6 +45,7 @@ type AgentEmailDrawerProps = {
   rowCount: number;
   onCancel: () => void;
   onChange: (field: keyof AgentEmailRow, value: string | boolean) => void;
+  onNotWorkedChange: (checked: boolean) => void;
   onNavigate: (index: number) => void;
   onReset: () => void;
   onSave: () => void;
@@ -187,6 +188,7 @@ export function AgentEmailDrawer({
   rowCount,
   onCancel,
   onChange,
+  onNotWorkedChange,
   onNavigate,
   onReset,
   onSave,
@@ -484,7 +486,7 @@ export function AgentEmailDrawer({
               <CheckboxInput
                 checked={row.notWorked}
                 onChange={(event) =>
-                  onChange("notWorked", event.target.checked)
+                  onNotWorkedChange(event.target.checked)
                 }
                 labelClassName="justify-end"
               />

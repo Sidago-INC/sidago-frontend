@@ -28,6 +28,7 @@ import {
   useSmsQueue,
   useUpdateSmsState,
 } from "../_lib/hooks";
+import { toggleMarkVoid } from "@/features/agent-calls/_lib/markVoid";
 
 type AgentSmsProps = {
   agentName: string;
@@ -266,6 +267,21 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     );
   };
 
+  const handleNotWorkedChange = async (checked: boolean) => {
+    const row = drawerState.draft;
+    if (!row) return;
+
+    updateDraft("notWorked", checked);
+    if (!checked) return;
+
+    const ok = await toggleMarkVoid(agentSlug, row.leadId, checked, {
+      successMessage: "Lead marked as no longer working at the company.",
+    });
+    if (!ok) {
+      updateDraft("notWorked", false);
+    }
+  };
+
   const columns = useMemo<Column<AgentSmsRow>[]>(
     () => [
       {
@@ -434,6 +450,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         rowCount={rows.length}
         onCancel={closeDrawer}
         onChange={updateDraft}
+        onNotWorkedChange={handleNotWorkedChange}
         onNavigate={openDrawerAtIndex}
         onReset={resetDraft}
         onSave={saveDraft}

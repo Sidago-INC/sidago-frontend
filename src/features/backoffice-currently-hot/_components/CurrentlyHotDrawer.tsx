@@ -30,10 +30,8 @@ import {
   type LeadPatchBody,
 } from "@/features/backoffice-shared/use-update-lead";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import {
-  getCallBackDateError,
-  getMinCallBackDate,
-} from "@/features/agent-calls/_lib/utils";
+import { getCallBackDateError, getMinCallBackDate } from "@/features/agent-calls/_lib/utils";
+import { toggleMarkVoid, jsonEqualIgnoringKeys } from "@/features/agent-calls/_lib/markVoid";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -48,6 +46,7 @@ import {
 type CurrentlyHotSvgDrawerProps = {
   data: LeadRow[];
   columns?: Column<LeadRow>[];
+  variant: "svg" | "95rm" | "benton";
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;
@@ -170,6 +169,7 @@ function buildLeadCompanyRow(row: LeadRow): CompanyRow | null {
 export function CurrentlyHotDrawer({
   data,
   columns,
+  variant,
   selectedIndex,
   onSelectedIndexChange,
   onClose,
@@ -204,7 +204,7 @@ export function CurrentlyHotDrawer({
   const companyChanged = form?.companyName !== initialForm?.companyName;
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
-    return JSON.stringify(form) !== JSON.stringify(initialForm);
+    return !jsonEqualIgnoringKeys(form, initialForm, ["notWorked"]);
   }, [form, initialForm]);
 
   const extraCompanyOptions = useMemo(() => {
@@ -530,6 +530,23 @@ export function CurrentlyHotDrawer({
     }));
   };
 
+  const handleNotWorkedChange = async (checked: boolean) => {
+    if (!row?.leadId) {
+      showErrorToast(new Error("Cannot update: this row has no leadId."));
+      return;
+    }
+
+    updateForm("notWorked", checked);
+    if (!checked) return;
+
+    const ok = await toggleMarkVoid(variant, row.leadId, checked, {
+      successMessage: "Lead marked as no longer working at the company.",
+    });
+    if (!ok) {
+      updateForm("notWorked", false);
+    }
+  };
+
   const handleCompanyChange = (value: string | number) => {
     const stringValue = String(value);
     const selectedOption = companyOptions.find(
@@ -609,9 +626,6 @@ export function CurrentlyHotDrawer({
     if (form.role !== initialForm.role) leadDiff.role = form.role;
     if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
-    }
-    if (form.notWorked !== initialForm.notWorked) {
-      leadDiff.not_work_anymore = form.notWorked;
     }
     if (form.companyName !== initialForm.companyName) {
       leadDiff.company_name = form.companyName;
@@ -890,7 +904,7 @@ export function CurrentlyHotDrawer({
             <ToggleField
               label="Not Work Anymore"
               checked={form.notWorked}
-              onChange={(checked) => updateForm("notWorked", checked)}
+              onChange={handleNotWorkedChange}
             />
           </div>
         </DetailCard>

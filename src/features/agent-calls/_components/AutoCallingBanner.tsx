@@ -27,7 +27,7 @@ export function AutoCallingBanner({
           : "border-b border-slate-200 bg-white dark:border-gray-700 dark:bg-gray-900"
       }`}
     >
-      <div className="mx-auto flex max-w-5xl flex-col gap-2.5 px-3 py-2.5 sm:h-14 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4 sm:py-0">
+      <div className="flex flex-col gap-2.5 px-4 py-2.5 sm:h-14 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-0">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           {isAutoCalling && <PingDot />}
           <span
