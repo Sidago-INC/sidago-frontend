@@ -1,11 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import {
-  applyLeaderboardBadgeStatuses,
-  type LeaderboardBadgeStatus,
-} from "@/lib/resolveLeaderboardBadge";
-
-export type { LeaderboardBadgeStatus };
 
 export type TodayAgentCard = {
   id: string;
@@ -15,7 +9,7 @@ export type TodayAgentCard = {
   callsToday: number;
   hotLeadsToday: number;
   currentHotLeads: number;
-  badgeStatus: LeaderboardBadgeStatus;
+  isWinner: boolean;
 };
 
 export type MonthlyAgentCard = {
@@ -23,11 +17,25 @@ export type MonthlyAgentCard = {
   name: string;
   surname: string;
   brand: string;
+  monthlyCalls: number;
+  hotLeads: number;
+  lostHotLeads: number;
+  contractsClosed: number;
   monthlyPoints: number;
   lastMonthPoints: number;
   allPoints: number;
   wins: number;
-  badgeStatus: LeaderboardBadgeStatus;
+  isWinner: boolean;
+};
+
+export type AgentHistoryMonth = {
+  yearMonth: string;
+  callsMade: number;
+  hotLeads: number;
+  lostHotLeads: number;
+  contractsClosed: number;
+  points: number;
+  isWinner: boolean;
 };
 
 type DailyScoresResponse = {
@@ -64,6 +72,13 @@ type MonthlyScoresResponse = {
   }>;
 };
 
+type AgentMonthlyHistoryResponse = {
+  ok: true;
+  agentSlug: string;
+  brandCode: string;
+  history: AgentHistoryMonth[];
+};
+
 function brandCodeToLabel(brandCode: string): string {
   switch (brandCode.toLowerCase()) {
     case "svg":
@@ -96,9 +111,8 @@ function formatMonthParam(date: Date) {
 function mapDailyScoresToCards(
   scores: DailyScoresResponse["dailyScores"],
 ): TodayAgentCard[] {
-  const baseCards = scores.map((score) => {
+  return scores.map((score) => {
     const { name, surname } = splitAgentName(score.name);
-
     return {
       id: score.agentSlug,
       name,
@@ -107,37 +121,32 @@ function mapDailyScoresToCards(
       callsToday: score.callsMade,
       hotLeadsToday: score.hotLeads,
       currentHotLeads: score.currentHotLeads,
-      points: score.points,
+      isWinner: score.isWinner,
     };
   });
-
-  return applyLeaderboardBadgeStatuses(baseCards, (card) => card.points).map(
-    ({ points: _points, ...card }) => card,
-  );
 }
 
 function mapMonthlyScoresToCards(
   scores: MonthlyScoresResponse["monthlyScores"],
 ): MonthlyAgentCard[] {
-  const baseCards = scores.map((score) => {
+  return scores.map((score) => {
     const { name, surname } = splitAgentName(score.name);
-
     return {
       id: score.agentSlug,
       name,
       surname,
       brand: brandCodeToLabel(score.brandCode),
+      monthlyCalls: score.callsMade,
+      hotLeads: score.hotLeads,
+      lostHotLeads: score.lostHotLeads,
+      contractsClosed: score.contractsClosed,
       monthlyPoints: score.monthlyPoints,
       lastMonthPoints: score.lastMonthPoints,
       allPoints: score.allPoints,
       wins: score.wins,
+      isWinner: score.isWinner,
     };
   });
-
-  return applyLeaderboardBadgeStatuses(
-    baseCards,
-    (card) => card.monthlyPoints,
-  );
 }
 
 export function useAdminTodayAgentCards(selectedDate: Date) {
@@ -175,5 +184,19 @@ export function useAdminMonthlyAgentCards(selectedDate: Date) {
       };
     },
     staleTime: 60_000,
+  });
+}
+
+export function useAgentMonthlyHistory(agentSlug: string | null) {
+  return useQuery({
+    queryKey: ["agent-monthly-history", agentSlug],
+    queryFn: async () => {
+      const json = (await api.get(
+        `/dashboard/agent-monthly-history?agentSlug=${agentSlug}`,
+      )) as AgentMonthlyHistoryResponse;
+      return json;
+    },
+    enabled: Boolean(agentSlug),
+    staleTime: 5 * 60_000,
   });
 }

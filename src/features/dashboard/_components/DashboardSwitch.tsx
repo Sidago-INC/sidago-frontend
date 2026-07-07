@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/providers/AuthProvider";
 import AgentDashboard from "@/features/agent-dashboard/AgentDashboard";
-import AdminDashboard from "@/features/admin-dashboard/AdminDashboard";
 import { BackofficeDashboard } from "@/features/backoffice-dashboard/_components/BackofficeDashboard";
 
 export default function DashboardSwitch() {
@@ -16,12 +15,9 @@ export default function DashboardSwitch() {
     return <AgentDashboard />;
   }
 
-  if (user.role === "backoffice") {
+  // backoffice (manager) and admin both see the same all-agents comparison view
+  if (user.role === "backoffice" || user.role === "admin") {
     return <BackofficeDashboard />;
-  }
-
-  if (user.role === "admin") {
-    return <AdminDashboard />;
   }
 
   return null;

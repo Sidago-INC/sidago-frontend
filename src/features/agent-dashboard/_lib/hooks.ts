@@ -208,6 +208,126 @@ function mergeDashboardScores(params: {
   return agents;
 }
 
+// ── Panel 1: call report ──────────────────────────────────────────────────
+
+type CallReportResponse = {
+  ok: true;
+  startDate: string;
+  endDate: string;
+  agentSlug: string;
+  brandCode: string;
+  totalCalls: number;
+  byResult: Record<string, number>;
+};
+
+export function useAgentCallReport(
+  agentSlug: string | null | undefined,
+  startDate: string,
+  endDate: string,
+) {
+  return useQuery({
+    queryKey: ["agent-dashboard", "call-report", agentSlug, startDate, endDate],
+    queryFn: async () =>
+      api.get(
+        `/dashboard/call-report?agentSlug=${agentSlug}&startDate=${startDate}&endDate=${endDate}`,
+      ) as Promise<CallReportResponse>,
+    enabled: Boolean(agentSlug),
+    staleTime: 60_000,
+  });
+}
+
+// ── Panel 2: call details ─────────────────────────────────────────────────
+
+export type CallDetailRow = {
+  callLogId: string;
+  calledAt: string;
+  resultCode: string | null;
+  notes: string | null;
+  durationSeconds: number | null;
+  source: string | null;
+  leadId: string;
+  fullName: string | null;
+  companyName: string | null;
+  companySymbol: string | null;
+  leadType: string | null;
+};
+
+type CallDetailsResponse = {
+  ok: true;
+  startDate: string;
+  endDate: string;
+  agentSlug: string;
+  brandCode: string;
+  data: CallDetailRow[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+};
+
+export function useAgentCallDetails(
+  agentSlug: string | null | undefined,
+  startDate: string,
+  endDate: string,
+  page: number,
+  limit: number,
+) {
+  return useQuery({
+    queryKey: ["agent-dashboard", "call-details", agentSlug, startDate, endDate, page, limit],
+    queryFn: async () =>
+      api.get(
+        `/dashboard/call-details?agentSlug=${agentSlug}&startDate=${startDate}&endDate=${endDate}&page=${page}&limit=${limit}`,
+      ) as Promise<CallDetailsResponse>,
+    enabled: Boolean(agentSlug),
+    staleTime: 60_000,
+  });
+}
+
+// ── Panel 3: hot and closed ───────────────────────────────────────────────
+
+export type HotAndClosedRow = {
+  leadId: string;
+  leadIdExternal: string | null;
+  fullName: string | null;
+  phone: string | null;
+  phoneExtension: string | null;
+  email: string | null;
+  role: string | null;
+  timezone: string | null;
+  contactType: string | null;
+  leadType: string | null;
+  lastCalledDate: string | null;
+  followUpDate: string | null;
+  dateBecameHot: string | null;
+  callResultCode: string | null;
+  companyName: string | null;
+  companySymbol: string | null;
+};
+
+type HotAndClosedResponse = {
+  ok: true;
+  agentSlug: string;
+  brandCode: string;
+  counts: { hot: number; contractClosed: number };
+  data: HotAndClosedRow[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+};
+
+export function useAgentHotAndClosed(
+  agentSlug: string | null | undefined,
+  page: number,
+  limit: number,
+) {
+  return useQuery({
+    queryKey: ["agent-dashboard", "hot-and-closed", agentSlug, page, limit],
+    queryFn: async () =>
+      api.get(
+        `/dashboard/hot-and-closed?agentSlug=${agentSlug}&page=${page}&limit=${limit}`,
+      ) as Promise<HotAndClosedResponse>,
+    enabled: Boolean(agentSlug),
+    staleTime: 60_000,
+  });
+}
+
+// ── All-agents merged scores (still used by StatusSection) ────────────────
+
 export function useAgentDashboard(selectedDate = new Date()) {
   const date = formatLocalDateParam(selectedDate);
   const currentMonth = formatLocalMonthParam(selectedDate);

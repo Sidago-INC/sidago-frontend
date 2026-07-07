@@ -1,8 +1,8 @@
 
-import { AgentGridSection } from "./_components/AgentGridSection";
-import { ChartsSection } from "./_components/ChartsSection";
-import { Leaderboard } from "./_components/Leaderboard";
 import { StatusSection } from "./_components/StatusSection";
+import { AgentCallReportPanel } from "./_components/AgentCallReportPanel";
+import { AgentCallDetailsPanel } from "./_components/AgentCallDetailsPanel";
+import { AgentHotAndClosedPanel } from "./_components/AgentHotAndClosedPanel";
 import { findAgentByLoggedInName, getMonthlyWinner } from "./_lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
 import { ErrorState, Preloader } from "@/components/ui";
@@ -10,9 +10,12 @@ import { useAgentDashboard } from "./_lib/hooks";
 
 export default function AgentDashboard() {
   const { user } = useAuth();
+  const agentSlug = user?.slug ?? null;
   const { data, isLoading, isError, error, refetch } = useAgentDashboard();
   const agents = data?.agents ?? [];
-  const currentAgent = findAgentByLoggedInName(agents, user?.name);
+  const currentAgent = agentSlug
+    ? agents.find((a) => a.recordId === agentSlug)
+    : findAgentByLoggedInName(agents, user?.name);
   const monthlyWinner = getMonthlyWinner(agents);
 
   if (isLoading && agents.length === 0) {
@@ -46,11 +49,11 @@ export default function AgentDashboard() {
           loggedInName={user?.name ?? ""}
         />
 
-        <Leaderboard agents={agents} />
+        <AgentCallReportPanel agentSlug={agentSlug} />
 
-        <ChartsSection agents={agents} />
+        <AgentCallDetailsPanel agentSlug={agentSlug} />
 
-        <AgentGridSection agents={agents} />
+        <AgentHotAndClosedPanel agentSlug={agentSlug} />
 
         <div className="h-4" />
       </main>

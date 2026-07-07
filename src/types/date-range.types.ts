@@ -1,7 +1,6 @@
-export type DateRange = {
-  from?: Date;
-  to?: Date;
-};
+import type { DateRange } from "react-day-picker";
+
+export type { DateRange };
 
 function formatYMD(date: Date): string {
   const year = date.getFullYear();

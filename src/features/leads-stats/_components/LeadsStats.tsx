@@ -2,7 +2,7 @@
 
 import { DateRangePicker, SimpleStatusCard } from "@/components/ui";
 import { Ban, CircleOff, Target, RefreshCcw, Wrench } from "lucide-react";
-import type { DateRange } from "@/types/date-range.types";
+import { type DateRange } from "react-day-picker";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDrawer } from "@/providers/DrawerProvider";
 import {
@@ -67,7 +67,7 @@ export function LeadsStats() {
     () => [
       {
         id: "leads-fixed",
-        label: "Leads Fixed",
+        label: "Leads fixed",
         value: effectiveStats?.leadsFixed ?? 0,
         icon: <Wrench size={18} />,
         titleClassName: "text-emerald-700 dark:text-emerald-300",
@@ -75,7 +75,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-fix",
-        label: "Leads Sent To Fix",
+        label: "Leads sent to fix",
         value: effectiveStats?.leadsSentToFix ?? 0,
         icon: <RefreshCcw size={18} />,
         titleClassName: "text-sky-700 dark:text-sky-300",
@@ -83,7 +83,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-cant-locate",
-        label: "Leads Sent To Can't Locate",
+        label: "Leads sent to can't locate",
         value: effectiveStats?.leadsSentToCantLocate ?? 0,
         icon: <Target size={18} />,
         titleClassName: "text-amber-700 dark:text-amber-300",
@@ -91,7 +91,7 @@ export function LeadsStats() {
       },
       {
         id: "new-leads-created",
-        label: "New Leads Created",
+        label: "New leads created",
         value: effectiveStats?.newLeadsCreated ?? 0,
         icon: <Wrench size={18} />,
         titleClassName: "text-violet-700 dark:text-violet-300",
@@ -99,7 +99,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-void",
-        label: "Leads Sent To VOID",
+        label: "Leads sent to VOID",
         value: effectiveStats?.leadsSentToVoid ?? 0,
         icon: <Ban size={18} />,
         titleClassName: "text-rose-700 dark:text-rose-300",
@@ -107,7 +107,7 @@ export function LeadsStats() {
       },
       {
         id: "leads-sent-to-dnc",
-        label: "Leads Sent To DNC",
+        label: "Leads sent to DNC",
         value: effectiveStats?.leadsSentToDnc ?? 0,
         icon: <CircleOff size={18} />,
         titleClassName: "text-slate-600 dark:text-slate-300",
@@ -126,21 +126,22 @@ export function LeadsStats() {
           </h1>
         </div>
 
-        <div className="flex shrink-0">
-          <DateRangePicker
-            value={selectedRange}
-            onChange={(value) =>
-              setSelectedRange(
-                value ?? {
-                  from: today,
-                  to: today,
-                },
-              )
-            }
-            placeholder="Pick a date or range"
-            fullWidth={false}
-            className="h-11 rounded-xl border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-950"
-          />
+        <div className="flex w-full max-w-xl flex-col lg:items-end">
+          <div className="w-full lg:max-w-md">
+            <DateRangePicker
+              value={selectedRange}
+              onChange={(value) =>
+                setSelectedRange(
+                  value ?? {
+                    from: today,
+                    to: today,
+                  },
+                )
+              }
+              placeholder="Pick a date or range"
+              className="h-11 rounded-xl border-slate-300 bg-white text-sm dark:border-slate-700 dark:bg-slate-950"
+            />
+          </div>
         </div>
       </div>
 
