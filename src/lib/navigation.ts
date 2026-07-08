@@ -15,6 +15,7 @@ import {
   Phone,
   RefreshCw,
   RotateCcw,
+  ShieldAlert,
   Target,
   Upload,
   UserPlus,
@@ -357,6 +358,11 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
       },
     ],
   },
+  {
+    label: "Call Fraud",
+    href: "/call-fraud",
+    icon: ShieldAlert,
+  },
 ];
 }
 
@@ -487,6 +493,7 @@ const ROUTE_LABEL_FALLBACKS: Record<string, string> = {
   "/additional-contacts": "Additional Contacts",
   "/monthly-stats-points": "Monthly Stats",
   "/closed-contacts": "Closed Contacts",
+  "/call-fraud": "Call Fraud Review",
   "/currently-hot-leads-svg": "Currently Hot SVG",
   "/currently-hot-leads-95rm": "Currently Hot 95RM",
   "/currently-hot-leads-benton": "Currently Hot Benton",

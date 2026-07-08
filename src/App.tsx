@@ -35,6 +35,7 @@ import { EmailBlocklistDirectory } from "@/features/email-blocklist-directory/_c
 import { DeadMissingEmail } from "@/features/dead-missing-email/_components/DeadMissingEmail";
 import { BackofficeDashboard } from "@/features/backoffice-dashboard/_components/BackofficeDashboard";
 import { ClosedContacts } from "@/features/backoffice-closed-contacts/_components/ClosedContacts";
+import { CallFraud } from "@/features/call-fraud/CallFraud";
 
 // SMS / Email pages
 import SmsPage from "@/pages/SmsPage";
@@ -120,6 +121,9 @@ export default function App() {
                 {/* Backoffice dashboard */}
                 <Route path="/monthly-stats-points" element={<P><BackofficeDashboard initialView="monthly" /></P>} />
                 <Route path="/closed-contacts" element={<P><ClosedContacts /></P>} />
+
+                {/* Call Fraud (admin only) */}
+                <Route path="/call-fraud" element={<P><CallFraud /></P>} />
 
                 {/* Currently Hot */}
                 <Route path="/currently-hot-leads-svg" element={<P><CurrentlyHotSvg /></P>} />

@@ -72,6 +72,7 @@ export function AgentCalls() {
   const [outcomeLoading, setOutcomeLoading] = useState(false);
   const [dialLoading, setDialLoading] = useState(false);
   const [hasCalledCurrentLead, setHasCalledCurrentLead] = useState(false);
+  const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [callBackDateError, setCallBackDateError] = useState<string>();
   const stopAutoCallRef = useRef(false);
 
@@ -136,6 +137,7 @@ export function AgentCalls() {
 
   useEffect(() => {
     setHasCalledCurrentLead(false);
+    setActiveCallId(null);
   }, [currentLead?.leadId]);
 
   const handleSelectLead = (index: number) => setCurrentIndex(index);
@@ -174,10 +176,11 @@ export function AgentCalls() {
       await agentCallsApi.logResult({
         agentSlug,
         leadId: currentLead.leadId,
+        callId: activeCallId ?? undefined,
         resultCode,
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
-        source: "manual",
+        source: activeCallId ? "dialer" : "manual",
       });
       setHasCalledCurrentLead(false);
 
@@ -247,6 +250,7 @@ export function AgentCalls() {
     try {
       const res = await agentCallsApi.dial(agentSlug, currentLead.leadId);
       setTestMode(res.testMode);
+      setActiveCallId(res.callId);
       setHasCalledCurrentLead(true);
     } catch (err) {
       setModal({
@@ -272,6 +276,7 @@ export function AgentCalls() {
         const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
         setTestMode(res.testMode);
         if (snapshot[i].leadId === currentLead?.leadId) {
+          setActiveCallId(res.callId);
           setHasCalledCurrentLead(true);
         }
       } catch (err) {

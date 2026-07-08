@@ -107,6 +107,7 @@ export type LeadDetailResponse = {
 export type LogResultBody = {
   agentSlug: string;
   leadId: string;
+  callId?: string;
   resultCode: string;
   notes?: string;
   followUpDate?: string;
