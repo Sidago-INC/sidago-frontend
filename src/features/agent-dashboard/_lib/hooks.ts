@@ -244,6 +244,8 @@ export type CallDetailRow = {
   resultCode: string | null;
   notes: string | null;
   durationSeconds: number | null;
+  mcDurationSeconds: number | null;
+  mcRecordingLink: string | null;
   source: string | null;
   leadId: string;
   fullName: string | null;

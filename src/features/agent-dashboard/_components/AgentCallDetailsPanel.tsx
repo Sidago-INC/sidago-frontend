@@ -89,7 +89,7 @@ export function AgentCallDetailsPanel({
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
               <tr>
-                {["Time", "Lead", "Company", "Outcome", "Lead Type", "Duration"].map(
+                {["Time", "Lead", "Company", "Outcome", "Lead Type", "Duration", "Recording"].map(
                   (h) => (
                     <th
                       key={h}
@@ -125,7 +125,21 @@ export function AgentCallDetailsPanel({
                     {row.leadType ?? "—"}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-400">
-                    {formatDuration(row.durationSeconds)}
+                    {formatDuration(row.mcDurationSeconds ?? row.durationSeconds)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {row.mcRecordingLink ? (
+                      <a
+                        href={row.mcRecordingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-medium text-violet-600 hover:text-violet-500 hover:underline dark:text-violet-400 dark:hover:text-violet-300"
+                      >
+                        Listen
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-600">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
