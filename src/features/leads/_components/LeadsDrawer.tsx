@@ -48,7 +48,7 @@ import {
   relatedLeadToDirectoryRow,
   type LeadDrawerFormState,
 } from "../_lib/lead-detail";
-import { type LeadDirectoryRow } from "../_lib/data";
+import { createLeadDirectoryRow, type LeadDirectoryRow } from "../_lib/data";
 import type { RelatedLead } from "@/features/fix-leads/_lib/data";
 import { useRelatedLeads } from "@/features/fix-leads/_lib/data";
 
@@ -74,6 +74,35 @@ function escapeHtml(value: string) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function applyFormToDirectoryRow(
+  row: LeadDirectoryRow,
+  form: LeadDrawerFormState,
+): LeadDirectoryRow {
+  return createLeadDirectoryRow(
+    {
+      ...row,
+      companyName: form.companyName,
+      fullName: form.fullName,
+      phone: form.phone,
+      role: form.role,
+      email: form.email,
+      contactType: form.contactType,
+      svgLeadType: form.svgLeadType,
+      svgToBeCalledBy: form.svgToBeCalledBy,
+      bentonLeadType: form.bentonLeadType,
+      bentonToBeCalledBy: form.bentonToBeCalledBy,
+      rm95LeadType: form.rm95LeadType,
+      rm95ToBeCalledBy: form.rm95ToBeCalledBy,
+      notWorked: form.notWorked,
+    },
+    {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      phoneExtension: form.phoneExtension,
+    },
+  );
 }
 
 function ToggleField({
@@ -182,9 +211,14 @@ export function LeadsDrawer({
   const relatedContacts = relatedQuery.data ?? [];
 
   const displayRow = useMemo(
-    () =>
-      detailPayload ? leadDetailToDirectoryRow(detailPayload, row) : row,
-    [detailPayload, row],
+    () => {
+      const baseRow = detailPayload ? leadDetailToDirectoryRow(detailPayload, row) : row;
+      if (!baseRow) return baseRow;
+      return formState?.key === rowKey
+        ? applyFormToDirectoryRow(baseRow, formState.value)
+        : baseRow;
+    },
+    [detailPayload, formState, row, rowKey],
   );
 
   const isEditMode = rowKey !== "" && editModeKey === rowKey;
@@ -450,8 +484,17 @@ export function LeadsDrawer({
     const leadDiff: NonNullable<LeadPatchBody["lead"]> = {};
 
     if (form.fullName !== initialForm.fullName) leadDiff.full_name = form.fullName;
+    if (form.firstName !== initialForm.firstName) {
+      leadDiff.first_name = form.firstName;
+    }
+    if (form.lastName !== initialForm.lastName) {
+      leadDiff.last_name = form.lastName;
+    }
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
+    if (form.phoneExtension !== initialForm.phoneExtension) {
+      leadDiff.phone_extension = form.phoneExtension;
+    }
     if (form.role !== initialForm.role) leadDiff.role = form.role;
     if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
@@ -479,16 +522,34 @@ export function LeadsDrawer({
         to_be_called_by: form.svgToBeCalledBy || null,
       };
     }
+    if (form.svgToBeCalledOn !== initialForm.svgToBeCalledOn) {
+      brandStates.svg = {
+        ...brandStates.svg,
+        last_called_date: form.svgToBeCalledOn || null,
+      };
+    }
     if (form.bentonToBeCalledBy !== initialForm.bentonToBeCalledBy) {
       brandStates.benton = {
         ...brandStates.benton,
         to_be_called_by: form.bentonToBeCalledBy || null,
       };
     }
+    if (form.bentonToBeCalledOn !== initialForm.bentonToBeCalledOn) {
+      brandStates.benton = {
+        ...brandStates.benton,
+        last_called_date: form.bentonToBeCalledOn || null,
+      };
+    }
     if (form.rm95ToBeCalledBy !== initialForm.rm95ToBeCalledBy) {
       brandStates["95rm"] = {
         ...brandStates["95rm"],
         to_be_called_by: form.rm95ToBeCalledBy || null,
+      };
+    }
+    if (form.rm95ToBeCalledOn !== initialForm.rm95ToBeCalledOn) {
+      brandStates["95rm"] = {
+        ...brandStates["95rm"],
+        last_called_date: form.rm95ToBeCalledOn || null,
       };
     }
 
@@ -502,18 +563,38 @@ export function LeadsDrawer({
 
     try {
       await updateLead.mutateAsync({ leadId: row.leadId, body });
+      const savedRow = applyFormToDirectoryRow(displayRow, form);
+
+      queryClient.setQueriesData<
+        { data: LeadDirectoryRow[]; meta: unknown } | undefined
+      >({ queryKey: ["leads", "directory"] }, (current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          data: current.data.map((item) =>
+            item.leadId === row.leadId ? savedRow : item,
+          ),
+        };
+      });
+
+      setFormState({ key: rowKey, value: form });
+      setEditModeKey(null);
+
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["leads", "directory"] }),
-        queryClient.invalidateQueries({
+        queryClient.refetchQueries({
+          queryKey: ["leads", "directory"],
+          type: "active",
+        }),
+        queryClient.refetchQueries({
           queryKey: ["lead-call-detail", row.leadId],
+          type: "active",
         }),
         queryClient.invalidateQueries({
           queryKey: ["lead-related", row.leadId],
         }),
       ]);
       showSuccessToast("Lead changes saved successfully.");
-      setEditModeKey(null);
-      setFormState(null);
     } catch (error) {
       showErrorToast(error);
     }
