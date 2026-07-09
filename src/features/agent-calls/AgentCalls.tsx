@@ -199,16 +199,47 @@ export function AgentCalls() {
       );
 
       setLeads(queueRes.data);
-      const preservedIndex = queueRes.data.findIndex(
-        (lead) => lead.leadId === currentLead.leadId,
-      );
-      if (preservedIndex >= 0) {
-        setCurrentIndex(preservedIndex);
-      } else if (currentIndex >= queueRes.data.length) {
-        setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+
+      if (isAutoCalling && !stopAutoCallRef.current && queueRes.data.length > 0) {
+        // Auto-calling: advance past the lead we just logged, then dial the next one.
+        // If the logged lead is still in the queue, go one position after it.
+        // If it was removed, currentIndex already points to the natural next lead.
+        const loggedPosInNew = queueRes.data.findIndex(
+          (l) => l.leadId === currentLead.leadId,
+        );
+        const nextIdx =
+          loggedPosInNew >= 0
+            ? loggedPosInNew + 1
+            : Math.min(currentIndex, queueRes.data.length - 1);
+
+        if (nextIdx < queueRes.data.length) {
+          setCurrentIndex(nextIdx);
+          const nextLead = queueRes.data[nextIdx];
+          const nextCallId = await dialOneLead(nextLead);
+          if (nextCallId) {
+            setActiveCallId(nextCallId);
+            setHasCalledCurrentLead(true);
+          } else {
+            setIsAutoCalling(false);
+          }
+        } else {
+          setIsAutoCalling(false);
+          setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+        }
+      } else {
+        // Manual mode: stay on the current lead if it is still in the queue.
+        const preservedIndex = queueRes.data.findIndex(
+          (lead) => lead.leadId === currentLead.leadId,
+        );
+        if (preservedIndex >= 0) {
+          setCurrentIndex(preservedIndex);
+        } else if (currentIndex >= queueRes.data.length) {
+          setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+        }
       }
     } catch (err) {
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
+      setIsAutoCalling(false);
     } finally {
       setOutcomeLoading(false);
     }
@@ -243,54 +274,44 @@ export function AgentCalls() {
     }
   };
 
-  const handleCallCurrentLead = async () => {
-    if (!currentLead || dialLoading || isAutoCalling) return;
-
+  // Shared dial logic. Takes the target lead explicitly so it is safe to call
+  // from anywhere without stale-closure bugs. Returns the callId on success, null on error.
+  const dialOneLead = async (lead: QueueLead): Promise<string | null> => {
     setDialLoading(true);
     try {
-      const res = await agentCallsApi.dial(agentSlug, currentLead.leadId);
+      const res = await agentCallsApi.dial(agentSlug, lead.leadId);
       setTestMode(res.testMode);
-      setActiveCallId(res.callId);
-      setHasCalledCurrentLead(true);
+      return res.callId;
     } catch (err) {
-      setModal({
-        title: "Dial Error",
-        message: getDialErrorMessage(err),
-        direction: "top",
-      });
+      setModal({ title: "Dial Error", message: getDialErrorMessage(err), direction: "top" });
+      return null;
     } finally {
       setDialLoading(false);
     }
   };
 
+  const handleCallCurrentLead = async () => {
+    if (!currentLead || dialLoading || isAutoCalling) return;
+    const callId = await dialOneLead(currentLead);
+    if (callId) {
+      setActiveCallId(callId);
+      setHasCalledCurrentLead(true);
+    }
+  };
+
+  // Starts auto-calling from the current lead. Dials exactly one lead at a time;
+  // the next dial fires only after the agent logs an outcome (see handleOutcome).
   const handleDial = async () => {
-    if (leads.length === 0) return;
+    if (!currentLead || leads.length === 0 || isAutoCalling || dialLoading) return;
     stopAutoCallRef.current = false;
     setIsAutoCalling(true);
-
-    const snapshot = leads;
-    for (let i = currentIndex; i < snapshot.length; i++) {
-      if (stopAutoCallRef.current) break;
-      // setCurrentIndex(i);
-      try {
-        const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
-        setTestMode(res.testMode);
-        if (snapshot[i].leadId === currentLead?.leadId) {
-          setActiveCallId(res.callId);
-          setHasCalledCurrentLead(true);
-        }
-      } catch (err) {
-        setModal({
-          title: "Dial Error",
-          message: getDialErrorMessage(err),
-          direction: "top",
-        });
-        break;
-      }
+    const callId = await dialOneLead(currentLead);
+    if (callId) {
+      setActiveCallId(callId);
+      setHasCalledCurrentLead(true);
+    } else {
+      setIsAutoCalling(false);
     }
-
-    stopAutoCallRef.current = false;
-    setIsAutoCalling(false);
   };
 
   const handleStopAutoCalling = () => {
