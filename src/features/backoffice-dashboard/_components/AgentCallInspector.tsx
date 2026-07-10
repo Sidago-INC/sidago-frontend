@@ -53,6 +53,12 @@ function formatDateTime(ts: string): string {
   });
 }
 
+function ensureAbsoluteUrl(url: string): string {
+  return url.startsWith("http://") || url.startsWith("https://")
+    ? url
+    : `https://${url}`;
+}
+
 function formatDuration(seconds: number | null): string {
   if (!seconds) return "—";
   const mins = Math.floor(seconds / 60);
@@ -254,7 +260,7 @@ export function AgentCallInspector() {
                         <td className="whitespace-nowrap px-4 py-3">
                           {row.mcRecordingLink ? (
                             <a
-                              href={row.mcRecordingLink}
+                              href={ensureAbsoluteUrl(row.mcRecordingLink)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs font-medium text-violet-600 hover:text-violet-500 hover:underline dark:text-violet-400 dark:hover:text-violet-300"
