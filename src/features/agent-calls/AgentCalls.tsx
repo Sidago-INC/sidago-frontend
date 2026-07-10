@@ -9,6 +9,7 @@ import { CallsHeader } from "./_components/CallsHeader";
 import { DatesCard } from "./_components/DatesCard";
 import { HistoryCard } from "./_components/HistoryCard";
 import { IdentityCard } from "./_components/IdentityCard";
+import { OtherContactsCard } from "./_components/OtherContactsCard";
 import { HeroCard } from "./_components/HeroCard";
 import { PhoneCard } from "./_components/PhoneCard";
 import { WorkToggleRow } from "./_components/WorkToggleRow";
@@ -19,12 +20,33 @@ import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
 import {
   formatCallsHistory,
   formatNotesHistory,
-  formatRelatedContacts,
 } from "@/features/agent-call-logs/_lib/format";
 import { getHistoryEntries } from "./_lib/history";
 import { MessageSquare, NotebookText, Users } from "lucide-react";
 
 const QUEUE_REFETCH_MS = 90_000;
+const PENDING_OUTCOME_STORAGE_KEY = "agent-calls:pending-outcome";
+
+type PendingOutcomeState = {
+  leadId: string;
+  callId: string | null;
+};
+
+function readPendingOutcomeState(): PendingOutcomeState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_OUTCOME_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingOutcomeState>;
+    if (typeof parsed.leadId !== "string") return null;
+    return {
+      leadId: parsed.leadId,
+      callId: typeof parsed.callId === "string" ? parsed.callId : null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function emptyForm(): CallsFormState {
   return {
@@ -71,10 +93,12 @@ export function AgentCalls() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
   const [dialLoading, setDialLoading] = useState(false);
-  const [hasCalledCurrentLead, setHasCalledCurrentLead] = useState(false);
-  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [pendingOutcome, setPendingOutcome] = useState<PendingOutcomeState | null>(
+    () => readPendingOutcomeState(),
+  );
   const [callBackDateError, setCallBackDateError] = useState<string>();
   const stopAutoCallRef = useRef(false);
+  const currentLeadIdRef = useRef<string | null>(null);
 
   // Queue: load on mount + refetch every 90s
   useEffect(() => {
@@ -84,9 +108,16 @@ export function AgentCalls() {
         const res = await agentCallsApi.queue(agentSlug);
         if (cancelled) return;
         setLeads(res.data);
-        setCurrentIndex((prev) =>
-          Math.min(prev, Math.max(res.data.length - 1, 0)),
-        );
+        const currentLeadId = currentLeadIdRef.current;
+        setCurrentIndex((prev) => {
+          if (currentLeadId) {
+            const preservedIndex = res.data.findIndex(
+              (lead) => lead.leadId === currentLeadId,
+            );
+            if (preservedIndex >= 0) return preservedIndex;
+          }
+          return Math.min(prev, Math.max(res.data.length - 1, 0));
+        });
       } catch {
         // Keep existing leads on refetch failure
       } finally {
@@ -102,6 +133,14 @@ export function AgentCalls() {
   }, [agentSlug]);
 
   const currentLead: QueueLead | null = leads[currentIndex] ?? null;
+  const canLogCurrentLeadOutcome =
+    pendingOutcome?.leadId != null &&
+    pendingOutcome.leadId === currentLead?.leadId;
+  const activeCallId = canLogCurrentLeadOutcome ? pendingOutcome.callId : null;
+
+  useEffect(() => {
+    currentLeadIdRef.current = currentLead?.leadId ?? null;
+  }, [currentLead?.leadId]);
 
   // Detail: load whenever the selected lead changes
   useEffect(() => {
@@ -136,9 +175,16 @@ export function AgentCalls() {
   }, [currentLead?.leadId, agentSlug]);
 
   useEffect(() => {
-    setHasCalledCurrentLead(false);
-    setActiveCallId(null);
-  }, [currentLead?.leadId]);
+    if (typeof window === "undefined") return;
+    if (pendingOutcome) {
+      window.sessionStorage.setItem(
+        PENDING_OUTCOME_STORAGE_KEY,
+        JSON.stringify(pendingOutcome),
+      );
+      return;
+    }
+    window.sessionStorage.removeItem(PENDING_OUTCOME_STORAGE_KEY);
+  }, [pendingOutcome]);
 
   const handleSelectLead = (index: number) => setCurrentIndex(index);
 
@@ -182,7 +228,9 @@ export function AgentCalls() {
         followUpDate: form.callBackDate || undefined,
         source: activeCallId ? "dialer" : "manual",
       });
-      setHasCalledCurrentLead(false);
+      setPendingOutcome((prev) =>
+        prev?.leadId === currentLead.leadId ? null : prev,
+      );
 
       const [detailRes, queueRes] = await Promise.all([
         agentCallsApi.detail(currentLead.leadId, agentSlug),
@@ -246,13 +294,23 @@ export function AgentCalls() {
   const handleCallCurrentLead = async () => {
     if (!currentLead || dialLoading || isAutoCalling) return;
 
+    const previousPendingOutcome = pendingOutcome;
+    setPendingOutcome({
+      leadId: currentLead.leadId,
+      callId: previousPendingOutcome?.leadId === currentLead.leadId
+        ? previousPendingOutcome.callId
+        : null,
+    });
     setDialLoading(true);
     try {
       const res = await agentCallsApi.dial(agentSlug, currentLead.leadId);
       setTestMode(res.testMode);
-      setActiveCallId(res.callId);
-      setHasCalledCurrentLead(true);
+      setPendingOutcome({
+        leadId: currentLead.leadId,
+        callId: res.callId,
+      });
     } catch (err) {
+      setPendingOutcome(previousPendingOutcome);
       setModal({
         title: "Dial Error",
         message: getDialErrorMessage(err),
@@ -269,17 +327,32 @@ export function AgentCalls() {
     setIsAutoCalling(true);
 
     const snapshot = leads;
+    const pendingLeadId = currentLead?.leadId ?? null;
+    const previousPendingOutcome = pendingOutcome;
+    if (pendingLeadId) {
+      setPendingOutcome({
+        leadId: pendingLeadId,
+        callId: previousPendingOutcome?.leadId === pendingLeadId
+          ? previousPendingOutcome.callId
+          : null,
+      });
+    }
     for (let i = currentIndex; i < snapshot.length; i++) {
       if (stopAutoCallRef.current) break;
       // setCurrentIndex(i);
       try {
         const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
         setTestMode(res.testMode);
-        if (snapshot[i].leadId === currentLead?.leadId) {
-          setActiveCallId(res.callId);
-          setHasCalledCurrentLead(true);
+        if (snapshot[i].leadId === pendingLeadId) {
+          setPendingOutcome({
+            leadId: pendingLeadId,
+            callId: res.callId,
+          });
         }
       } catch (err) {
+        if (snapshot[i].leadId === pendingLeadId) {
+          setPendingOutcome(previousPendingOutcome);
+        }
         setModal({
           title: "Dial Error",
           message: getDialErrorMessage(err),
@@ -373,7 +446,7 @@ export function AgentCalls() {
             <CallOutcomeCard
               onSelect={handleOutcome}
               disabled={
-                outcomeLoading || detailLoading || !hasCalledCurrentLead
+                outcomeLoading || detailLoading || !canLogCurrentLeadOutcome
               }
             />
 
@@ -402,12 +475,8 @@ export function AgentCalls() {
                 }
                 icon={MessageSquare}
               />
-              <HistoryCard
-                title="Other Contacts"
-                value={
-                  detail ? formatRelatedContacts(detail.relatedContacts) : ""
-                }
-                icon={Users}
+              <OtherContactsCard
+                contacts={detail?.relatedContacts ?? []}
                 className="sm:col-span-2"
               />
             </div>
