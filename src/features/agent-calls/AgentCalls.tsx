@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
+import { createNamespacedSocket } from "@/lib/socket";
 import { useSearchParams } from "react-router-dom";
 import { Info } from "lucide-react";
 import { CardShell, EmptyState, Modal } from "@/components/ui";
@@ -75,6 +77,11 @@ export function AgentCalls() {
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [callBackDateError, setCallBackDateError] = useState<string>();
   const stopAutoCallRef = useRef(false);
+  const isAutoCallingRef = useRef(false);
+  const [awaitingCallEnd, setAwaitingCallEnd] = useState(false);
+  const callsSocketRef = useRef<Socket | null>(null);
+  const completedCallIdsRef = useRef<Set<string>>(new Set());
+  const callCompletedResolversRef = useRef<Map<string, () => void>>(new Map());
 
   // Queue: load on mount + refetch every 90s
   useEffect(() => {
@@ -83,10 +90,12 @@ export function AgentCalls() {
       try {
         const res = await agentCallsApi.queue(agentSlug);
         if (cancelled) return;
-        setLeads(res.data);
-        setCurrentIndex((prev) =>
-          Math.min(prev, Math.max(res.data.length - 1, 0)),
-        );
+        if (!isAutoCallingRef.current) {
+          setLeads(res.data);
+          setCurrentIndex((prev) =>
+            Math.min(prev, Math.max(res.data.length - 1, 0)),
+          );
+        }
       } catch {
         // Keep existing leads on refetch failure
       } finally {
@@ -100,6 +109,31 @@ export function AgentCalls() {
       clearInterval(id);
     };
   }, [agentSlug]);
+
+  // WebSocket: receive OutgoingCallCompleted events from the backend so the
+  // auto-advance guard (Phase 3) knows when MightyCall has freed the line.
+  useEffect(() => {
+    const socket = createNamespacedSocket("/agent-calls");
+    callsSocketRef.current = socket;
+
+    socket.on("call-completed", (data: { callId: string; mcStatus: string | null }) => {
+      completedCallIdsRef.current.add(data.callId);
+      const resolver = callCompletedResolversRef.current.get(data.callId);
+      if (resolver) {
+        resolver();
+        callCompletedResolversRef.current.delete(data.callId);
+      }
+    });
+
+    socket.connect();
+
+    return () => {
+      socket.disconnect();
+      callsSocketRef.current = null;
+      for (const resolve of callCompletedResolversRef.current.values()) resolve();
+      callCompletedResolversRef.current.clear();
+    };
+  }, []);
 
   const currentLead: QueueLead | null = leads[currentIndex] ?? null;
 
@@ -215,18 +249,40 @@ export function AgentCalls() {
         if (nextIdx < queueRes.data.length) {
           setCurrentIndex(nextIdx);
           const nextLead = queueRes.data[nextIdx];
-          const nextCallId = await dialOneLead(nextLead);
-          if (nextCallId) {
-            setActiveCallId(nextCallId);
-            setHasCalledCurrentLead(true);
-          } else {
+
+          // Phase 3 guard: wait for MightyCall to confirm the previous call
+          // ended before dialing the next lead. Prevents 409 "call in progress"
+          // errors. Times out after 60s so auto-calling never deadlocks.
+          if (activeCallId) {
+            setAwaitingCallEnd(true);
+            await waitForCallCompleted(activeCallId);
+            setAwaitingCallEnd(false);
+          }
+
+          if (stopAutoCallRef.current) {
             setIsAutoCalling(false);
+            isAutoCallingRef.current = false;
+          } else {
+            const nextCallId = await dialOneLead(nextLead);
+            if (nextCallId) {
+              setActiveCallId(nextCallId);
+              setHasCalledCurrentLead(true);
+            } else {
+              setIsAutoCalling(false);
+              isAutoCallingRef.current = false;
+            }
           }
         } else {
           setIsAutoCalling(false);
+          isAutoCallingRef.current = false;
           setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
         }
       } else {
+        // Queue empty or stop requested while auto-calling — end the session.
+        if (isAutoCalling) {
+          setIsAutoCalling(false);
+          isAutoCallingRef.current = false;
+        }
         // Manual mode: stay on the current lead if it is still in the queue.
         const preservedIndex = queueRes.data.findIndex(
           (lead) => lead.leadId === currentLead.leadId,
@@ -240,6 +296,8 @@ export function AgentCalls() {
     } catch (err) {
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
       setIsAutoCalling(false);
+      isAutoCallingRef.current = false;
+      setAwaitingCallEnd(false);
     } finally {
       setOutcomeLoading(false);
     }
@@ -290,6 +348,21 @@ export function AgentCalls() {
     }
   };
 
+  // Resolves when the backend emits call-completed for this callId (keyed on
+  // call_logs.id). If the event already arrived before this is called, resolves
+  // immediately. Falls through after timeoutMs regardless so auto-calling never
+  // deadlocks if the MightyCall webhook is delayed or lost.
+  const waitForCallCompleted = (callId: string, timeoutMs = 60_000): Promise<void> => {
+    if (completedCallIdsRef.current.has(callId)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      callCompletedResolversRef.current.set(callId, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  };
+
   const handleCallCurrentLead = async () => {
     if (!currentLead || dialLoading || isAutoCalling) return;
     const callId = await dialOneLead(currentLead);
@@ -305,18 +378,21 @@ export function AgentCalls() {
     if (!currentLead || leads.length === 0 || isAutoCalling || dialLoading) return;
     stopAutoCallRef.current = false;
     setIsAutoCalling(true);
+    isAutoCallingRef.current = true;
     const callId = await dialOneLead(currentLead);
     if (callId) {
       setActiveCallId(callId);
       setHasCalledCurrentLead(true);
     } else {
       setIsAutoCalling(false);
+      isAutoCallingRef.current = false;
     }
   };
 
   const handleStopAutoCalling = () => {
     stopAutoCallRef.current = true;
     setIsAutoCalling(false);
+    isAutoCallingRef.current = false;
   };
 
   if (queueLoading) {
@@ -346,6 +422,7 @@ export function AgentCalls() {
         isAutoCalling={isAutoCalling}
         testMode={testMode}
         currentLeadName={currentLead.fullName}
+        awaitingCallEnd={awaitingCallEnd}
         onStart={handleDial}
         onStop={handleStopAutoCalling}
       />
@@ -393,9 +470,7 @@ export function AgentCalls() {
             />
             <CallOutcomeCard
               onSelect={handleOutcome}
-              disabled={
-                outcomeLoading || detailLoading || !hasCalledCurrentLead
-              }
+              disabled={outcomeLoading || !hasCalledCurrentLead}
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
