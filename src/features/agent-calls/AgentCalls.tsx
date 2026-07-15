@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { Socket } from "socket.io-client";
+import { createNamespacedSocket } from "@/lib/socket";
 import { useSearchParams } from "react-router-dom";
 import { Info } from "lucide-react";
 import { CardShell, EmptyState, Modal } from "@/components/ui";
@@ -22,7 +24,7 @@ import {
   formatNotesHistory,
 } from "@/features/agent-call-logs/_lib/format";
 import { getHistoryEntries } from "./_lib/history";
-import { MessageSquare, NotebookText, Users } from "lucide-react";
+import { MessageSquare, NotebookText } from "lucide-react";
 
 const QUEUE_REFETCH_MS = 90_000;
 const PENDING_OUTCOME_STORAGE_KEY = "agent-calls:pending-outcome";
@@ -97,8 +99,13 @@ export function AgentCalls() {
     () => readPendingOutcomeState(),
   );
   const [callBackDateError, setCallBackDateError] = useState<string>();
+  const [awaitingCallEnd, setAwaitingCallEnd] = useState(false);
   const stopAutoCallRef = useRef(false);
   const currentLeadIdRef = useRef<string | null>(null);
+  const isAutoCallingRef = useRef(false);
+  const callsSocketRef = useRef<Socket | null>(null);
+  const completedCallIdsRef = useRef<Set<string>>(new Set());
+  const callCompletedResolversRef = useRef<Map<string, () => void>>(new Map());
 
   // Queue: load on mount + refetch every 90s
   useEffect(() => {
@@ -107,6 +114,8 @@ export function AgentCalls() {
       try {
         const res = await agentCallsApi.queue(agentSlug);
         if (cancelled) return;
+        // Skip refetch while auto-calling to avoid racing the one-at-a-time dial session.
+        if (isAutoCallingRef.current) return;
         setLeads(res.data);
         const currentLeadId = currentLeadIdRef.current;
         setCurrentIndex((prev) => {
@@ -131,6 +140,31 @@ export function AgentCalls() {
       clearInterval(id);
     };
   }, [agentSlug]);
+
+  // WebSocket: receive OutgoingCallCompleted events from the backend so the
+  // auto-advance guard (Phase 3) knows when MightyCall has freed the line.
+  useEffect(() => {
+    const socket = createNamespacedSocket("/agent-calls");
+    callsSocketRef.current = socket;
+
+    socket.on("call-completed", (data: { callId: string; mcStatus: string | null }) => {
+      completedCallIdsRef.current.add(data.callId);
+      const resolver = callCompletedResolversRef.current.get(data.callId);
+      if (resolver) {
+        resolver();
+        callCompletedResolversRef.current.delete(data.callId);
+      }
+    });
+
+    socket.connect();
+
+    return () => {
+      socket.disconnect();
+      callsSocketRef.current = null;
+      for (const resolve of callCompletedResolversRef.current.values()) resolve();
+      callCompletedResolversRef.current.clear();
+    };
+  }, []);
 
   const currentLead: QueueLead | null = leads[currentIndex] ?? null;
   const canLogCurrentLeadOutcome =
@@ -200,6 +234,54 @@ export function AgentCalls() {
     }
   };
 
+  // Shared dial logic. Takes the target lead explicitly so it is safe to call
+  // from anywhere without stale-closure bugs. Returns the callId on success, null on error.
+  const dialOneLead = async (lead: QueueLead): Promise<string | null> => {
+    const previousPendingOutcome = pendingOutcome;
+    setPendingOutcome({
+      leadId: lead.leadId,
+      callId:
+        previousPendingOutcome?.leadId === lead.leadId
+          ? previousPendingOutcome.callId
+          : null,
+    });
+    setDialLoading(true);
+    try {
+      const res = await agentCallsApi.dial(agentSlug, lead.leadId);
+      setTestMode(res.testMode);
+      setPendingOutcome({
+        leadId: lead.leadId,
+        callId: res.callId,
+      });
+      return res.callId;
+    } catch (err) {
+      setPendingOutcome(previousPendingOutcome);
+      setModal({
+        title: "Dial Error",
+        message: getDialErrorMessage(err),
+        direction: "top",
+      });
+      return null;
+    } finally {
+      setDialLoading(false);
+    }
+  };
+
+  // Resolves when the backend emits call-completed for this callId (keyed on
+  // call_logs.id). If the event already arrived before this is called, resolves
+  // immediately. Falls through after timeoutMs regardless so auto-calling never
+  // deadlocks if the MightyCall webhook is delayed or lost.
+  const waitForCallCompleted = (callId: string, timeoutMs = 60_000): Promise<void> => {
+    if (completedCallIdsRef.current.has(callId)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      callCompletedResolversRef.current.set(callId, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  };
+
   const handleOutcome = async (resultCode: string) => {
     if (!currentLead || outcomeLoading) return;
 
@@ -217,16 +299,18 @@ export function AgentCalls() {
       return;
     }
 
+    const loggedCallId = activeCallId;
+
     setOutcomeLoading(true);
     try {
       await agentCallsApi.logResult({
         agentSlug,
         leadId: currentLead.leadId,
-        callId: activeCallId ?? undefined,
+        callId: loggedCallId ?? undefined,
         resultCode,
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
-        source: activeCallId ? "dialer" : "manual",
+        source: loggedCallId ? "dialer" : "manual",
       });
       setPendingOutcome((prev) =>
         prev?.leadId === currentLead.leadId ? null : prev,
@@ -247,16 +331,68 @@ export function AgentCalls() {
       );
 
       setLeads(queueRes.data);
-      const preservedIndex = queueRes.data.findIndex(
-        (lead) => lead.leadId === currentLead.leadId,
-      );
-      if (preservedIndex >= 0) {
-        setCurrentIndex(preservedIndex);
-      } else if (currentIndex >= queueRes.data.length) {
-        setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+
+      if (isAutoCalling && !stopAutoCallRef.current && queueRes.data.length > 0) {
+        // Auto-calling: advance past the lead we just logged, then dial the next one.
+        // If the logged lead is still in the queue, go one position after it.
+        // If it was removed, currentIndex already points to the natural next lead.
+        const loggedPosInNew = queueRes.data.findIndex(
+          (l) => l.leadId === currentLead.leadId,
+        );
+        const nextIdx =
+          loggedPosInNew >= 0
+            ? loggedPosInNew + 1
+            : Math.min(currentIndex, queueRes.data.length - 1);
+
+        if (nextIdx < queueRes.data.length) {
+          setCurrentIndex(nextIdx);
+          const nextLead = queueRes.data[nextIdx];
+
+          // Phase 3 guard: wait for MightyCall to confirm the previous call
+          // ended before dialing the next lead. Prevents 409 "call in progress"
+          // errors. Times out after 60s so auto-calling never deadlocks.
+          if (loggedCallId) {
+            setAwaitingCallEnd(true);
+            await waitForCallCompleted(loggedCallId);
+            setAwaitingCallEnd(false);
+          }
+
+          if (stopAutoCallRef.current) {
+            setIsAutoCalling(false);
+            isAutoCallingRef.current = false;
+          } else {
+            const nextCallId = await dialOneLead(nextLead);
+            if (!nextCallId) {
+              setIsAutoCalling(false);
+              isAutoCallingRef.current = false;
+            }
+          }
+        } else {
+          setIsAutoCalling(false);
+          isAutoCallingRef.current = false;
+          setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+        }
+      } else {
+        // Queue empty or stop requested while auto-calling — end the session.
+        if (isAutoCalling) {
+          setIsAutoCalling(false);
+          isAutoCallingRef.current = false;
+        }
+        // Manual mode: stay on the current lead if it is still in the queue.
+        const preservedIndex = queueRes.data.findIndex(
+          (lead) => lead.leadId === currentLead.leadId,
+        );
+        if (preservedIndex >= 0) {
+          setCurrentIndex(preservedIndex);
+        } else if (currentIndex >= queueRes.data.length) {
+          setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+        }
       }
     } catch (err) {
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
+      setIsAutoCalling(false);
+      isAutoCallingRef.current = false;
+      setAwaitingCallEnd(false);
     } finally {
       setOutcomeLoading(false);
     }
@@ -293,82 +429,27 @@ export function AgentCalls() {
 
   const handleCallCurrentLead = async () => {
     if (!currentLead || dialLoading || isAutoCalling) return;
-
-    const previousPendingOutcome = pendingOutcome;
-    setPendingOutcome({
-      leadId: currentLead.leadId,
-      callId: previousPendingOutcome?.leadId === currentLead.leadId
-        ? previousPendingOutcome.callId
-        : null,
-    });
-    setDialLoading(true);
-    try {
-      const res = await agentCallsApi.dial(agentSlug, currentLead.leadId);
-      setTestMode(res.testMode);
-      setPendingOutcome({
-        leadId: currentLead.leadId,
-        callId: res.callId,
-      });
-    } catch (err) {
-      setPendingOutcome(previousPendingOutcome);
-      setModal({
-        title: "Dial Error",
-        message: getDialErrorMessage(err),
-        direction: "top",
-      });
-    } finally {
-      setDialLoading(false);
-    }
+    await dialOneLead(currentLead);
   };
 
+  // Starts auto-calling from the current lead. Dials exactly one lead at a time;
+  // the next dial fires only after the agent logs an outcome (see handleOutcome).
   const handleDial = async () => {
-    if (leads.length === 0) return;
+    if (!currentLead || leads.length === 0 || isAutoCalling || dialLoading) return;
     stopAutoCallRef.current = false;
     setIsAutoCalling(true);
-
-    const snapshot = leads;
-    const pendingLeadId = currentLead?.leadId ?? null;
-    const previousPendingOutcome = pendingOutcome;
-    if (pendingLeadId) {
-      setPendingOutcome({
-        leadId: pendingLeadId,
-        callId: previousPendingOutcome?.leadId === pendingLeadId
-          ? previousPendingOutcome.callId
-          : null,
-      });
+    isAutoCallingRef.current = true;
+    const callId = await dialOneLead(currentLead);
+    if (!callId) {
+      setIsAutoCalling(false);
+      isAutoCallingRef.current = false;
     }
-    for (let i = currentIndex; i < snapshot.length; i++) {
-      if (stopAutoCallRef.current) break;
-      // setCurrentIndex(i);
-      try {
-        const res = await agentCallsApi.dial(agentSlug, snapshot[i].leadId);
-        setTestMode(res.testMode);
-        if (snapshot[i].leadId === pendingLeadId) {
-          setPendingOutcome({
-            leadId: pendingLeadId,
-            callId: res.callId,
-          });
-        }
-      } catch (err) {
-        if (snapshot[i].leadId === pendingLeadId) {
-          setPendingOutcome(previousPendingOutcome);
-        }
-        setModal({
-          title: "Dial Error",
-          message: getDialErrorMessage(err),
-          direction: "top",
-        });
-        break;
-      }
-    }
-
-    stopAutoCallRef.current = false;
-    setIsAutoCalling(false);
   };
 
   const handleStopAutoCalling = () => {
     stopAutoCallRef.current = true;
     setIsAutoCalling(false);
+    isAutoCallingRef.current = false;
   };
 
   if (queueLoading) {
@@ -398,6 +479,7 @@ export function AgentCalls() {
         isAutoCalling={isAutoCalling}
         testMode={testMode}
         currentLeadName={currentLead.fullName}
+        awaitingCallEnd={awaitingCallEnd}
         onStart={handleDial}
         onStop={handleStopAutoCalling}
       />

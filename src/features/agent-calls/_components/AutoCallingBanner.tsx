@@ -8,6 +8,7 @@ type AutoCallingBannerProps = {
   isAutoCalling: boolean;
   testMode: boolean;
   currentLeadName: string;
+  awaitingCallEnd: boolean;
   onStart: () => void;
   onStop: () => void;
 };
@@ -16,6 +17,7 @@ export function AutoCallingBanner({
   isAutoCalling,
   testMode,
   currentLeadName,
+  awaitingCallEnd,
   onStart,
   onStop,
 }: AutoCallingBannerProps) {
@@ -35,7 +37,11 @@ export function AutoCallingBanner({
               isAutoCalling ? "text-white" : "text-slate-600 dark:text-gray-300"
             }`}
           >
-            {isAutoCalling ? "Auto Calling in progress..." : "Auto Calling"}
+            {isAutoCalling
+              ? awaitingCallEnd
+                ? "Waiting for call to end…"
+                : "Auto Calling in progress..."
+              : "Auto Calling"}
           </span>
           {isAutoCalling && testMode && (
             <span className="shrink-0 rounded bg-amber-400 px-1.5 py-0.5 text-xs font-bold text-amber-900">
