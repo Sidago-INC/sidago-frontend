@@ -796,6 +796,7 @@ export function LeadsDrawer({
           toBeCalledOn={form.svgToBeCalledOn}
           onToBeCalledOnChange={handleSvgToBeCalledOnChange}
           toBeCalledOnError={svgToBeCalledOnError}
+          lastCalledDate={displayRow.svgLastCallDate ?? ""}
           minCallBackDate={getMinCallBackDate(displayRow.svgLastCallDate ?? "")}
           historyCalls={form.svgHistoryCalls}
           historyNotes={form.svgHistoryNotes}
@@ -817,6 +818,7 @@ export function LeadsDrawer({
           toBeCalledOn={form.bentonToBeCalledOn}
           onToBeCalledOnChange={handleBentonToBeCalledOnChange}
           toBeCalledOnError={bentonToBeCalledOnError}
+          lastCalledDate={displayRow.bentonLastCallDate ?? ""}
           minCallBackDate={getMinCallBackDate(displayRow.bentonLastCallDate ?? "")}
           historyCalls={form.bentonHistoryCalls}
           historyNotes={form.bentonHistoryNotes}
@@ -838,6 +840,7 @@ export function LeadsDrawer({
           toBeCalledOn={form.rm95ToBeCalledOn}
           onToBeCalledOnChange={handleRm95ToBeCalledOnChange}
           toBeCalledOnError={rm95ToBeCalledOnError}
+          lastCalledDate={displayRow.rm95LastCallDate ?? ""}
           minCallBackDate={getMinCallBackDate(displayRow.rm95LastCallDate ?? "")}
           historyCalls={form.rm95HistoryCalls}
           historyNotes={form.rm95HistoryNotes}
@@ -885,6 +888,7 @@ function LeadDetailsCard({
   toBeCalledOn,
   onToBeCalledOnChange,
   toBeCalledOnError,
+  lastCalledDate,
   minCallBackDate,
   historyCalls,
   historyNotes,
@@ -900,6 +904,7 @@ function LeadDetailsCard({
   toBeCalledOn: string;
   onToBeCalledOnChange: (value: string) => void;
   toBeCalledOnError?: string;
+  lastCalledDate: string;
   minCallBackDate: Date;
   historyCalls: string;
   historyNotes: string;
@@ -937,6 +942,13 @@ function LeadDetailsCard({
           minDate={minCallBackDate}
           error={toBeCalledOnError}
           className="text-xs font-semibold"
+        />
+      </EditableField>
+      <EditableField label="Last Called Date">
+        <TextInput
+          value={lastCalledDate || "-"}
+          readOnly
+          className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
         />
       </EditableField>
       <EditableField label="History Calls" align="stack">

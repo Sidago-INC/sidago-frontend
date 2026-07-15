@@ -1,6 +1,7 @@
 
 import {
   Badge,
+  Button,
   EmailLink,
   ErrorState,
   Table,
@@ -13,7 +14,7 @@ import {
   showSuccessToast,
 } from "@/lib/toast";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import {
@@ -28,6 +29,7 @@ import { DeadMissingEmailDrawer } from "./DeadMissingEmailDrawer";
 const DEFAULT_ROWS_PER_PAGE = 500;
 
 export function DeadMissingEmail() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { page, perPage, setPage, setPerPage } = useServerPagination(
     DEFAULT_ROWS_PER_PAGE,
@@ -136,8 +138,23 @@ export function DeadMissingEmail() {
           </div>
         ),
       },
+      {
+        title: "Fix Lead",
+        key: "fixLead",
+        render: (row) => (
+          <Button
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/fix-leads/${row.leadId}`);
+            }}
+            className="cursor-pointer inline-flex h-6 items-center justify-center rounded border border-blue-600 bg-blue-500 px-4 text-sm font-semibold text-white transition hover:bg-blue-600 dark:border-blue-400 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500"
+          >
+            Fix
+          </Button>
+        ),
+      },
     ],
-    [],
+    [navigate],
   );
 
   const clearRow = async (row: DeadMissingEmailRow) => {

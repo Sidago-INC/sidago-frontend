@@ -162,6 +162,7 @@ function mapBrandState(
     leadType: state.leadType,
     followUpDate: state.followUpDate,
     lastCalledDate: state.lastCalledDate,
+    toBeCalledBy: state.toBeCalledBy?.trim() || null,
     callHistory: getHistoryEntries(history, state.brandCode).map(mapHistoryEntry),
   };
 }

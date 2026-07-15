@@ -3,11 +3,10 @@ import type { SmsQueueItem } from "./apiTypes";
 
 export type SmsBrand = "Sidago" | "Benton" | "95RM";
 export const SMS_STATUS_VALUES = [
-  "Queued",
-  "Sent",
-  "Delivered",
-  "Replied",
-  "Failed",
+  "1st",
+  "2nd",
+  "3rd",
+  "finished",
 ] as const;
 export type SmsStatus = (typeof SMS_STATUS_VALUES)[number];
 export const smsStatusOptions = SMS_STATUS_VALUES.map((value) => ({
@@ -50,11 +49,11 @@ export const smsAgentProfiles: Record<
 };
 
 function toSmsStatus(value: string | null): SmsStatus {
-  const normalized = (value ?? "Queued").trim();
-  if (SMS_STATUS_VALUES.includes(normalized as SmsStatus)) {
-    return normalized as SmsStatus;
-  }
-  return "Queued";
+  const normalized = (value ?? "1st").trim().toLowerCase();
+  const match = SMS_STATUS_VALUES.find(
+    (status) => status.toLowerCase() === normalized,
+  );
+  return match ?? "1st";
 }
 
 export function mapSmsQueueItem(
