@@ -1,11 +1,27 @@
+import { useState } from "react";
 import { Wave } from "@/components/ui";
 import { useServerPagination } from "@/lib/use-server-pagination";
-import { useFixQueue } from "../_lib/data";
+import {
+  contactsFilterOptions,
+  fixTimezoneOptions,
+  useFixQueue,
+  type ContactsFilter,
+} from "../_lib/data";
 import { FixLeadsTable } from "./FixLeadsTable";
 
 export function FixLeads() {
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const { data: result, isLoading, isError, error } = useFixQueue(page, perPage);
+  const [contactsFilter, setContactsFilter] = useState<ContactsFilter | "">("");
+  const [hasOtherContacts, setHasOtherContacts] = useState(false);
+  const [timezone, setTimezone] = useState("");
+
+  const { data: result, isLoading, isError, error } = useFixQueue(
+    page,
+    perPage,
+    contactsFilter || undefined,
+    hasOtherContacts || undefined,
+    timezone || undefined,
+  );
   const serverPagination = result?.meta
     ? {
         meta: result.meta,
@@ -20,6 +36,67 @@ export function FixLeads() {
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
           Fix Queue
         </h1>
+
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="contacts-filter"
+            className="text-sm font-medium text-slate-600 dark:text-slate-300"
+          >
+            Contacts filter
+          </label>
+          <select
+            id="contacts-filter"
+            value={contactsFilter}
+            onChange={(e) => {
+              setContactsFilter(e.target.value as ContactsFilter | "");
+              setPage(1);
+            }}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">All contacts</option>
+            {contactsFilterOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
+          <label
+            htmlFor="timezone-filter"
+            className="text-sm font-medium text-slate-600 dark:text-slate-300"
+          >
+            Timezone
+          </label>
+          <select
+            id="timezone-filter"
+            value={timezone}
+            onChange={(e) => {
+              setTimezone(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          >
+            <option value="">All timezones</option>
+            {fixTimezoneOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={hasOtherContacts}
+              onChange={(e) => {
+                setHasOtherContacts(e.target.checked);
+                setPage(1);
+              }}
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+            />
+            Has other contacts
+          </label>
+        </div>
       </div>
 
       {isLoading ? (

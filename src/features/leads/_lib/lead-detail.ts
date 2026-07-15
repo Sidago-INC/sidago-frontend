@@ -196,6 +196,10 @@ export function mapLeadDetailResponseToPayload(
       role: lead.role,
       timezone: lead.timezone,
       contactType: lead.contactType,
+      // The All-Leads detail endpoint does not return the per-lead
+      // other_contacts free-text field; it is surfaced on the Fix Lead form
+      // (via /leads/:id). Kept null here to satisfy the shared FullLead type.
+      otherContacts: null,
       notWorkAnymore: lead.notWorkAnymore,
       companyId: company.id,
       companyName: company.companyName,

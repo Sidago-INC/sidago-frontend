@@ -155,7 +155,27 @@ export function FixLeadsTable({
         ),
       },
       {
+        // The lead's own other_contacts free-text field (extra phone numbers,
+        // addresses, etc.) — the Airtable "other contacts" concept.
         title: "Other Contacts",
+        key: "otherContacts",
+        getValue: (row) => row.otherContacts ?? "",
+        render: (row) =>
+          row.otherContacts ? (
+            <span
+              title={row.otherContacts}
+              className="block max-w-[220px] truncate text-sm text-slate-700 dark:text-slate-200"
+            >
+              {row.otherContacts}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400">—</span>
+          ),
+      },
+      {
+        // Count of OTHER leads in the same company (distinct from the field
+        // above) — opens the related-contacts modal.
+        title: "Related Leads",
         key: "otherContactsCount",
         getValue: (row) => row.otherContactsCount,
         render: (row) => (
@@ -166,7 +186,7 @@ export function FixLeadsTable({
           >
             <Users size={12} />
             {row.otherContactsCount}{" "}
-            {row.otherContactsCount === 1 ? "contact" : "contacts"}
+            {row.otherContactsCount === 1 ? "lead" : "leads"}
           </Button>
         ),
       },
