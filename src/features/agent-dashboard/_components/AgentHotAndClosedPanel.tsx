@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { Panel } from "./Panel";
 import { useAgentHotAndClosed } from "../_lib/hooks";
 
-const PAGE_LIMIT = 50;
+const PAGE_LIMIT = DEFAULT_PAGE_SIZE;
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -26,7 +27,7 @@ export function AgentHotAndClosedPanel({
 
   const rows = data?.data ?? [];
   const counts = data?.counts;
-  const totalPages = data?.meta?.totalPages ?? 1;
+  const totalPages = data?.meta?.total_pages ?? 1;
 
   return (
     <Panel title="Hot & Closed Leads" subtitle="Leads currently assigned to you">

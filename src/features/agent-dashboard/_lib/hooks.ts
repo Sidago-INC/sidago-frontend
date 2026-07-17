@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { PaginationMeta } from "@/lib/pagination";
 import { resolveLeaderboardBadgeStatuses } from "@/lib/resolveLeaderboardBadge";
 import type { Agent } from "@/types";
 
@@ -261,7 +262,7 @@ type CallDetailsResponse = {
   agentSlug: string;
   brandCode: string;
   data: CallDetailRow[];
-  meta: { page: number; limit: number; total: number; totalPages: number };
+  meta: PaginationMeta;
 };
 
 export function useAgentCallDetails(
@@ -271,11 +272,27 @@ export function useAgentCallDetails(
   page: number,
   limit: number,
 ) {
+  const params = new URLSearchParams({
+    agentSlug: agentSlug ?? "",
+    startDate,
+    endDate,
+    page: String(page),
+    limit: String(limit),
+  });
+
   return useQuery({
-    queryKey: ["agent-dashboard", "call-details", agentSlug, startDate, endDate, page, limit],
+    queryKey: [
+      "agent-dashboard",
+      "call-details",
+      agentSlug,
+      startDate,
+      endDate,
+      page,
+      limit,
+    ],
     queryFn: async () =>
       api.get(
-        `/dashboard/call-details?agentSlug=${agentSlug}&startDate=${startDate}&endDate=${endDate}&page=${page}&limit=${limit}`,
+        `/dashboard/call-details?${params.toString()}`,
       ) as Promise<CallDetailsResponse>,
     enabled: Boolean(agentSlug),
     staleTime: 60_000,
@@ -309,7 +326,7 @@ type HotAndClosedResponse = {
   brandCode: string;
   counts: { hot: number; contractClosed: number };
   data: HotAndClosedRow[];
-  meta: { page: number; limit: number; total: number; totalPages: number };
+  meta: PaginationMeta;
 };
 
 export function useAgentHotAndClosed(

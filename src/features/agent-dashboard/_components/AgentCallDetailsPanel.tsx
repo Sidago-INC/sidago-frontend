@@ -2,10 +2,11 @@ import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { Panel } from "./Panel";
 import { useAgentCallDetails } from "../_lib/hooks";
 
-const PAGE_LIMIT = 50;
+const PAGE_LIMIT = DEFAULT_PAGE_SIZE;
 
 function localDate(date: Date): string {
   const y = date.getFullYear();
@@ -61,7 +62,7 @@ export function AgentCallDetailsPanel({
   );
 
   const rows = data?.data ?? [];
-  const totalPages = data?.meta?.totalPages ?? 1;
+  const totalPages = data?.meta?.total_pages ?? 1;
 
   const handleRangeChange = (range: DateRange | undefined) => {
     setDateRange(range);
