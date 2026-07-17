@@ -250,27 +250,13 @@ export function AgentCalls() {
           setCurrentIndex(nextIdx);
           const nextLead = queueRes.data[nextIdx];
 
-          // Phase 3 guard: wait for MightyCall to confirm the previous call
-          // ended before dialing the next lead. Prevents 409 "call in progress"
-          // errors. Times out after 60s so auto-calling never deadlocks.
-          if (activeCallId) {
-            setAwaitingCallEnd(true);
-            await waitForCallCompleted(activeCallId);
-            setAwaitingCallEnd(false);
-          }
-
-          if (stopAutoCallRef.current) {
+          const nextCallId = await dialOneLead(nextLead);
+          if (nextCallId) {
+            setActiveCallId(nextCallId);
+            setHasCalledCurrentLead(true);
+          } else {
             setIsAutoCalling(false);
             isAutoCallingRef.current = false;
-          } else {
-            const nextCallId = await dialOneLead(nextLead);
-            if (nextCallId) {
-              setActiveCallId(nextCallId);
-              setHasCalledCurrentLead(true);
-            } else {
-              setIsAutoCalling(false);
-              isAutoCallingRef.current = false;
-            }
           }
         } else {
           setIsAutoCalling(false);
@@ -297,7 +283,6 @@ export function AgentCalls() {
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
       setIsAutoCalling(false);
       isAutoCallingRef.current = false;
-      setAwaitingCallEnd(false);
     } finally {
       setOutcomeLoading(false);
     }
