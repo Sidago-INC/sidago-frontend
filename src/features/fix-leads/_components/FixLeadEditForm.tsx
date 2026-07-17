@@ -31,6 +31,7 @@ type FormState = {
   email: string;
   role: string;
   contactType: string;
+  otherContacts: string;
   notWorkAnymore: boolean;
 };
 
@@ -41,6 +42,7 @@ function toFormState(lead: FullLead): FormState {
     email: lead.email ?? "",
     role: lead.role ?? "",
     contactType: lead.contactType ?? "",
+    otherContacts: lead.otherContacts ?? "",
     notWorkAnymore: lead.notWorkAnymore,
   };
 }
@@ -120,6 +122,8 @@ export function FixLeadEditForm() {
     if (form.role !== baseline.role) leadPatch.role = form.role;
     if (form.contactType !== baseline.contactType)
       leadPatch.contact_type = form.contactType;
+    if (form.otherContacts !== baseline.otherContacts)
+      leadPatch.other_contacts = form.otherContacts;
     if (form.notWorkAnymore !== baseline.notWorkAnymore)
       leadPatch.not_work_anymore = form.notWorkAnymore;
 
@@ -217,6 +221,16 @@ export function FixLeadEditForm() {
                 onChange={(value) => updateField("contactType", String(value))}
                 placeholder="Select contact type"
                 className="h-10 rounded text-sm"
+              />
+              <TextInput
+                label="Other Contacts"
+                value={form.otherContacts}
+                onChange={(event) =>
+                  updateField("otherContacts", event.target.value)
+                }
+                placeholder="Extra phone numbers, addresses, etc."
+                className={inputClassName}
+                wrapperClassName="md:col-span-2"
               />
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">

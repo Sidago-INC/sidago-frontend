@@ -11,7 +11,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { AgentEmailDrawer } from "./AgentEmailDrawer";
 import {
-  AgentEmailBooleanEditor,
   AgentEmailBooleanRead,
   AgentEmailEditableTrigger,
   AgentEmailInlineTextCell,
@@ -241,6 +240,36 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     }
   };
 
+  // Toggle the dead/missing-email flag straight from the table row. Persists
+  // via PATCH /email/state (the same endpoint the drawer Save uses) so the
+  // lead actually appears on / leaves the Dead/Missing Email page. Optimistic:
+  // flips the cell immediately, rolls back if the request fails.
+  const toggleMissingDead = async (row: AgentEmailRow) => {
+    const next = !row.missingDeadEmail;
+    updateRow(row.id, (currentRow) => ({
+      ...currentRow,
+      missingDeadEmail: next,
+    }));
+    try {
+      await updateEmailState.mutateAsync({
+        leadId: row.leadId,
+        brandCode: row.brandCode,
+        body: { isMissingDeadEmail: next },
+      });
+      showSuccessToast(
+        next
+          ? "Lead flagged as dead/missing email."
+          : "Dead/missing email flag cleared.",
+      );
+    } catch (error) {
+      updateRow(row.id, (currentRow) => ({
+        ...currentRow,
+        missingDeadEmail: !next,
+      }));
+      showErrorToast(error);
+    }
+  };
+
   const openDrawer = useCallback((row: AgentEmailRow) => {
     setEditingRowId(null);
     setDrawerState({
@@ -376,22 +405,15 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       {
         title: "missing/dead_email",
         key: "missingDeadEmail",
-        render: (row) =>
-          editingRowId === row.id ? (
-            <AgentEmailBooleanEditor
-              checked={row.missingDeadEmail}
-              onChange={(checked) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  missingDeadEmail: checked,
-                }))
-              }
-            />
-          ) : (
-            <AgentEmailEditableTrigger onClick={() => setEditingRowId(row.id)}>
-              <AgentEmailBooleanRead checked={row.missingDeadEmail} />
-            </AgentEmailEditableTrigger>
-          ),
+        render: (row) => (
+          <AgentEmailEditableTrigger
+            onClick={() => {
+              void toggleMissingDead(row);
+            }}
+          >
+            <AgentEmailBooleanRead checked={row.missingDeadEmail} />
+          </AgentEmailEditableTrigger>
+        ),
       },
     ],
     [editingRowId, openDrawer],
