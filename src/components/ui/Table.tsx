@@ -30,7 +30,7 @@ export function Table<T>({
   description,
   emptyText = "No data found",
   emptyState,
-  showTableWhenEmpty = false,
+  showTableWhenEmpty: _showTableWhenEmpty = false,
   showToolbarTitle = true,
   headerContent,
   onRowClick,
@@ -127,18 +127,6 @@ export function Table<T>({
             className="h-10 animate-pulse rounded bg-slate-100 dark:bg-slate-800"
           />
         ))}
-      </div>
-    );
-  }
-
-  if ((!data || data.length === 0) && !showTableWhenEmpty) {
-    return (
-      <div className="overflow-hidden">
-        {emptyState ?? (
-          <div className="p-10 text-center text-gray-500 dark:text-slate-400">
-            {emptyText}
-          </div>
-        )}
       </div>
     );
   }
