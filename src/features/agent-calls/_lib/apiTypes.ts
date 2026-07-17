@@ -71,6 +71,10 @@ export type BrandState = {
   dateBecameIgnore: string | null;
   callResultCode: string | null;
   toBeCalledByUserId: string | null;
+  /** Assigned agent display name when provided by brand-state list/detail. */
+  toBeCalledBy?: string | null;
+  /** Preferred display-name field from lead detail / brand-state APIs. */
+  toBeCalledByName?: string | null;
   lastFixedDate: string | null;
 };
 

@@ -3,6 +3,7 @@ import { ExternalLink, ShieldAlert } from "lucide-react";
 import { ErrorState, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   useSuspiciousCalls,
@@ -10,8 +11,6 @@ import {
   type FraudFlagValue,
   type SuspiciousCallRow,
 } from "./_lib/data";
-
-const PER_PAGE = 50;
 
 function formatDuration(seconds: number | null): string {
   if (seconds === null) return "—";
@@ -80,7 +79,7 @@ function ActionButtons({
 }
 
 export function CallFraud() {
-  const { page, perPage, setPage, setPerPage } = useServerPagination(PER_PAGE);
+  const { page, perPage, setPage, setPerPage } = useServerPagination(DEFAULT_PAGE_SIZE);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   const { data: result, isLoading, isError, error, refetch } = useSuspiciousCalls(

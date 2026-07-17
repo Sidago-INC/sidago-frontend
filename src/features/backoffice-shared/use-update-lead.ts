@@ -9,7 +9,10 @@ export type LeadPatchBody = {
   fix_submit?: boolean;
   lead?: {
     full_name?: string;
+    first_name?: string;
+    last_name?: string;
     phone?: string;
+    phone_extension?: string;
     email?: string;
     role?: string;
     contact_type?: string;

@@ -22,6 +22,10 @@ type LegacyPaginatedResponse<T> = {
   ok?: boolean;
   data?: T[];
   count?: number;
+  total?: number;
+  page?: number;
+  limit?: number;
+  pages?: number;
   meta?: Partial<PaginationMeta>;
 };
 
@@ -67,6 +71,23 @@ export function parsePaginatedResponse<T>(json: unknown): PaginatedResult<T> {
       response.meta.per_page ?? (data.length || DEFAULT_PAGE_SIZE);
     const totalCount = response.meta.total_count ?? data.length;
     const currentPage = response.meta.current_page ?? 1;
+
+    return {
+      data,
+      meta: createPaginationMeta(totalCount, perPage, currentPage),
+    };
+  }
+
+  // Legacy flat pagination shape (e.g. call-fraud):
+  // { data, total, page, limit, pages }
+  if (
+    typeof response.total === "number" ||
+    typeof response.limit === "number" ||
+    typeof response.page === "number"
+  ) {
+    const perPage = response.limit ?? (data.length || DEFAULT_PAGE_SIZE);
+    const totalCount = response.total ?? data.length;
+    const currentPage = response.page ?? 1;
 
     return {
       data,

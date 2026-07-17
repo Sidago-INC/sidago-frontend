@@ -25,6 +25,7 @@ export type TableProps<T> = {
   serverPagination?: ServerPaginationConfig;
   emptyText?: string;
   emptyState?: React.ReactNode;
+  /** @deprecated Toolbar/filters now always render when data is empty. */
   showTableWhenEmpty?: boolean;
   showToolbarTitle?: boolean;
   headerContent?: React.ReactNode;
