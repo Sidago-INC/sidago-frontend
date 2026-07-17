@@ -28,8 +28,8 @@ export function Panel({
       )}
     >
       {(title || subtitle || action) && (
-        <div className="flex items-center justify-between border-b border-gray-100 px-3 py-3 sm:px-5 sm:py-4 dark:border-gray-700">
-          <div>
+        <div className="flex flex-col gap-3 border-b border-gray-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4 dark:border-gray-700">
+          <div className="min-w-0">
             {title && (
               <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">
                 {title}

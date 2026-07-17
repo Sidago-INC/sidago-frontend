@@ -52,7 +52,7 @@ export function DateRangePicker({
     <Popover className="relative">
       <PopoverButton
         className={clsx(
-          "flex h-10 w-full items-center justify-between gap-3 rounded-md border bg-white px-3 text-left text-xs transition focus:outline-none dark:bg-slate-900",
+          "flex h-10 w-full items-center justify-between gap-3 rounded-md border bg-white px-3 text-left text-xs transition outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 data-focus:outline-none data-focus:ring-0 dark:bg-slate-900",
           hasValue
             ? "border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-100"
             : "border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500",
