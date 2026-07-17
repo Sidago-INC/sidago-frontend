@@ -28,8 +28,10 @@ type CallHistoryEntry = {
 type ExtendedBrandState = {
   leadType?: string | null;
   followUpDate?: string | null;
+  nextFollowUpDate?: string | null;
   lastCalledDate?: string | null;
   toBeCalledBy?: string | null;
+  toBeCalledByName?: string | null;
   to_be_called_by?: string | null;
   callHistory?: CallHistoryEntry[];
   history?: CallHistoryEntry[];
@@ -131,6 +133,7 @@ function emptyBrandState() {
   return {
     leadType: null,
     followUpDate: null,
+    nextFollowUpDate: null,
     lastCalledDate: null,
   };
 }
@@ -154,6 +157,14 @@ function mapHistoryEntry(entry: HistoryEntry): CallHistoryEntry {
   };
 }
 
+function resolveToBeCalledByName(state: BrandState): string | null {
+  const name =
+    state.toBeCalledByName?.trim() ||
+    state.toBeCalledBy?.trim() ||
+    "";
+  return name || null;
+}
+
 function mapBrandState(
   state: BrandState,
   history: LeadDetailResponse["history"],
@@ -161,8 +172,10 @@ function mapBrandState(
   return {
     leadType: state.leadType,
     followUpDate: state.followUpDate,
+    nextFollowUpDate: state.nextFollowUpDate,
     lastCalledDate: state.lastCalledDate,
-    toBeCalledBy: state.toBeCalledBy?.trim() || null,
+    toBeCalledBy: resolveToBeCalledByName(state),
+    toBeCalledByName: resolveToBeCalledByName(state),
     callHistory: getHistoryEntries(history, state.brandCode).map(mapHistoryEntry),
   };
 }
@@ -232,7 +245,12 @@ function splitName(fullName: string) {
 }
 
 function getToBeCalledBy(state: ExtendedBrandState | undefined): string {
-  return state?.toBeCalledBy?.trim() || state?.to_be_called_by?.trim() || "";
+  return (
+    state?.toBeCalledByName?.trim() ||
+    state?.toBeCalledBy?.trim() ||
+    state?.to_be_called_by?.trim() ||
+    ""
+  );
 }
 
 function isoToDateInput(iso: string | null | undefined): string {
@@ -403,16 +421,16 @@ export function leadDetailToFormState(
     svgToBeCalledBy: row.svgToBeCalledBy,
     svgHistoryCalls: formatBrandCallsHistory(getCallHistory(extended.svg)),
     svgHistoryNotes: formatBrandNotesHistory(getCallHistory(extended.svg)),
-    svgToBeCalledOn: isoToDate(detail.brandStates.svg?.followUpDate),
+    svgToBeCalledOn: isoToDate(detail.brandStates.svg?.nextFollowUpDate),
     bentonLeadType: row.bentonLeadType,
     bentonToBeCalledBy: row.bentonToBeCalledBy,
     bentonHistoryCalls: formatBrandCallsHistory(getCallHistory(extended.benton)),
     bentonHistoryNotes: formatBrandNotesHistory(getCallHistory(extended.benton)),
-    bentonToBeCalledOn: isoToDate(detail.brandStates.benton?.followUpDate),
+    bentonToBeCalledOn: isoToDate(detail.brandStates.benton?.nextFollowUpDate),
     rm95LeadType: row.rm95LeadType,
     rm95ToBeCalledBy: row.rm95ToBeCalledBy,
     rm95HistoryCalls: formatBrandCallsHistory(getCallHistory(extended["95rm"])),
     rm95HistoryNotes: formatBrandNotesHistory(getCallHistory(extended["95rm"])),
-    rm95ToBeCalledOn: isoToDate(detail.brandStates["95rm"]?.followUpDate),
+    rm95ToBeCalledOn: isoToDate(detail.brandStates["95rm"]?.nextFollowUpDate),
   };
 }
