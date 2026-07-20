@@ -95,6 +95,8 @@ export type LeadDetailResponse = {
     counterB: number;
     counterF: number;
     counterFixes: number;
+    /** Cross-brand last action timestamp when provided by lead detail. */
+    lastActionDate?: string | null;
   };
   company: {
     id: string;
@@ -106,6 +108,8 @@ export type LeadDetailResponse = {
   peerBrandStates: BrandState[];
   history: HistoryEntry[] | HistoryByBrand;
   relatedContacts: RelatedContact[];
+  /** Some detail payloads surface this at the root instead of under lead. */
+  lastActionDate?: string | null;
 };
 
 export type LogResultBody = {

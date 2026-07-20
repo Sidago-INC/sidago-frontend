@@ -752,6 +752,13 @@ export function LeadsDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
+          <EditableField label="Last action date (all brands)">
+            <TextInput
+              value={displayRow?.lastActionDate || "-"}
+              readOnly
+              className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
+            />
+          </EditableField>
         </DetailCard>
 
         <DetailCard label="Lead Details">

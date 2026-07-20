@@ -219,6 +219,7 @@ export function mapLeadDetailResponseToPayload(
       companyName: company.companyName,
       companySymbol: company.companySymbol,
       companyTimezone: company.timezone,
+      lastActionDate: response.lastActionDate ?? lead.lastActionDate ?? null,
     },
     brandStates,
   };
@@ -378,7 +379,8 @@ export function leadDetailToDirectoryRow(
       svgDateBecomeHot: "",
       bentonDateBecomeHot: "",
       rm95DateBecomeHot: "",
-      lastActionDate: "",
+      lastActionDate:
+        isoToDate(lead.lastActionDate) || fallback?.lastActionDate || "",
       lastFixedDate: "",
       notWorked: lead.notWorkAnymore ?? false,
     },
