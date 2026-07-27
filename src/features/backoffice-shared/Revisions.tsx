@@ -1,6 +1,5 @@
 
-
-import { Activity, ActivityTimeline } from "@/components/ui/ActivityTimeline";
+import { ActivityTimeline } from "@/components/ui/ActivityTimeline";
 import {
   useCompanyRevisionHistory,
   useLeadRevisionHistory,
@@ -12,7 +11,7 @@ import {
   Transition,
 } from "@headlessui/react";
 import { Bell, Check, ChevronDown, Hourglass, X } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 type RevisionsProps = {
   leadId?: string;
@@ -24,23 +23,30 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
   const [notificationMode, setNotificationMode] = useState("mentions");
   const targetId = leadId ?? companyId;
   const isCompanyRevision = Boolean(companyId && !leadId);
+
   const leadRevisionQuery = useLeadRevisionHistory(
     isCompanyRevision ? undefined : leadId,
+    { enabled: open },
   );
   const companyRevisionQuery = useCompanyRevisionHistory(
     isCompanyRevision ? companyId : undefined,
+    { enabled: open },
   );
-  const apiActivities = isCompanyRevision
-    ? companyRevisionQuery.data
-    : leadRevisionQuery.data;
-  const isLoading = isCompanyRevision
-    ? companyRevisionQuery.isLoading
-    : leadRevisionQuery.isLoading;
+  const revisionQuery = isCompanyRevision
+    ? companyRevisionQuery
+    : leadRevisionQuery;
+  const activities = revisionQuery.data ?? [];
+  const isLoading = revisionQuery.isLoading || revisionQuery.isFetching;
+  const isError = revisionQuery.isError;
 
   const PAGE_SIZE = 10;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const activities = apiActivities ?? [];
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+    setOpen(false);
+  }, [targetId]);
+
   const visibleActivities = activities.slice(0, visibleCount);
   const hasMore = visibleCount < activities.length;
 
@@ -48,11 +54,10 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
     <div className="w-full">
       {!open && (
         <button
+          type="button"
           onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-between px-4 py-3
-          bg-white hover:bg-slate-50
-          dark:bg-slate-900 dark:hover:bg-slate-800
-          border-slate-200 dark:border-slate-700 transition cursor-pointer"
+          disabled={!targetId}
+          className="flex w-full cursor-pointer items-center justify-between border-slate-200 bg-white px-4 py-3 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
         >
           <div className="flex items-center gap-3">
             <Hourglass size={16} className="text-slate-400" />
@@ -64,8 +69,8 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
       )}
 
       {open && (
-        <div className="overflow-visible bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-700">
+        <div className="overflow-visible border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 dark:border-slate-700">
             <div className="text-xs">Revision History</div>
 
             <div className="flex items-center gap-2">
@@ -87,20 +92,22 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
                   <PopoverPanel
                     anchor="top"
                     portal
-                    className="z-260 w-64 rounded-lg border shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                    className="z-260 w-64 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
                   >
                     <div className="p-2">
                       <button
+                        type="button"
                         onClick={() => setNotificationMode("mentions")}
-                        className="w-full text-left px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between cursor-pointer"
+                        className="flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         <span>Notify me only for @mentions</span>
                         {notificationMode === "mentions" && <Check size={14} />}
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => setNotificationMode("all")}
-                        className="w-full text-left px-3 py-2 rounded-md text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between cursor-pointer"
+                        className="flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         <span>Notify me about all comments</span>
                         {notificationMode === "all" && <Check size={14} />}
@@ -111,6 +118,7 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
               </Popover>
 
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="cursor-pointer rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
@@ -119,10 +127,18 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
             </div>
           </div>
 
-          <div className="max-h-80 overflow-y-auto p-4 space-y-3">
-            {isLoading && targetId ? (
+          <div className="max-h-80 space-y-3 overflow-y-auto p-4">
+            {!targetId ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Revision history is unavailable for this record.
+              </p>
+            ) : isLoading ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Loading revision history…
+              </p>
+            ) : isError ? (
+              <p className="text-sm text-red-600 dark:text-red-400">
+                Failed to load revision history.
               </p>
             ) : visibleActivities.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -135,8 +151,9 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
             {hasMore && (
               <div className="flex justify-center pt-3">
                 <button
+                  type="button"
                   onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-                  className="cursor-pointer text-sm px-3 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                  className="cursor-pointer rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                   Show more
                 </button>

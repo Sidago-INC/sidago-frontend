@@ -158,25 +158,28 @@ export function CompanyDrawer({
         />
       }
       footer={
-        isEditMode ? (
-          <EditableDrawerFooter
-            onCancel={() => {
-              setIsEditMode(mode === "create");
-              onCancel();
-            }}
-            onReset={onReset}
-            onSave={() => {
-              onSave();
-              if (mode === "edit") {
-                setIsEditMode(false);
-              }
-            }}
-            saveLabel={isSaving ? "Saving..." : undefined}
-            saveDisabled={isSaving}
-          />
-        ) : (
-          <Revisions companyId={companyId ?? undefined} />
-        )
+        <div className="flex flex-col">
+          {isEditMode ? (
+            <EditableDrawerFooter
+              onCancel={() => {
+                setIsEditMode(mode === "create");
+                onCancel();
+              }}
+              onReset={onReset}
+              onSave={() => {
+                onSave();
+                if (mode === "edit") {
+                  setIsEditMode(false);
+                }
+              }}
+              saveLabel={isSaving ? "Saving..." : undefined}
+              saveDisabled={isSaving}
+            />
+          ) : null}
+          {mode === "edit" && companyId ? (
+            <Revisions companyId={companyId} />
+          ) : null}
+        </div>
       }
     >
       <div className="space-y-6" onFocus={() => setIsEditMode(true)}>

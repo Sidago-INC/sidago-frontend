@@ -655,18 +655,19 @@ export function LeadsDrawer({
         fullName: form.fullName,
       })}
       footer={
-        isEditMode ? (
-          <EditableDrawerFooter
-            onCancel={() => {
-              setEditModeKey(null);
-              onClose();
-            }}
-            onReset={handleReset}
-            onSave={handleSave}
-          />
-        ) : (
-          <Revisions leadId={row.leadId} />
-        )
+        <div className="flex flex-col">
+          {isEditMode ? (
+            <EditableDrawerFooter
+              onCancel={() => {
+                setEditModeKey(null);
+                onClose();
+              }}
+              onReset={handleReset}
+              onSave={handleSave}
+            />
+          ) : null}
+          <Revisions leadId={detailPayload?.lead.id ?? row.leadId} />
+        </div>
       }
     >
       {detailUnavailable ? (

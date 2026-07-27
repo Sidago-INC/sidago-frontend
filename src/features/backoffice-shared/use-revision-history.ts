@@ -4,28 +4,29 @@ import type { Activity, ActivitySection } from "@/components/ui/ActivityTimeline
 
 type RevisionChange = {
   field: string;
-  from: string | boolean | null;
-  to: string | boolean | null;
+  from: string | boolean | number | null;
+  to: string | boolean | number | null;
 };
 
 type RevisionGroup = {
   table: string;
   brandCode?: string;
-  operation: string;
+  operation?: string;
   changes: RevisionChange[];
 };
 
 type RevisionEntry = {
-  changeGroupId: string;
+  changeGroupId?: string;
   changedAt: string;
   changedBy: string;
   groups: RevisionGroup[];
 };
 
 type RevisionHistoryResponse = {
-  ok: true;
-  count: number;
-  data: RevisionEntry[];
+  ok?: boolean;
+  count?: number;
+  data?: RevisionEntry[];
+  revisions?: RevisionEntry[];
 };
 
 function formatFieldLabel(field: string): string {
@@ -47,12 +48,27 @@ function formatRelativeTime(value: string): string {
   return `${Math.floor(diffMonths / 12)}y ago`;
 }
 
+function normalizeRevisionEntries(payload: unknown): RevisionEntry[] {
+  if (Array.isArray(payload)) {
+    return payload as RevisionEntry[];
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const response = payload as RevisionHistoryResponse;
+  if (Array.isArray(response.data)) return response.data;
+  if (Array.isArray(response.revisions)) return response.revisions;
+  return [];
+}
+
 function mapRevisionToActivity(entry: RevisionEntry, index: number): Activity {
-  const sections: ActivitySection[] = entry.groups.map((group) => ({
+  const sections: ActivitySection[] = (entry.groups ?? []).map((group) => ({
     title: group.brandCode
       ? `${group.table} (${group.brandCode.toUpperCase()})`
-      : group.table.toUpperCase(),
-    items: group.changes.map((change) => ({
+      : (group.table ?? "UPDATE").toUpperCase(),
+    items: (group.changes ?? []).map((change) => ({
       type: "badge" as const,
       label: `${formatFieldLabel(change.field)}: ${String(change.from ?? "-")} → ${String(change.to ?? "-")}`,
     })),
@@ -61,8 +77,11 @@ function mapRevisionToActivity(entry: RevisionEntry, index: number): Activity {
   return {
     id: index + 1,
     actor: {
-      type: entry.changedBy === "migration" ? "system" : "user",
-      name: entry.changedBy,
+      type:
+        entry.changedBy === "migration" || entry.changedBy === "system"
+          ? "system"
+          : "user",
+      name: entry.changedBy || "Unknown",
     },
     action: "updated this record",
     time: formatRelativeTime(entry.changedAt),
@@ -70,29 +89,39 @@ function mapRevisionToActivity(entry: RevisionEntry, index: number): Activity {
   };
 }
 
-export function useLeadRevisionHistory(leadId: string | null | undefined) {
+type RevisionHistoryOptions = {
+  enabled?: boolean;
+};
+
+export function useLeadRevisionHistory(
+  leadId: string | null | undefined,
+  options: RevisionHistoryOptions = {},
+) {
+  const enabled = options.enabled ?? true;
+
   return useQuery({
     queryKey: ["revision-history", "lead", leadId],
-    enabled: Boolean(leadId),
+    enabled: Boolean(leadId) && enabled,
     queryFn: async () => {
-      const json = (await api.get(
-        `/revision-history/lead/${leadId}`,
-      )) as RevisionHistoryResponse;
-      return json.data.map(mapRevisionToActivity);
+      const json = await api.get(`/revision-history/lead/${leadId}`);
+      return normalizeRevisionEntries(json).map(mapRevisionToActivity);
     },
     staleTime: 60_000,
   });
 }
 
-export function useCompanyRevisionHistory(companyId: string | null | undefined) {
+export function useCompanyRevisionHistory(
+  companyId: string | null | undefined,
+  options: RevisionHistoryOptions = {},
+) {
+  const enabled = options.enabled ?? true;
+
   return useQuery({
     queryKey: ["revision-history", "company", companyId],
-    enabled: Boolean(companyId),
+    enabled: Boolean(companyId) && enabled,
     queryFn: async () => {
-      const json = (await api.get(
-        `/revision-history/company/${companyId}`,
-      )) as RevisionHistoryResponse;
-      return json.data.map(mapRevisionToActivity);
+      const json = await api.get(`/revision-history/company/${companyId}`);
+      return normalizeRevisionEntries(json).map(mapRevisionToActivity);
     },
     staleTime: 60_000,
   });
