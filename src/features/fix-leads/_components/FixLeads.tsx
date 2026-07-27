@@ -33,8 +33,8 @@ export function FixLeads() {
   const totalFixLeads = result?.meta.total_count;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 px-4 pt-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 flex-col gap-3 px-4 pt-2 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="min-w-0 shrink-0">
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
             Fix Queue
@@ -118,7 +118,7 @@ export function FixLeads() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
+        <div className="flex flex-1 justify-center py-12">
           <Wave />
         </div>
       ) : isError ? (
@@ -128,11 +128,13 @@ export function FixLeads() {
             "Unknown error"}
         </div>
       ) : (
-        <FixLeadsTable
-          data={result?.data ?? []}
-          title="Fix Queue"
-          serverPagination={serverPagination}
-        />
+        <div className="min-h-0 flex-1">
+          <FixLeadsTable
+            data={result?.data ?? []}
+            title="Fix Queue"
+            serverPagination={serverPagination}
+          />
+        </div>
       )}
     </div>
   );

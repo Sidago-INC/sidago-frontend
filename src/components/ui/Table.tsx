@@ -173,7 +173,7 @@ export function Table<T>({
   }
 
   return (
-    <div className="flex min-h-0 max-h-[calc(100dvh-3.5rem)] flex-col">
+    <div className="flex h-full min-h-0 max-h-[calc(100dvh-3.5rem)] flex-col">
       <div className="mb-2 flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/75 px-8 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 md:justify-between">
         {showToolbarTitle ? (
           <div className="min-w-0 py-2 hidden md:block">

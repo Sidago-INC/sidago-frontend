@@ -196,15 +196,17 @@ export function FixLeadsTable({
 
   return (
     <>
-      <Table
-        data={data}
-        columns={columns}
-        serverPagination={serverPagination}
-        title={title}
-        showToolbarTitle={false}
-        description=""
-        emptyText="No leads are currently flagged for fix."
-      />
+      <div className="h-full min-h-0">
+        <Table
+          data={data}
+          columns={columns}
+          serverPagination={serverPagination}
+          title={title}
+          showToolbarTitle={false}
+          description=""
+          emptyText="No leads are currently flagged for fix."
+        />
+      </div>
 
       <Modal
         isOpen={contactsModalRow !== null}
