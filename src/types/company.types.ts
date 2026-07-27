@@ -20,7 +20,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "NTS",
     name: "NovaTech Solutions",
-    timezone: "1-EST",
+    timezone: "EST",
     country: "United States",
     description: "Enterprise automation and data workflow platform.",
     estimatedMarketCap: "$4.2B",
@@ -34,7 +34,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "BPS",
     name: "BluePeak Systems",
-    timezone: "2-CST",
+    timezone: "CST",
     country: "United States",
     description: "Cloud infrastructure tooling for regional operators.",
     estimatedMarketCap: "$1.8B",
@@ -48,7 +48,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "ZCL",
     name: "ZenithCore Labs",
-    timezone: "5-INTL",
+    timezone: "INTL",
     country: "Canada",
     description: "Applied research lab focused on customer intelligence.",
     estimatedMarketCap: "$920M",
@@ -62,7 +62,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "ARD",
     name: "Aurora Dynamics",
-    timezone: "4-PST",
+    timezone: "PST",
     country: "United States",
     description: "Industrial analytics software for manufacturing teams.",
     estimatedMarketCap: "$2.5B",
@@ -76,7 +76,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "SBI",
     name: "SkyBridge Innovations",
-    timezone: "5-INTL",
+    timezone: "INTL",
     country: "United Kingdom",
     description: "Cross-border payment and compliance products.",
     estimatedMarketCap: "$3.1B",
@@ -90,7 +90,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "PFT",
     name: "PixelForge Technologies",
-    timezone: "5-INTL",
+    timezone: "INTL",
     country: "Ireland",
     description: "Creative operations software for distributed media teams.",
     estimatedMarketCap: "$760M",
@@ -104,7 +104,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "QLS",
     name: "QuantumLeaf Systems",
-    timezone: "5-INTL",
+    timezone: "INTL",
     country: "India",
     description: "Supply chain planning tools for food and retail brands.",
     estimatedMarketCap: "$1.2B",
@@ -118,7 +118,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "HPW",
     name: "Hyperion Works",
-    timezone: "5-INTL",
+    timezone: "INTL",
     country: "Japan",
     description: "Robotics coordination software for logistics networks.",
     estimatedMarketCap: "$5.6B",
@@ -132,7 +132,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "CBC",
     name: "CrystalByte Corp",
-    timezone: "5-INTL",
+    timezone: "INTL",
     country: "Australia",
     description: "Secure storage and backup products for small businesses.",
     estimatedMarketCap: "$640M",
@@ -146,7 +146,7 @@ export const COMPANY_VALUES: COMPANY[] = [
   {
     symbol: "ICN",
     name: "IronClad Networks",
-    timezone: "1-EST",
+    timezone: "EST",
     country: "United States",
     description: "Network monitoring and resilience tools.",
     estimatedMarketCap: "$2.9B",

@@ -198,7 +198,7 @@ export function BulkLeadImport() {
             role: "Operations Manager",
             companySymbol: "NASDAQ:EXAMPLE",
             companyName: "Example Corp",
-            timezone: "1-EST",
+            timezone: "EST",
             country: "United States",
           },
         ],

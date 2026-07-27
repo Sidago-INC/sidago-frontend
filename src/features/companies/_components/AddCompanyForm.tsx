@@ -20,7 +20,7 @@ import { CountryPicker } from "./CountryPicker";
 const blankCompany: COMPANY = {
   symbol: "",
   name: "",
-  timezone: "1-EST",
+  timezone: "EST",
   country: "United States",
   description: "",
   estimatedMarketCap: "",

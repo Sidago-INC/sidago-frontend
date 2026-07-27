@@ -1,9 +1,9 @@
 export const TIMEZONE_VALUES = [
-  "1-EST",
-  "2-CST",
-  "3-MST",
-  "4-PST",
-  "5-INTL",
+  "EST",
+  "CST",
+  "MST",
+  "PST",
+  "INTL",
 ] as const;
 
 export type TIMEZONE = (typeof TIMEZONE_VALUES)[number];
@@ -20,13 +20,14 @@ const INTERNATIONAL_ALIASES = new Set([
 ]);
 
 export const TIMEZONE_LABELS: Record<TIMEZONE, string> = {
-  "1-EST": "EST -- Eastern Standard Time (United States)",
-  "2-CST": "CST -- Central Standard Time (United States)",
-  "3-MST": "MST -- Mountain Standard Time (United States)",
-  "4-PST": "PST -- Pacific Standard Time (United States)",
-  "5-INTL": "INTL -- International (any country outside the United States)",
+  EST: "EST -- Eastern Standard Time (United States)",
+  CST: "CST -- Central Standard Time (United States)",
+  MST: "MST -- Mountain Standard Time (United States)",
+  PST: "PST -- Pacific Standard Time (United States)",
+  INTL: "INTL -- International (any country outside the United States)",
 };
 
+/** Strips a leading digits-and-dash prefix from timezone strings if present. */
 export function stripTimezonePrefix(tz?: string | null): string {
   return (tz ?? "").trim().replace(/^\d+-/, "");
 }

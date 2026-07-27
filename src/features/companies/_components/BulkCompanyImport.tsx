@@ -413,7 +413,7 @@ export function BulkCompanyImport() {
           {
             symbol: "ALP",
             name: "Alpha Ridge Partners",
-            timezone: "1-EST",
+            timezone: "EST",
             country: "United States",
             description:
               "Workflow intelligence software for distributed finance teams.",
