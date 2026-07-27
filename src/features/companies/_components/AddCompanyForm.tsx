@@ -14,7 +14,6 @@ import { companyValidationSchema } from "@/lib/validation/company";
 import { type COMPANY } from "@/types/company.types";
 import type { TIMEZONE } from "@/types/timezone.types";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { CountryPicker } from "./CountryPicker";
 
@@ -65,7 +64,6 @@ type CreateCompanyResponse = {
 };
 
 export function AddCompanyForm() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<COMPANY>(blankCompany);
   const [errors, setErrors] = useState<Partial<Record<keyof COMPANY, string>>>(
@@ -123,7 +121,6 @@ export function AddCompanyForm() {
       setForm(blankCompany);
       setErrors({});
       showSuccessToast(`Company "${response.symbol}" saved.`);
-      navigate(`/companies?company=${encodeURIComponent(response.symbol)}`);
     } catch (err) {
       showErrorToast(err);
     } finally {
