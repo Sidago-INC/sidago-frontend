@@ -188,13 +188,9 @@ function SelectOptionsPanel({
           </div>
         )}
 
-        {isSearching ? (
+        {displayOptions.length === 0 ? (
           <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
-            Searching...
-          </div>
-        ) : displayOptions.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
-            No options found
+            {isSearching ? "Searching..." : "No options found"}
           </div>
         ) : (
           displayOptions.map((option, index) => (
@@ -226,7 +222,13 @@ function SelectOptionsPanel({
           ))
         )}
 
-        {hasMore && !isSearching && (
+        {isSearching && displayOptions.length > 0 && (
+          <div className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
+            Searching...
+          </div>
+        )}
+
+        {hasMore && (
           <div ref={loadMoreSentinelRef} className="h-px" aria-hidden="true" />
         )}
 
@@ -353,8 +355,39 @@ export function Select({
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [placement, setPlacement] = useState<SelectPlacement>("bottom");
   const [internalSearch, setInternalSearch] = useState("");
+  // Keep the last matched option so remote/paginated lists can clear search
+  // (and swap option pages) without wiping the selected label from the trigger.
+  const [cachedSelected, setCachedSelected] = useState<SelectOption | null>(
+    null,
+  );
   const search = searchValue ?? internalSearch;
-  const selected = options.find((o) => String(o.value) === String(value));
+  const matched = useMemo(
+    () => options.find((o) => String(o.value) === String(value)),
+    [options, value],
+  );
+  const selected =
+    matched ??
+    (cachedSelected && String(cachedSelected.value) === String(value)
+      ? cachedSelected
+      : undefined);
+  const optionsWithSelected = useMemo(() => {
+    if (!selected) return options;
+    if (options.some((o) => String(o.value) === String(selected.value))) {
+      return options;
+    }
+    return [selected, ...options];
+  }, [options, selected]);
+
+  useEffect(() => {
+    if (matched) {
+      setCachedSelected(matched);
+      return;
+    }
+
+    if (value === undefined || value === null || value === "") {
+      setCachedSelected(null);
+    }
+  }, [matched, value]);
 
   const setSearch = useCallback(
     (nextValue: string) => {
@@ -397,6 +430,12 @@ export function Select({
       <Listbox
         value={value ?? ""}
         onChange={(nextValue) => {
+          const nextSelected = options.find(
+            (o) => String(o.value) === String(nextValue),
+          );
+          if (nextSelected) {
+            setCachedSelected(nextSelected);
+          }
           onChange?.(nextValue);
           setSearch("");
         }}
@@ -409,7 +448,7 @@ export function Select({
             error={error}
             id={id}
             open={open}
-            options={options}
+            options={optionsWithSelected}
             optionsClassName={optionsClassName}
             placement={placement}
             placeholder={placeholder}
