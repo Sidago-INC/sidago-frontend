@@ -42,7 +42,7 @@ export function GroupPanel({
 
       <PopoverPanel
         anchor="bottom end"
-        className="w-screen md:w-2xl border border-slate-200 shadow-2xl bg-white rounded-xl p-2 text-sm backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-visible"
+        className="z-50 w-screen md:w-2xl border border-slate-200 shadow-2xl bg-white rounded-xl p-2 text-sm backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-visible"
       >
         <div className="space-y-3">
           {groupRules.length > 0 ? (
@@ -95,7 +95,7 @@ export function GroupPanel({
 
                     <PopoverPanel
                       anchor="bottom end"
-                      className="w-72 max-w-[90vw] border border-slate-200 shadow-2xl bg-white rounded-xl p-2 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-hidden"
+                      className="z-50 w-72 max-w-[90vw] border border-slate-200 shadow-2xl bg-white rounded-xl p-2 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-hidden"
                     >
                       <button
                         type="button"

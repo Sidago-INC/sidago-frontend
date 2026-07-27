@@ -174,7 +174,7 @@ export function Table<T>({
 
   return (
     <div className="flex h-full min-h-0 max-h-[calc(100dvh-3.5rem)] flex-col">
-      <div className="mb-2 flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/75 px-8 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 md:justify-between">
+      <div className="relative z-30 mb-2 flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/75 px-8 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 md:justify-between">
         {showToolbarTitle ? (
           <div className="min-w-0 py-2 hidden md:block">
             <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -264,7 +264,7 @@ export function Table<T>({
 
             <PopoverPanel
               anchor="bottom end"
-              className="w-56 border border-slate-200 shadow-2xl bg-white rounded-xl p-2 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-hidden"
+              className="z-50 w-56 border border-slate-200 shadow-2xl bg-white rounded-xl p-2 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-hidden"
             >
               <button
                 type="button"
@@ -309,7 +309,7 @@ export function Table<T>({
               {columns.map((col) => (
                 <th
                   key={col.title}
-                  className="sticky top-0 z-20 whitespace-nowrap border-b border-slate-200/80 bg-white px-6 py-4 text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
+                  className="sticky top-0 z-10 whitespace-nowrap border-b border-slate-200/80 bg-white px-6 py-4 text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
                 >
                   {col.title}
                 </th>

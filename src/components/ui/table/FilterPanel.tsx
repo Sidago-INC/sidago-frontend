@@ -433,7 +433,7 @@ export function FilterPanel({
 
       <PopoverPanel
         anchor="bottom end"
-        className="w-screen md:w-2xl border border-slate-200 shadow-2xl bg-white rounded-xl p-2 text-xs backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-visible"
+        className="z-50 w-screen md:w-2xl border border-slate-200 shadow-2xl bg-white rounded-xl p-2 text-xs backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-visible"
       >
         <div className="flex flex-col gap-4">
           <div className="space-y-2">

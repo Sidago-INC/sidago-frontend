@@ -39,7 +39,7 @@ export function SortPanel({
 
       <PopoverPanel
         anchor="bottom end"
-        className="w-screen md:w-2xl border border-slate-200 shadow-2xl bg-white rounded-xl p-2 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-hidden"
+        className="z-50 w-screen md:w-2xl border border-slate-200 shadow-2xl bg-white rounded-xl p-2 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 flex flex-col overflow-hidden"
       >
         <div className="space-y-3">
           {sortRules.length > 0 ? (
