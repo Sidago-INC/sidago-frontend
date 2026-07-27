@@ -19,6 +19,18 @@ const TOOLBAR_BUTTON_CLASS =
 const TOOLBAR_ICON_BUTTON_CLASS =
   "flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900";
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (target.isContentEditable) return true;
+
+  return Boolean(
+    target.closest("input, textarea, select, [contenteditable='true']"),
+  );
+}
+
 export function Table<T>({
   data,
   columns,
@@ -92,6 +104,8 @@ export function Table<T>({
   const handleTableScrollKeys = (
     event: React.KeyboardEvent<HTMLDivElement>,
   ) => {
+    if (isEditableTarget(event.target)) return;
+
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -101,21 +115,48 @@ export function Table<T>({
     switch (event.key) {
       case "ArrowLeft":
         event.preventDefault();
-        container.scrollBy({ left: -horizontalStep, behavior: "smooth" });
+        container.scrollBy({ left: -horizontalStep, behavior: "auto" });
         break;
       case "ArrowRight":
         event.preventDefault();
-        container.scrollBy({ left: horizontalStep, behavior: "smooth" });
+        container.scrollBy({ left: horizontalStep, behavior: "auto" });
         break;
       case "ArrowUp":
         event.preventDefault();
-        container.scrollBy({ top: -verticalStep, behavior: "smooth" });
+        container.scrollBy({ top: -verticalStep, behavior: "auto" });
         break;
       case "ArrowDown":
         event.preventDefault();
-        container.scrollBy({ top: verticalStep, behavior: "smooth" });
+        container.scrollBy({ top: verticalStep, behavior: "auto" });
+        break;
+      case "Home":
+        if (event.shiftKey) {
+          event.preventDefault();
+          container.scrollTo({ left: 0, behavior: "auto" });
+        }
+        break;
+      case "End":
+        if (event.shiftKey) {
+          event.preventDefault();
+          container.scrollTo({
+            left: container.scrollWidth,
+            behavior: "auto",
+          });
+        }
         break;
     }
+  };
+
+  const focusScrollContainer = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (isEditableTarget(event.target)) return;
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.closest("a, button, [role='button']")) return;
+
+    scrollContainerRef.current?.focus({ preventScroll: true });
   };
 
   if (isLoading) {
@@ -132,8 +173,8 @@ export function Table<T>({
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-center md:justify-between mb-2 border-b border-slate-200/80 bg-white/75 px-8 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70">
+    <div className="flex min-h-0 max-h-[calc(100dvh-3.5rem)] flex-col">
+      <div className="mb-2 flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/75 px-8 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70 md:justify-between">
         {showToolbarTitle ? (
           <div className="min-w-0 py-2 hidden md:block">
             <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -258,16 +299,17 @@ export function Table<T>({
         ref={scrollContainerRef}
         tabIndex={0}
         onKeyDown={handleTableScrollKeys}
-        className="overflow-x-auto overflow-y-visible px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+        onPointerDown={focusScrollContainer}
+        className="min-h-0 flex-1 overflow-auto px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
         aria-label="Scrollable table"
       >
         <table ref={tableElementRef} className="min-w-240 w-full">
-          <thead className="text-xs uppercase text-gray-500 dark:text-white tracking-wide border-b border-slate-200/80 transition-colors dark:border-slate-600">
+          <thead className="text-xs uppercase tracking-wide text-gray-500 transition-colors dark:text-white">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.title}
-                  className="px-6 py-4 text-left font-semibold whitespace-nowrap"
+                  className="sticky top-0 z-20 whitespace-nowrap border-b border-slate-200/80 bg-white px-6 py-4 text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
                 >
                   {col.title}
                 </th>
@@ -296,18 +338,20 @@ export function Table<T>({
       </div>
 
       {!groupedData && (processedData.length > 0 || serverPagination) && (
-        <TablePagination
-          paginationStart={paginationStart}
-          paginationEnd={paginationEnd}
-          totalCount={totalCount}
-          rowsPerPage={rowsPerPage}
-          setRowsPerPage={setRowsPerPage}
-          pageNumbers={pageNumbers}
-          safeCurrentPage={safeCurrentPage}
-          totalPages={totalPages}
-          paginationContextKey={paginationContextKey}
-          setPageState={setPageState}
-        />
+        <div className="shrink-0">
+          <TablePagination
+            paginationStart={paginationStart}
+            paginationEnd={paginationEnd}
+            totalCount={totalCount}
+            rowsPerPage={rowsPerPage}
+            setRowsPerPage={setRowsPerPage}
+            pageNumbers={pageNumbers}
+            safeCurrentPage={safeCurrentPage}
+            totalPages={totalPages}
+            paginationContextKey={paginationContextKey}
+            setPageState={setPageState}
+          />
+        </div>
       )}
     </div>
   );
