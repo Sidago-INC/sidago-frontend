@@ -1,6 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Activity, ActivitySection } from "@/components/ui/ActivityTimeline";
+import {
+  buildPaginationParams,
+  parsePaginatedResponse,
+  type PaginationMeta,
+} from "@/lib/pagination";
+
+const REVISION_PAGE_SIZE = 50;
 
 type RevisionChange = {
   field: string;
@@ -22,11 +29,9 @@ type RevisionEntry = {
   groups: RevisionGroup[];
 };
 
-type RevisionHistoryResponse = {
-  ok?: boolean;
-  count?: number;
-  data?: RevisionEntry[];
-  revisions?: RevisionEntry[];
+type RevisionPage = {
+  data: Activity[];
+  meta: PaginationMeta;
 };
 
 function formatFieldLabel(field: string): string {
@@ -48,22 +53,11 @@ function formatRelativeTime(value: string): string {
   return `${Math.floor(diffMonths / 12)}y ago`;
 }
 
-function normalizeRevisionEntries(payload: unknown): RevisionEntry[] {
-  if (Array.isArray(payload)) {
-    return payload as RevisionEntry[];
-  }
-
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-
-  const response = payload as RevisionHistoryResponse;
-  if (Array.isArray(response.data)) return response.data;
-  if (Array.isArray(response.revisions)) return response.revisions;
-  return [];
-}
-
-function mapRevisionToActivity(entry: RevisionEntry, index: number): Activity {
+function mapRevisionToActivity(
+  entry: RevisionEntry,
+  index: number,
+  page: number,
+): Activity {
   const sections: ActivitySection[] = (entry.groups ?? []).map((group) => ({
     title: group.brandCode
       ? `${group.table} (${group.brandCode.toUpperCase()})`
@@ -74,8 +68,15 @@ function mapRevisionToActivity(entry: RevisionEntry, index: number): Activity {
     })),
   }));
 
+  const stableId =
+    entry.changeGroupId && Number.parseInt(entry.changeGroupId, 10);
+  const id =
+    Number.isFinite(stableId) && (stableId as number) > 0
+      ? (stableId as number)
+      : page * 100_000 + index + 1;
+
   return {
-    id: index + 1,
+    id,
     actor: {
       type:
         entry.changedBy === "migration" || entry.changedBy === "system"
@@ -89,40 +90,63 @@ function mapRevisionToActivity(entry: RevisionEntry, index: number): Activity {
   };
 }
 
+async function fetchRevisionHistoryPage(
+  path: string,
+  page: number,
+): Promise<RevisionPage> {
+  const params = buildPaginationParams(page, REVISION_PAGE_SIZE);
+  const json = await api.get(`${path}?${params.toString()}`);
+  const parsed = parsePaginatedResponse<RevisionEntry>(json);
+
+  return {
+    data: parsed.data.map((entry, index) =>
+      mapRevisionToActivity(entry, index, page),
+    ),
+    meta: parsed.meta,
+  };
+}
+
 type RevisionHistoryOptions = {
   enabled?: boolean;
 };
+
+function useRevisionHistoryInfinite(
+  kind: "lead" | "company",
+  entityId: string | null | undefined,
+  options: RevisionHistoryOptions = {},
+) {
+  const enabled = (options.enabled ?? true) && Boolean(entityId);
+
+  return useInfiniteQuery({
+    queryKey: ["revision-history", kind, entityId, REVISION_PAGE_SIZE],
+    enabled,
+    initialPageParam: 1,
+    queryFn: ({ pageParam = 1 }) =>
+      fetchRevisionHistoryPage(
+        `/revision-history/${kind}/${entityId}`,
+        pageParam,
+      ),
+    getNextPageParam: (lastPage) => {
+      const { current_page, total_pages } = lastPage.meta;
+      if (current_page < total_pages) {
+        return current_page + 1;
+      }
+      return undefined;
+    },
+    staleTime: 60_000,
+  });
+}
 
 export function useLeadRevisionHistory(
   leadId: string | null | undefined,
   options: RevisionHistoryOptions = {},
 ) {
-  const enabled = options.enabled ?? true;
-
-  return useQuery({
-    queryKey: ["revision-history", "lead", leadId],
-    enabled: Boolean(leadId) && enabled,
-    queryFn: async () => {
-      const json = await api.get(`/revision-history/lead/${leadId}`);
-      return normalizeRevisionEntries(json).map(mapRevisionToActivity);
-    },
-    staleTime: 60_000,
-  });
+  return useRevisionHistoryInfinite("lead", leadId, options);
 }
 
 export function useCompanyRevisionHistory(
   companyId: string | null | undefined,
   options: RevisionHistoryOptions = {},
 ) {
-  const enabled = options.enabled ?? true;
-
-  return useQuery({
-    queryKey: ["revision-history", "company", companyId],
-    enabled: Boolean(companyId) && enabled,
-    queryFn: async () => {
-      const json = await api.get(`/revision-history/company/${companyId}`);
-      return normalizeRevisionEntries(json).map(mapRevisionToActivity);
-    },
-    staleTime: 60_000,
-  });
+  return useRevisionHistoryInfinite("company", companyId, options);
 }

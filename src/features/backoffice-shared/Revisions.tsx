@@ -11,7 +11,15 @@ import {
   Transition,
 } from "@headlessui/react";
 import { Bell, Check, ChevronDown, Hourglass, X } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type UIEvent,
+} from "react";
 
 type RevisionsProps = {
   leadId?: string;
@@ -23,6 +31,8 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
   const [notificationMode, setNotificationMode] = useState("mentions");
   const targetId = leadId ?? companyId;
   const isCompanyRevision = Boolean(companyId && !leadId);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
   const leadRevisionQuery = useLeadRevisionHistory(
     isCompanyRevision ? undefined : leadId,
@@ -35,20 +45,63 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
   const revisionQuery = isCompanyRevision
     ? companyRevisionQuery
     : leadRevisionQuery;
-  const activities = revisionQuery.data ?? [];
-  const isLoading = revisionQuery.isLoading || revisionQuery.isFetching;
-  const isError = revisionQuery.isError;
 
-  const PAGE_SIZE = 10;
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    isError,
+    hasNextPage,
+    fetchNextPage,
+  } = revisionQuery;
+
+  const activities = useMemo(
+    () => data?.pages.flatMap((page) => page.data) ?? [],
+    [data],
+  );
+  const isInitialLoading = isLoading || (isFetching && activities.length === 0);
+  const hasMore = Boolean(hasNextPage);
+
+  const tryLoadMore = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
     setOpen(false);
   }, [targetId]);
 
-  const visibleActivities = activities.slice(0, visibleCount);
-  const hasMore = visibleCount < activities.length;
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+
+    if (!open || !root || !sentinel || !hasMore) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          tryLoadMore();
+        }
+      },
+      { root, rootMargin: "64px", threshold: 0 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activities.length, hasMore, isFetchingNextPage, open, tryLoadMore]);
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const distanceFromBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+
+    if (distanceFromBottom < 48) {
+      tryLoadMore();
+    }
+  };
 
   return (
     <div className="w-full">
@@ -127,12 +180,16 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
             </div>
           </div>
 
-          <div className="max-h-80 space-y-3 overflow-y-auto p-4">
+          <div
+            ref={scrollContainerRef}
+            onScroll={handleScroll}
+            className="max-h-80 space-y-3 overflow-y-auto p-4"
+          >
             {!targetId ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Revision history is unavailable for this record.
               </p>
-            ) : isLoading ? (
+            ) : isInitialLoading ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Loading revision history…
               </p>
@@ -140,24 +197,22 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
               <p className="text-sm text-red-600 dark:text-red-400">
                 Failed to load revision history.
               </p>
-            ) : visibleActivities.length === 0 ? (
+            ) : activities.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 No revision history yet.
               </p>
             ) : (
-              <ActivityTimeline activities={visibleActivities} />
+              <ActivityTimeline activities={activities} />
             )}
 
             {hasMore && (
-              <div className="flex justify-center pt-3">
-                <button
-                  type="button"
-                  onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-                  className="cursor-pointer rounded-md bg-slate-100 px-3 py-1 text-sm text-slate-700 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                >
-                  Show more
-                </button>
-              </div>
+              <div ref={loadMoreSentinelRef} className="h-px" aria-hidden="true" />
+            )}
+
+            {isFetchingNextPage && (
+              <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                Loading more…
+              </p>
             )}
           </div>
         </div>
