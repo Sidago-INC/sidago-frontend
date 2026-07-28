@@ -1,6 +1,4 @@
-
-
-import { CompanySymbolBadge, TypeBadge } from "@/components/ui";
+import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
 import { Table, type Column } from "@/components/ui/Table";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 import {
@@ -13,7 +11,12 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { LeadsDrawer } from "./LeadsDrawer";
-import { type LeadDirectoryRow } from "../_lib/data";
+import {
+  assigneeOptions,
+  leadTypeOptions,
+  timezoneOptions,
+  type LeadDirectoryRow,
+} from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
 
 export function Leads() {
@@ -66,6 +69,16 @@ export function Leads() {
       },
       { title: "Company Name", key: "companyName" },
       { title: "Full Name", key: "fullName" },
+      { title: "Phone", key: "phone" },
+      { title: "Email", key: "email" },
+      {
+        title: "Timezone",
+        key: "timezone",
+        type: "select",
+        options: timezoneOptions,
+        render: (row) =>
+          row.timezone ? <TimezoneBadge timezone={row.timezone} /> : "-",
+      },
       {
         title: "Contact Type",
         key: "contactType",
@@ -73,10 +86,64 @@ export function Leads() {
         options: CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
         render: (row) => <TypeBadge value={row.contactType} kind="contact" />,
       },
-      { title: "Phone", key: "phone" },
       {
-        title: "Email",
-        key: "email",
+        title: "SVG Lead Type",
+        key: "svgLeadType",
+        type: "select",
+        options: leadTypeOptions,
+        render: (row) => <TypeBadge value={row.svgLeadType} kind="lead" />,
+      },
+      {
+        title: "SVG To Be Called By",
+        key: "svgToBeCalledBy",
+        type: "select",
+        options: assigneeOptions.map((value) => ({ label: value, value })),
+      },
+      {
+        title: "SVG Last Called Date",
+        key: "svgLastCallDate",
+        type: "date",
+      },
+      {
+        title: "Benton Lead Type",
+        key: "bentonLeadType",
+        type: "select",
+        options: leadTypeOptions,
+        render: (row) => <TypeBadge value={row.bentonLeadType} kind="lead" />,
+      },
+      {
+        title: "Benton To Be Called By",
+        key: "bentonToBeCalledBy",
+        type: "select",
+        options: assigneeOptions.map((value) => ({ label: value, value })),
+      },
+      {
+        title: "Benton Last Called Date",
+        key: "bentonLastCallDate",
+        type: "date",
+      },
+      {
+        title: "95RM Lead Type",
+        key: "rm95LeadType",
+        type: "select",
+        options: leadTypeOptions,
+        render: (row) => <TypeBadge value={row.rm95LeadType} kind="lead" />,
+      },
+      {
+        title: "95RM To Be Called By",
+        key: "rm95ToBeCalledBy",
+        type: "select",
+        options: assigneeOptions.map((value) => ({ label: value, value })),
+      },
+      {
+        title: "95RM Last Called Date",
+        key: "rm95LastCallDate",
+        type: "date",
+      },
+      {
+        title: "Last Action Date",
+        key: "lastActionDate",
+        type: "date",
       },
     ],
     [rows],

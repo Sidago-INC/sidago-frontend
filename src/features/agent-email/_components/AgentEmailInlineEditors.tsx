@@ -10,7 +10,6 @@ import clsx from "clsx";
 import { BooleanCheckBadge, EmailPriorityBadge } from "@/components/ui";
 import { Check, ChevronDown } from "lucide-react";
 import type { ReactNode, SyntheticEvent } from "react";
-import type { EmailPriority } from "../_lib/data";
 
 const cellInputClass =
   "h-8 min-w-[8rem] w-full rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 hover:bg-slate-50 focus:border-slate-200 focus:bg-white focus:text-slate-900 dark:text-slate-200 dark:placeholder:text-slate-500 dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900";
@@ -100,9 +99,9 @@ export function AgentEmailPriorityEditor({
   options,
   onChange,
 }: {
-  value: EmailPriority;
-  options: Array<{ label: string; value: EmailPriority }>;
-  onChange: (value: EmailPriority) => void;
+  value: string;
+  options: Array<{ label: string; value: string }>;
+  onChange: (value: string) => void;
 }) {
   return (
     <div onClick={stopCellClick}>

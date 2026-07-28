@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
   buildPaginationParams,
@@ -227,6 +227,29 @@ export function useRelatedLeads(leadId: string | null | undefined) {
       return json.data;
     },
     staleTime: 60_000,
+  });
+}
+
+type CantLocateResponse = {
+  ok: true;
+  leadId: string;
+  cantLocateBrands: string[];
+};
+
+export function useCantLocateLead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (leadId: string) => {
+      return (await api.post(
+        `/leads/${leadId}/cant-locate`,
+        {},
+      )) as CantLocateResponse;
+    },
+    onSuccess: (_data, leadId) => {
+      queryClient.invalidateQueries({ queryKey: ["fix-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["lead-full", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["lead-stats"] });
+    },
   });
 }
 

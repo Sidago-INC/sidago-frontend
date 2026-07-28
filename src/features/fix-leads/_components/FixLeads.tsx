@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Wave } from "@/components/ui";
 import { useServerPagination } from "@/lib/use-server-pagination";
-import { Wrench } from "lucide-react";
+import { CheckCircle2, RefreshCcw, Wrench } from "lucide-react";
+import {
+  useLeadStatsSocket,
+  useLeadStatsSummary,
+  toYMD,
+  type LeadStatsSummary,
+} from "@/features/leads-stats/_lib/hooks";
 import {
   contactsFilterOptions,
   fixTimezoneOptions,
@@ -15,6 +21,19 @@ export function FixLeads() {
   const [contactsFilter, setContactsFilter] = useState<ContactsFilter | "">("");
   const [hasOtherContacts, setHasOtherContacts] = useState(false);
   const [timezone, setTimezone] = useState("");
+  const [socketStats, setSocketStats] = useState<LeadStatsSummary | null>(null);
+
+  const today = useMemo(() => new Date(), []);
+  const todayStr = toYMD(today);
+  const { data: todayStats, isLoading: statsLoading } = useLeadStatsSummary(
+    today,
+    today,
+  );
+  const handleSocketUpdate = useCallback((update: LeadStatsSummary) => {
+    setSocketStats(update);
+  }, []);
+  useLeadStatsSocket(handleSocketUpdate);
+  const effectiveStats = socketStats ?? todayStats;
 
   const { data: result, isLoading, isError, error } = useFixQueue(
     page,
@@ -31,6 +50,7 @@ export function FixLeads() {
       }
     : undefined;
   const totalFixLeads = result?.meta.total_count;
+  const statsPending = statsLoading && !effectiveStats;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -39,6 +59,9 @@ export function FixLeads() {
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
             Fix Queue
           </h1>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Today ({todayStr})
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 sm:justify-end">
@@ -100,6 +123,34 @@ export function FixLeads() {
             />
             Has other contacts
           </label>
+
+          <div className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-emerald-200/80 bg-emerald-50/80 px-2.5 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
+              <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </span>
+            <div className="flex items-baseline gap-1.5 leading-none">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                Leads Fixed
+              </p>
+              <p className="text-sm font-semibold tabular-nums text-emerald-900 dark:text-emerald-50">
+                {statsPending ? "—" : (effectiveStats?.leadsFixed ?? 0)}
+              </p>
+            </div>
+          </div>
+
+          <div className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-sky-200/80 bg-sky-50/80 px-2.5 shadow-sm dark:border-sky-800 dark:bg-sky-950/40">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-300">
+              <RefreshCcw className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </span>
+            <div className="flex items-baseline gap-1.5 leading-none">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                Fix
+              </p>
+              <p className="text-sm font-semibold tabular-nums text-sky-900 dark:text-sky-50">
+                {statsPending ? "—" : (effectiveStats?.leadsSentToFix ?? 0)}
+              </p>
+            </div>
+          </div>
 
           <div className="inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border border-slate-200/80 bg-white px-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">

@@ -280,6 +280,29 @@ export const TimezoneBadge = ({
   );
 };
 
+const EMAIL_STATUS_DISPLAY: Record<string, string> = {
+  "1st": "1st",
+  "2nd": "2nd",
+  "3rd": "3rd",
+  "4th": "4th",
+  "5th": "5th",
+  send_contract: "Send Contract",
+  resend_contract: "Resend Contract",
+  lukewarm: "Lukewarm",
+  finished: "Finished",
+};
+
+const EMAIL_STATUS_STYLES: Record<string, string> = {
+  send_contract:
+    "border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  resend_contract:
+    "border-indigo-200 bg-indigo-100 text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300",
+  lukewarm:
+    "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+  finished:
+    "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+};
+
 export const EmailPriorityBadge = ({
   value,
   className,
@@ -287,9 +310,16 @@ export const EmailPriorityBadge = ({
   value: string;
   className?: string;
 }) => {
-  const priorityNumber = Number(value.match(/\d+/)?.[0] ?? 1);
-  const priorityStyle =
-    EMAIL_PRIORITY_STYLES[(priorityNumber - 1) % EMAIL_PRIORITY_STYLES.length];
+  const normalized = value.trim();
+  const display = EMAIL_STATUS_DISPLAY[normalized] ?? normalized;
+  const digitMatch = normalized.match(/\d+/);
+  const priorityStyle = EMAIL_STATUS_STYLES[normalized]
+    ? EMAIL_STATUS_STYLES[normalized]
+    : EMAIL_PRIORITY_STYLES[
+        ((Number(digitMatch?.[0] ?? 1) - 1) % EMAIL_PRIORITY_STYLES.length +
+          EMAIL_PRIORITY_STYLES.length) %
+          EMAIL_PRIORITY_STYLES.length
+      ];
 
   return (
     <span
@@ -299,7 +329,7 @@ export const EmailPriorityBadge = ({
         className,
       )}
     >
-      {value}
+      {display}
     </span>
   );
 };

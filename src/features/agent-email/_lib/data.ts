@@ -7,9 +7,31 @@ export const EMAIL_PRIORITY_VALUES = [
   "3rd",
   "4th",
   "5th",
+  "send_contract",
+  "resend_contract",
+  "lukewarm",
+  "finished",
 ] as const;
 
 export type EmailPriority = (typeof EMAIL_PRIORITY_VALUES)[number];
+
+export const EMAIL_STATUS_LABELS: Record<string, string> = {
+  "1st": "1st",
+  "2nd": "2nd",
+  "3rd": "3rd",
+  "4th": "4th",
+  "5th": "5th",
+  send_contract: "Send Contract",
+  resend_contract: "Resend Contract",
+  lukewarm: "Lukewarm",
+  finished: "Finished",
+};
+
+export function formatEmailStatusLabel(value: string | null | undefined): string {
+  const normalized = (value ?? "").trim();
+  if (!normalized) return "";
+  return EMAIL_STATUS_LABELS[normalized] ?? normalized;
+}
 
 export type AgentEmailRow = {
   id: string;
@@ -29,7 +51,7 @@ export type AgentEmailRow = {
   additionalContacts: string;
   selectedOutcome: string;
   notWorked: boolean;
-  emailToBeSent: EmailPriority;
+  emailToBeSent: string;
   history: string;
   checkToLog: boolean;
   missingDeadEmail: boolean;
@@ -37,12 +59,10 @@ export type AgentEmailRow = {
   brandCode: string;
 };
 
-function toEmailPriority(value: string | null): EmailPriority {
-  const normalized = (value ?? "1st").trim();
-  if (EMAIL_PRIORITY_VALUES.includes(normalized as EmailPriority)) {
-    return normalized as EmailPriority;
-  }
-  return "1st";
+/** Keep API status values as-is; never collapse Hot stages to "1st". */
+function toEmailStatus(value: string | null): string {
+  const normalized = (value ?? "").trim();
+  return normalized || "1st";
 }
 
 export function mapEmailQueueItem(
@@ -71,7 +91,7 @@ export function mapEmailQueueItem(
     additionalContacts: "",
     selectedOutcome: "",
     notWorked: item.notWorkAnymore,
-    emailToBeSent: toEmailPriority(item.emailStatus),
+    emailToBeSent: toEmailStatus(item.emailStatus),
     history: "",
     checkToLog: item.isEmailLogged,
     missingDeadEmail: item.isMissingDeadEmail,
@@ -81,6 +101,6 @@ export function mapEmailQueueItem(
 }
 
 export const emailPriorityOptions = EMAIL_PRIORITY_VALUES.map((value) => ({
-  label: value,
+  label: formatEmailStatusLabel(value),
   value,
 }));

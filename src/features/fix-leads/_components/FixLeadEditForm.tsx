@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useLeadFull, type FullLead } from "../_lib/data";
+import { useCantLocateLead, useLeadFull, type FullLead } from "../_lib/data";
 
 const inputClassName = "h-10 rounded text-sm";
 const readOnlyInputClassName = `${inputClassName} bg-slate-100 dark:bg-slate-800`;
@@ -53,6 +53,7 @@ export function FixLeadEditForm() {
   const { leadId } = useParams<{ leadId: string }>();
   const { data, isLoading, isError, error } = useLeadFull(leadId);
   const updateLead = useUpdateLead();
+  const cantLocateLead = useCantLocateLead();
 
   const [form, setForm] = useState<FormState | null>(null);
   const initialForm = useMemo(
@@ -108,6 +109,21 @@ export function FixLeadEditForm() {
     if (initialForm) setForm(initialForm);
   };
 
+  const handleCantLocate = async () => {
+    if (!leadId || cantLocateLead.isPending) return;
+    try {
+      const result = await cantLocateLead.mutateAsync(leadId);
+      const brands =
+        result.cantLocateBrands?.length > 0
+          ? result.cantLocateBrands.join(", ")
+          : "eligible brands";
+      showSuccessToast(`Marked Can't Locate for ${brands}.`);
+      navigate("/fix-leads");
+    } catch (err) {
+      showErrorToast(err);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!leadId) return;
@@ -138,6 +154,7 @@ export function FixLeadEditForm() {
       // changes (a lead leaving "Fix" should disappear from the queue).
       queryClient.invalidateQueries({ queryKey: ["fix-queue"] });
       queryClient.invalidateQueries({ queryKey: ["lead-full", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["lead-stats"] });
       showSuccessToast(
         `Lead "${form.fullName || data.lead.fullName || leadId}" updated.`,
       );
@@ -149,6 +166,7 @@ export function FixLeadEditForm() {
 
   const lead = data.lead;
   const leadTimezone = resolveLeadTimezone(lead.timezone, lead.companyTimezone);
+  const actionPending = updateLead.isPending || cantLocateLead.isPending;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 lg:px-6">
@@ -222,6 +240,21 @@ export function FixLeadEditForm() {
                 placeholder="Select contact type"
                 className="h-10 rounded text-sm"
               />
+              <div className="flex flex-col gap-1 md:self-end">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Can&apos;t Locate
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCantLocate}
+                  disabled={actionPending}
+                  className="inline-flex h-10 cursor-pointer items-center justify-center rounded border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/70"
+                >
+                  {cantLocateLead.isPending
+                    ? "Marking…"
+                    : "Mark Can't Locate"}
+                </button>
+              </div>
               <TextInput
                 label="Other Contacts"
                 value={form.otherContacts}
@@ -284,14 +317,14 @@ export function FixLeadEditForm() {
               <button
                 type="button"
                 onClick={handleReset}
-                disabled={updateLead.isPending}
+                disabled={actionPending}
                 className="inline-flex h-10 cursor-pointer items-center justify-center rounded border border-slate-200 px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Reset
               </button>
               <button
                 type="submit"
-                disabled={updateLead.isPending}
+                disabled={actionPending}
                 className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
               >
                 {updateLead.isPending ? "Saving…" : "Save"}

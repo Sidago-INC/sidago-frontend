@@ -37,7 +37,11 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { type AgentEmailRow, emailPriorityOptions } from "../_lib/data";
+import {
+  type AgentEmailRow,
+  emailPriorityOptions,
+  formatEmailStatusLabel,
+} from "../_lib/data";
 
 type AgentEmailDrawerProps = {
   row: AgentEmailRow | null;
@@ -257,7 +261,7 @@ export function AgentEmailDrawer({
       ["Time zone", row.timezone],
       ["Contact Type", row.contactType],
       ["Lead Type Benton", row.bentonLeadType],
-      ["Email To Be Sent", row.emailToBeSent],
+      ["Email To Be Sent", formatEmailStatusLabel(row.emailToBeSent) || row.emailToBeSent],
       ["History", row.history],
       ["Check To Log", row.checkToLog ? "Yes" : "No"],
       ["Missing/Dead Email", row.missingDeadEmail ? "Yes" : "No"],
