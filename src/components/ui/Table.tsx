@@ -9,7 +9,12 @@ import { TableBody } from "./table/TableBody";
 import { TablePagination } from "./table/TablePagination";
 import { useTableState } from "./table/useTableState";
 
-export type { Column, ServerPaginationConfig, TableProps } from "./table/types";
+export type {
+  Column,
+  ServerPaginationConfig,
+  ServerSearchConfig,
+  TableProps,
+} from "./table/types";
 
 type Props<T> = import("./table/types").TableProps<T>;
 
@@ -38,6 +43,7 @@ export function Table<T>({
   rowsPerPage: initialRowsPerPage,
   onRowsPerPageChange,
   serverPagination,
+  serverSearch,
   title,
   description,
   emptyText = "No data found",
@@ -53,6 +59,7 @@ export function Table<T>({
     title,
     initialRowsPerPage,
     serverPagination,
+    serverSearch,
   });
 
   const {
@@ -232,9 +239,18 @@ export function Table<T>({
               />
               <input
                 type="text"
-                value={filterSearch}
-                onChange={(event) => setFilterSearch(event.target.value)}
-                placeholder="Search in table"
+                value={serverSearch ? serverSearch.value : filterSearch}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  if (serverSearch) {
+                    serverSearch.onChange(nextValue);
+                    return;
+                  }
+                  setFilterSearch(nextValue);
+                }}
+                placeholder={
+                  serverSearch?.placeholder ?? "Search in table"
+                }
                 className="h-9 w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-10 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
               />
               <button

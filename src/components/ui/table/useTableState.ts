@@ -27,7 +27,7 @@ import {
   getPageNumbers,
   getPaginationRange,
 } from "@/lib/pagination";
-import type { ServerPaginationConfig } from "./types";
+import type { ServerPaginationConfig, ServerSearchConfig } from "./types";
 
 interface UseTableStateOptions<T> {
   data: T[];
@@ -35,6 +35,7 @@ interface UseTableStateOptions<T> {
   title: string;
   initialRowsPerPage?: number;
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
 }
 
 export interface UseTableStateReturn<T> {
@@ -87,6 +88,7 @@ export function useTableState<T>({
   title,
   initialRowsPerPage = DEFAULT_PAGE_SIZE,
   serverPagination,
+  serverSearch,
 }: UseTableStateOptions<T>): UseTableStateReturn<T> {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableElementRef = useRef<HTMLTableElement | null>(null);
@@ -134,13 +136,16 @@ export function useTableState<T>({
 
   const filteredData = useMemo(() => {
     return data.filter((row) => {
-      const searchMatches = !filterSearch.trim()
+      // Server search is applied by the API; do not filter the current page in memory.
+      const searchMatches = serverSearch
         ? true
-        : columns.some((column) =>
-            String(getCellValue(row, column) ?? "")
-              .toLowerCase()
-              .includes(filterSearch.trim().toLowerCase()),
-          );
+        : !filterSearch.trim()
+          ? true
+          : columns.some((column) =>
+              String(getCellValue(row, column) ?? "")
+                .toLowerCase()
+                .includes(filterSearch.trim().toLowerCase()),
+            );
 
       if (!searchMatches) return false;
 
@@ -248,7 +253,15 @@ export function useTableState<T>({
         ? activeItems.every((item) => item.matches)
         : activeItems.some((item) => item.matches);
     });
-  }, [columnMap, columns, data, filterItems, filterSearch, rootFilterGate]);
+  }, [
+    columnMap,
+    columns,
+    data,
+    filterItems,
+    filterSearch,
+    rootFilterGate,
+    serverSearch,
+  ]);
 
   const processedData = useMemo(() => {
     const activeSortRules = sortRules.filter((rule) => rule.field);
@@ -366,11 +379,17 @@ export function useTableState<T>({
     setPageState(value);
   };
 
+  const activeSearchValue = serverSearch?.value ?? filterSearch;
   const activeFilterConditionCount =
-    countActiveFilterItems(filterItems) + Number(Boolean(filterSearch.trim()));
+    countActiveFilterItems(filterItems) +
+    Number(Boolean(activeSearchValue.trim()));
 
   const closeSearch = () => {
     setIsSearchOpen(false);
+    if (serverSearch) {
+      serverSearch.onChange("");
+      return;
+    }
     setFilterSearch("");
   };
 

@@ -14,12 +14,10 @@ import {
   AgentEmailBooleanRead,
   AgentEmailEditableTrigger,
   AgentEmailInlineTextCell,
-  AgentEmailPriorityEditor,
   AgentEmailReadText,
 } from "./AgentEmailInlineEditors";
 import {
   type AgentEmailRow,
-  emailPriorityOptions,
   mapEmailQueueItem,
 } from "../_lib/data";
 import {
@@ -336,25 +334,11 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       {
         title: "Email To Be Sent",
         key: "emailToBeSent",
-        render: (row) =>
-          editingRowId === row.id ? (
-            <AgentEmailPriorityEditor
-              value={row.emailToBeSent}
-              options={emailPriorityOptions}
-              onChange={(value) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  emailToBeSent: value,
-                }))
-              }
-            />
-          ) : (
-            <AgentEmailEditableTrigger onClick={() => setEditingRowId(row.id)}>
-              <div className="px-2.5 py-1.5">
-                <EmailPriorityBadge value={row.emailToBeSent} />
-              </div>
-            </AgentEmailEditableTrigger>
-          ),
+        render: (row) => (
+          <div className="px-2.5 py-1.5">
+            <EmailPriorityBadge value={row.emailToBeSent} />
+          </div>
+        ),
       },
       {
         title: "History",

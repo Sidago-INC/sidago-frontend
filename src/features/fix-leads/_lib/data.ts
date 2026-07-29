@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
   buildPaginationParams,
@@ -178,6 +178,7 @@ export function useFixQueue(
   contactsFilter?: ContactsFilter,
   hasOtherContacts?: boolean,
   timezone?: string,
+  search?: string,
 ) {
   return useQuery({
     queryKey: [
@@ -187,12 +188,14 @@ export function useFixQueue(
       contactsFilter ?? null,
       hasOtherContacts ?? null,
       timezone ?? null,
+      search ?? "",
     ],
     queryFn: async () => {
       const params = buildPaginationParams(page, perPage);
       if (contactsFilter) params.set("contactsFilter", contactsFilter);
       if (hasOtherContacts) params.set("hasOtherContacts", "true");
       if (timezone) params.set("timezone", timezone);
+      if (search?.trim()) params.set("search", search.trim());
       const json = (await api.get(
         `/leads/fix-queue?${params.toString()}`,
       )) as FixQueueResponse;
@@ -202,6 +205,7 @@ export function useFixQueue(
         meta: parsed.meta,
       };
     },
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }

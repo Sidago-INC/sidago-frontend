@@ -9,6 +9,7 @@ import {
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { LeadsDrawer } from "./LeadsDrawer";
 import {
@@ -23,7 +24,19 @@ export function Leads() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const { data: result, isLoading } = useLeadsDirectory(page, perPage);
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    setPage(1);
+  };
+
+  const { data: result, isLoading } = useLeadsDirectory(
+    page,
+    perPage,
+    debouncedSearch,
+  );
   const rows = result?.data ?? [];
   const serverPagination = result?.meta
     ? {
@@ -156,6 +169,11 @@ export function Leads() {
         columns={columns}
         isLoading={isLoading}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: handleSearchChange,
+          placeholder: "Search name, symbol, or lead ID",
+        }}
         title="Leads"
         description="All lead records across SVG, Benton, and 95RM"
         onRowClick={(row) => {

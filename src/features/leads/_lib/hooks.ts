@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { agentCallsApi } from "@/features/agent-calls/_lib/agentCallsApi";
 import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
 import { createLeadDirectoryRow } from "@/features/leads/_lib/data";
@@ -160,6 +160,7 @@ export function useLeadsDirectory(
         meta: parsed.meta,
       };
     },
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }

@@ -6,6 +6,7 @@ import {
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
+  EmailPriorityBadge,
   Select,
   Textarea,
   TextInput,
@@ -39,7 +40,6 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import {
   type AgentEmailRow,
-  emailPriorityOptions,
   formatEmailStatusLabel,
 } from "../_lib/data";
 
@@ -450,12 +450,9 @@ export function AgentEmailDrawer({
               />
             </EditableField>
             <EditableField label="Email To Be Sent">
-              <Select
-                value={row.emailToBeSent}
-                onChange={(value) => onChange("emailToBeSent", String(value))}
-                options={emailPriorityOptions}
-                className="text-xs font-semibold"
-              />
+              <div className="flex min-h-9 items-center justify-end">
+                <EmailPriorityBadge value={row.emailToBeSent} />
+              </div>
             </EditableField>
             <EditableField label="Check To Log">
               <CheckboxInput

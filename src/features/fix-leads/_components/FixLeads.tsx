@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Wave } from "@/components/ui";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { CheckCircle2, RefreshCcw, Wrench } from "lucide-react";
 import {
@@ -21,7 +22,14 @@ export function FixLeads() {
   const [contactsFilter, setContactsFilter] = useState<ContactsFilter | "">("");
   const [hasOtherContacts, setHasOtherContacts] = useState(false);
   const [timezone, setTimezone] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [socketStats, setSocketStats] = useState<LeadStatsSummary | null>(null);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    setPage(1);
+  };
 
   const today = useMemo(() => new Date(), []);
   const todayStr = toYMD(today);
@@ -41,6 +49,7 @@ export function FixLeads() {
     contactsFilter || undefined,
     hasOtherContacts || undefined,
     timezone || undefined,
+    debouncedSearch,
   );
   const serverPagination = result?.meta
     ? {
@@ -51,6 +60,7 @@ export function FixLeads() {
     : undefined;
   const totalFixLeads = result?.meta.total_count;
   const statsPending = statsLoading && !effectiveStats;
+  const showInitialLoading = isLoading && !result;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -161,18 +171,18 @@ export function FixLeads() {
                 Total Fix Leads
               </p>
               <p className="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-50">
-                {isLoading ? "—" : (totalFixLeads ?? 0)}
+                {showInitialLoading ? "—" : (totalFixLeads ?? 0)}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {isLoading ? (
+      {showInitialLoading ? (
         <div className="flex flex-1 justify-center py-12">
           <Wave />
         </div>
-      ) : isError ? (
+      ) : isError && !result ? (
         <div className="mx-4 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
           Failed to load fix queue:{" "}
           {(error as unknown as { message?: string[] })?.message?.join(", ") ??
@@ -184,6 +194,11 @@ export function FixLeads() {
             data={result?.data ?? []}
             title="Fix Queue"
             serverPagination={serverPagination}
+            serverSearch={{
+              value: searchInput,
+              onChange: handleSearchChange,
+              placeholder: "Search name, symbol, or lead ID",
+            }}
           />
         </div>
       )}

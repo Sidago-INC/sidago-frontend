@@ -7,6 +7,13 @@ export type ServerPaginationConfig = {
   onPerPageChange: (perPage: number) => void;
 };
 
+/** When set, the toolbar search is controlled by the parent and skips in-memory filtering. */
+export type ServerSearchConfig = {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+};
+
 export type Column<T> = {
   key: keyof T | string;
   title: string;
@@ -23,6 +30,7 @@ export type TableProps<T> = {
   rowsPerPage?: number;
   onRowsPerPageChange?: (rowsPerPage: number) => void;
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
   emptyText?: string;
   emptyState?: React.ReactNode;
   /** @deprecated Toolbar/filters now always render when data is empty. */
