@@ -13,7 +13,8 @@ import {
 } from "@/components/ui";
 import { useAuth } from "@/providers/AuthProvider";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { useLeadSelectSource, useAllAgents } from "@/features/level-2-update/_lib/hooks";
+import { useLeadSelectSource } from "@/features/level-2-update/_lib/hooks";
+import { useUsers } from "@/features/backoffice-shared/use-users";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -82,7 +83,11 @@ export function LeadManualUpdateForm() {
   const { user } = useAuth();
   const createManualUpdate = useCreateManualUpdate();
   const leadSelectSource = useLeadSelectSource();
-  const { data: agents = [], isLoading: agentsLoading } = useAllAgents();
+  // Brand-scoped agent queries — same pattern as Level 2 Update so the
+  // Agent dropdown only lists agents registered to the selected campaign.
+  const svgAgents = useUsers("svg");
+  const rm95Agents = useUsers("95rm");
+  const bentonAgents = useUsers("benton");
 
   const isAdmin = user?.role === "admin";
   const canSelectFixed =
@@ -95,24 +100,50 @@ export function LeadManualUpdateForm() {
   const agentFieldValue = isAdmin ? form.agent : currentAgentName;
   const campaignTypeValue = isAdmin ? form.campaignType : "SVG";
   const toBeLoggedValue = true;
+  const brandCode = campaignLabelToBrandCode(campaignTypeValue);
 
   const resultUpdateOptions = useMemo(
     () => getResultUpdateOptions(user?.role),
     [user?.role],
   );
 
+  const brandAgents = useMemo(() => {
+    if (brandCode === "svg") return svgAgents.data ?? [];
+    if (brandCode === "95rm") return rm95Agents.data ?? [];
+    if (brandCode === "benton") return bentonAgents.data ?? [];
+    return [];
+  }, [brandCode, svgAgents.data, rm95Agents.data, bentonAgents.data]);
+
+  const agentsLoading =
+    brandCode === "svg"
+      ? svgAgents.isLoading
+      : brandCode === "95rm"
+        ? rm95Agents.isLoading
+        : brandCode === "benton"
+          ? bentonAgents.isLoading
+          : false;
+
   const agentOptions = useMemo(() => {
-    return agents.map((agent) => ({
+    return brandAgents.map((agent) => ({
       label: agent.name,
       value: agent.name,
     }));
-  }, [agents]);
+  }, [brandAgents]);
 
   const updateField = <K extends keyof FormValues>(
     field: K,
     value: FormValues[K],
   ) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleCampaignChange = (nextCampaign: string) => {
+    // Clear agent so a Benton agent cannot stick around under SVG.
+    setForm((current) => ({
+      ...current,
+      campaignType: nextCampaign,
+      agent: "",
+    }));
   };
 
   const handleClear = () => {
@@ -147,7 +178,7 @@ export function LeadManualUpdateForm() {
       return;
     }
 
-    const selectedAgent = agents.find(
+    const selectedAgent = brandAgents.find(
       (agent) => agent.name === (isAdmin ? form.agent : currentAgentName),
     );
     const agentId = selectedAgent?.id ?? user?.id;
@@ -161,7 +192,7 @@ export function LeadManualUpdateForm() {
       await createManualUpdate.mutateAsync({
         leadId: form.lead,
         agentId,
-        brandCode: campaignLabelToBrandCode(campaignTypeValue),
+        brandCode,
         resultCode: form.resultUpdate,
         notes: form.notes.trim() || undefined,
         followUpDate: form.toBeCalledOn || undefined,
@@ -239,37 +270,45 @@ export function LeadManualUpdateForm() {
               />
               {isAdmin ? (
                 <Select
-                  label="Agent"
-                  value={agentFieldValue}
-                  options={agentOptions}
-                  placeholder={agentsLoading ? "Loading agents..." : "Select agent"}
-                  onChange={(value) => updateField("agent", String(value))}
+                  label="Campaign Type"
+                  value={campaignTypeValue}
+                  options={CAMPAIGN_TYPE_OPTIONS}
+                  placeholder="Select campaign type"
+                  onChange={(value) => handleCampaignChange(String(value))}
                   className={selectClassName}
-                  disabled={agentsLoading || createManualUpdate.isPending}
                 />
               ) : (
                 <TextInput
-                  label="Agent"
-                  value={agentFieldValue}
+                  label="Campaign Type"
+                  value={campaignTypeValue}
                   readOnly
                   className={readonlyInputClassName}
                 />
               )}
               {isAdmin ? (
                 <Select
-                  label="Campaign Type"
-                  value={campaignTypeValue}
-                  options={CAMPAIGN_TYPE_OPTIONS}
-                  placeholder="Select campaign type"
-                  onChange={(value) =>
-                    updateField("campaignType", String(value))
+                  label="Agent"
+                  value={agentFieldValue}
+                  options={agentOptions}
+                  placeholder={
+                    !campaignTypeValue
+                      ? "Pick a campaign first"
+                      : agentsLoading
+                        ? "Loading agents..."
+                        : "Select agent"
                   }
+                  onChange={(value) => updateField("agent", String(value))}
                   className={selectClassName}
+                  disabled={
+                    !campaignTypeValue ||
+                    agentsLoading ||
+                    createManualUpdate.isPending
+                  }
                 />
               ) : (
                 <TextInput
-                  label="Campaign Type"
-                  value={campaignTypeValue}
+                  label="Agent"
+                  value={agentFieldValue}
                   readOnly
                   className={readonlyInputClassName}
                 />

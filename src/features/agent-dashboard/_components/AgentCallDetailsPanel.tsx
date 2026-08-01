@@ -3,6 +3,7 @@ import type { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+import { ensureAbsoluteUrl } from "@/lib/url";
 import { Panel } from "./Panel";
 import { useAgentCallDetails } from "../_lib/hooks";
 
@@ -27,12 +28,6 @@ function formatTime(ts: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function ensureAbsoluteUrl(url: string): string {
-  return url.startsWith("http://") || url.startsWith("https://")
-    ? url
-    : `https://${url}`;
 }
 
 function formatDuration(seconds: number | null): string {

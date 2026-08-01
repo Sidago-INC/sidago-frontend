@@ -150,8 +150,11 @@ export function useLogLevel2Result() {
   return useMutation({
     mutationFn: async (body: Level2PostBody) =>
       (await api.post("/level-2-requests", body)) as Level2PostResponse,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["level-2-history"] });
+      qc.invalidateQueries({
+        queryKey: ["lead-brand-states", variables.leadId],
+      });
     },
   });
 }

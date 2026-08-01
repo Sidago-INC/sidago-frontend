@@ -330,8 +330,33 @@ export function Level2Update() {
         updatedNotes: row.updated_notes,
         callBackDate: row.call_back_date,
       });
+      // Re-fetch brand states so Lead Type cells reflect the result that was
+      // just logged (e.g. "not interested" → Ignore) without a page reload.
+      let leadTypePatch: Partial<Level2UpdateRow> = {};
+      try {
+        const json = (await api.get(
+          `/leads/${row.lead}/brand-states`,
+        )) as BrandStatesResponse;
+        leadTypePatch = {
+          lead_type_sidago: (json.brandStates.svg.leadType ?? "") as
+            | LEAD_TYPE
+            | "",
+          lead_type_benton: (json.brandStates.benton.leadType ?? "") as
+            | LEAD_TYPE
+            | "",
+          lead_type_95rm: (json.brandStates["95rm"].leadType ?? "") as
+            | LEAD_TYPE
+            | "",
+        };
+      } catch {
+        // Logging succeeded; leave lead types as-is if the refresh fails.
+      }
       showSuccessToast("Level 2 result logged.");
-      patchRow(rowId, { logged_at: new Date().toISOString(), api_id: result.id });
+      patchRow(rowId, {
+        logged_at: new Date().toISOString(),
+        api_id: result.id,
+        ...leadTypePatch,
+      });
     } catch (err) {
       showErrorToast(err);
     }

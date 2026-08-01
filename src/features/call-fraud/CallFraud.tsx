@@ -4,6 +4,7 @@ import { ErrorState, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+import { ensureAbsoluteUrl } from "@/lib/url";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   useSuspiciousCalls,
@@ -181,7 +182,7 @@ export function CallFraud() {
       render: (row) =>
         row.mcRecordingLink ? (
           <a
-            href={row.mcRecordingLink}
+            href={ensureAbsoluteUrl(row.mcRecordingLink)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"

@@ -20,6 +20,7 @@ import { Panel } from "@/features/agent-dashboard/_components/Panel";
 import { TablePagination } from "@/components/ui/table/TablePagination";
 import { createPaginationMeta, getPageNumbers, getPaginationRange, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { downloadWorkbook } from "@/lib/excel";
+import { ensureAbsoluteUrl } from "@/lib/url";
 
 const DEFAULT_DETAILS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -66,12 +67,6 @@ function formatDateTime(ts: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function ensureAbsoluteUrl(url: string): string {
-  return url.startsWith("http://") || url.startsWith("https://")
-    ? url
-    : `https://${url}`;
 }
 
 function formatDuration(seconds: number | null): string {
