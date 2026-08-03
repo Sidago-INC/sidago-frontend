@@ -185,6 +185,14 @@ export function CallFraud() {
             href={ensureAbsoluteUrl(row.mcRecordingLink)}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(event) => {
+              event.preventDefault();
+              window.open(
+                ensureAbsoluteUrl(row.mcRecordingLink!),
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
             className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"
           >
             Listen <ExternalLink className="h-3 w-3" />

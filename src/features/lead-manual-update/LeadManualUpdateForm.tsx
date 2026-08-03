@@ -1,6 +1,5 @@
-
-
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Button,
   Card,
@@ -15,6 +14,11 @@ import { useAuth } from "@/providers/AuthProvider";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useLeadSelectSource } from "@/features/level-2-update/_lib/hooks";
 import { useUsers } from "@/features/backoffice-shared/use-users";
+import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
+import {
+  brandCodeToCampaignLabel,
+  findNavAgentWithBrand,
+} from "@/lib/navigation-agents";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -67,22 +71,28 @@ const selectClassName =
 const readonlyInputClassName =
   "h-10 rounded text-sm bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300";
 
-function createInitialValues(agentName: string): FormValues {
+function createInitialValues(
+  agentName: string,
+  campaignType: string,
+): FormValues {
   return {
     lead: "",
     resultUpdate: "",
     toBeCalledOn: "",
     notes: "",
     agent: agentName,
-    campaignType: "SVG",
+    campaignType,
     toBeLogged: true,
   };
 }
 
 export function LeadManualUpdateForm() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const createManualUpdate = useCreateManualUpdate();
   const leadSelectSource = useLeadSelectSource();
+  const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
+
   // Brand-scoped agent queries — same pattern as Level 2 Update so the
   // Agent dropdown only lists agents registered to the selected campaign.
   const svgAgents = useUsers("svg");
@@ -94,13 +104,60 @@ export function LeadManualUpdateForm() {
     user?.role === "admin" || user?.role === "backoffice";
   const currentAgentName = user?.name?.trim() || "Current Agent";
 
-  const [form, setForm] = useState<FormValues>(() => createInitialValues(""));
+  // When opened from Agents > SVG|Benton|95RM > Agent nav, lock campaign
+  // to that brand and prefill the agent from the query string.
+  const navContext = useMemo(() => {
+    const match = findNavAgentWithBrand(
+      brandsWithAgents,
+      searchParams.get("agent"),
+      searchParams.get("agentId"),
+    );
+    if (!match) return null;
+    const campaignType = brandCodeToCampaignLabel(match.brand.brandCode);
+    if (!campaignType) return null;
+    return {
+      campaignType,
+      agentName: match.agent.name,
+      agentId: match.agent.agentId,
+    };
+  }, [brandsWithAgents, searchParams]);
+
+  const lockedCampaignType = navContext?.campaignType ?? null;
+  const defaultCampaignType = lockedCampaignType ?? "SVG";
+  const defaultAgentName = isAdmin
+    ? (navContext?.agentName ?? "")
+    : currentAgentName;
+
+  const [form, setForm] = useState<FormValues>(() =>
+    createInitialValues(defaultAgentName, defaultCampaignType),
+  );
   const [toBeCalledOnError, setToBeCalledOnError] = useState<string>();
 
+  // Sync when nav agent/brand resolves (brands query loads after first paint).
+  useEffect(() => {
+    if (!navContext || !isAdmin) return;
+    setForm((current) => ({
+      ...current,
+      campaignType: navContext.campaignType,
+      agent: navContext.agentName,
+    }));
+  }, [navContext, isAdmin]);
+
   const agentFieldValue = isAdmin ? form.agent : currentAgentName;
-  const campaignTypeValue = isAdmin ? form.campaignType : "SVG";
+  const campaignTypeValue = isAdmin
+    ? (lockedCampaignType ?? form.campaignType)
+    : "SVG";
   const toBeLoggedValue = true;
   const brandCode = campaignLabelToBrandCode(campaignTypeValue);
+
+  const campaignOptions = useMemo(() => {
+    if (lockedCampaignType) {
+      return CAMPAIGN_TYPE_OPTIONS.filter(
+        (option) => option.value === lockedCampaignType,
+      );
+    }
+    return CAMPAIGN_TYPE_OPTIONS;
+  }, [lockedCampaignType]);
 
   const resultUpdateOptions = useMemo(
     () => getResultUpdateOptions(user?.role),
@@ -138,6 +195,7 @@ export function LeadManualUpdateForm() {
   };
 
   const handleCampaignChange = (nextCampaign: string) => {
+    if (lockedCampaignType) return;
     // Clear agent so a Benton agent cannot stick around under SVG.
     setForm((current) => ({
       ...current,
@@ -147,7 +205,12 @@ export function LeadManualUpdateForm() {
   };
 
   const handleClear = () => {
-    setForm(createInitialValues(isAdmin ? currentAgentName : ""));
+    setForm(
+      createInitialValues(
+        isAdmin ? (navContext?.agentName ?? "") : "",
+        lockedCampaignType ?? "SVG",
+      ),
+    );
     setToBeCalledOnError(undefined);
   };
 
@@ -178,10 +241,16 @@ export function LeadManualUpdateForm() {
       return;
     }
 
+    const selectedAgentName = isAdmin ? form.agent : currentAgentName;
     const selectedAgent = brandAgents.find(
-      (agent) => agent.name === (isAdmin ? form.agent : currentAgentName),
+      (agent) => agent.name === selectedAgentName,
     );
-    const agentId = selectedAgent?.id ?? user?.id;
+    const agentId =
+      selectedAgent?.id ??
+      (selectedAgentName === navContext?.agentName
+        ? navContext?.agentId
+        : undefined) ??
+      user?.id;
 
     if (!agentId) {
       showErrorToast(new Error("Unable to resolve agent for this update."));
@@ -198,12 +267,19 @@ export function LeadManualUpdateForm() {
         followUpDate: form.toBeCalledOn || undefined,
       });
       showSuccessToast("Lead manual update submitted successfully.");
-      setForm(createInitialValues(isAdmin ? currentAgentName : ""));
+      setForm(
+        createInitialValues(
+          isAdmin ? (navContext?.agentName ?? "") : "",
+          lockedCampaignType ?? "SVG",
+        ),
+      );
       setToBeCalledOnError(undefined);
     } catch (error) {
       showErrorToast(error);
     }
   };
+
+  const campaignSelectDisabled = Boolean(lockedCampaignType);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 lg:px-6">
@@ -269,14 +345,23 @@ export function LeadManualUpdateForm() {
                 error={toBeCalledOnError}
               />
               {isAdmin ? (
-                <Select
-                  label="Campaign Type"
-                  value={campaignTypeValue}
-                  options={CAMPAIGN_TYPE_OPTIONS}
-                  placeholder="Select campaign type"
-                  onChange={(value) => handleCampaignChange(String(value))}
-                  className={selectClassName}
-                />
+                campaignSelectDisabled ? (
+                  <TextInput
+                    label="Campaign Type"
+                    value={campaignTypeValue}
+                    readOnly
+                    className={readonlyInputClassName}
+                  />
+                ) : (
+                  <Select
+                    label="Campaign Type"
+                    value={campaignTypeValue}
+                    options={campaignOptions}
+                    placeholder="Select campaign type"
+                    onChange={(value) => handleCampaignChange(String(value))}
+                    className={selectClassName}
+                  />
+                )
               ) : (
                 <TextInput
                   label="Campaign Type"

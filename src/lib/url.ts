@@ -1,22 +1,25 @@
 /**
- * Normalize a URL so `<a href>` opens correctly.
+ * Normalize a MightyCall recording URL.
  *
- * Handles:
- * - `https/host/...` (malformed scheme missing `://`) → `https://host/...`
- * - bare host paths → prefixed with `https://`
- * - already-absolute `http(s)://` URLs → unchanged
+ * Stored values often look like `https://https/console.mightycall.com/...`.
+ * Keep only from `console` onward, then prefix a single `https://`.
  */
 export function ensureAbsoluteUrl(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) return trimmed;
 
-  // Repair "https/host..." / "http/host..." (missing "://")
-  const brokenScheme = trimmed.match(/^(https?)\/(?!\/)/i);
-  if (brokenScheme) {
-    return `${brokenScheme[1].toLowerCase()}://${trimmed.slice(brokenScheme[0].length)}`;
+  const consoleIdx = trimmed.toLowerCase().indexOf("console.");
+  if (consoleIdx >= 0) {
+    return `https://${trimmed.slice(consoleIdx)}`;
   }
 
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-
-  return `https://${trimmed}`;
+  // Fallback for non-MightyCall links
+  let s = trimmed.replace(/\\\//g, "/");
+  let previous = "";
+  while (s !== previous) {
+    previous = s;
+    s = s.replace(/^(?:https?:\/\/|https?\/|\/\/)/i, "");
+  }
+  if (!s) return trimmed;
+  return `https://${s}`;
 }

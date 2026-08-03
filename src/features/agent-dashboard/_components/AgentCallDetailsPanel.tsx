@@ -135,6 +135,14 @@ export function AgentCallDetailsPanel({
                         href={ensureAbsoluteUrl(row.mcRecordingLink)}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          window.open(
+                            ensureAbsoluteUrl(row.mcRecordingLink!),
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                        }}
                         className="text-xs font-medium text-violet-600 hover:text-violet-500 hover:underline dark:text-violet-400 dark:hover:text-violet-300"
                       >
                         Listen

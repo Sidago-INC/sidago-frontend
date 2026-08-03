@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { buildPaginationParams, parsePaginatedResponse } from "@/lib/pagination";
+import { ensureAbsoluteUrl } from "@/lib/url";
 
 export type SuspiciousCallRow = {
   id: string;
@@ -32,7 +33,16 @@ export function useSuspiciousCalls(
       if (filters.userId) extra.userId = filters.userId;
       const params = buildPaginationParams(page, perPage, extra);
       const json = await api.get(`/call-fraud/suspicious?${params.toString()}`);
-      return parsePaginatedResponse<SuspiciousCallRow>(json);
+      const parsed = parsePaginatedResponse<SuspiciousCallRow>(json);
+      return {
+        ...parsed,
+        data: parsed.data.map((row) => ({
+          ...row,
+          mcRecordingLink: row.mcRecordingLink
+            ? ensureAbsoluteUrl(row.mcRecordingLink)
+            : null,
+        })),
+      };
     },
     staleTime: 30_000,
   });

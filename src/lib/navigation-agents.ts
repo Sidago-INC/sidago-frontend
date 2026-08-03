@@ -130,6 +130,15 @@ export function findNavAgent(
   slug: string | null | undefined,
   agentId: string | null | undefined,
 ): NavAgent | undefined {
+  return findNavAgentWithBrand(brands, slug, agentId)?.agent;
+}
+
+/** Resolve both the nav agent and the brand section they belong to. */
+export function findNavAgentWithBrand(
+  brands: BrandWithAgents[] | undefined,
+  slug: string | null | undefined,
+  agentId: string | null | undefined,
+): { brand: BrandWithAgents; agent: NavAgent } | undefined {
   if (!brands) return undefined;
 
   for (const brand of brands) {
@@ -138,12 +147,23 @@ export function findNavAgent(
         (slug && agent.slug === slug) ||
         (agentId && agent.agentId === agentId)
       ) {
-        return agent;
+        return { brand, agent };
       }
     }
   }
 
   return undefined;
+}
+
+/** Map API brandCode → Lead Manual Update campaign label. */
+export function brandCodeToCampaignLabel(
+  brandCode: string | null | undefined,
+): string | null {
+  const code = normalizeBrandCode(brandCode);
+  if (code === "svg") return "SVG";
+  if (code === "benton") return "Benton";
+  if (code === "95rm") return "95RM";
+  return null;
 }
 
 export const ADMIN_AGENT_ROUTE_PATHS = [

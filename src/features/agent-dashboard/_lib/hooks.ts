@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PaginationMeta } from "@/lib/pagination";
 import { resolveLeaderboardBadgeStatuses } from "@/lib/resolveLeaderboardBadge";
+import { ensureAbsoluteUrl } from "@/lib/url";
 import type { Agent } from "@/types";
 
 type DailyScoresResponse = {
@@ -290,10 +291,20 @@ export function useAgentCallDetails(
       page,
       limit,
     ],
-    queryFn: async () =>
-      api.get(
+    queryFn: async () => {
+      const json = (await api.get(
         `/dashboard/call-details?${params.toString()}`,
-      ) as Promise<CallDetailsResponse>,
+      )) as CallDetailsResponse;
+      return {
+        ...json,
+        data: json.data.map((row) => ({
+          ...row,
+          mcRecordingLink: row.mcRecordingLink
+            ? ensureAbsoluteUrl(row.mcRecordingLink)
+            : null,
+        })),
+      };
+    },
     enabled: Boolean(agentSlug),
     staleTime: 60_000,
   });
