@@ -82,6 +82,7 @@ const EXPORT_COLUMNS = [
   "Company",
   "Outcome",
   "Lead Type",
+  "Notes",
   "Duration",
   "Recording",
 ] as const;
@@ -93,6 +94,7 @@ function rowToExportValues(row: CallDetailRow): Record<(typeof EXPORT_COLUMNS)[n
     Company: row.companyName ?? "",
     Outcome: row.resultCode ?? "",
     "Lead Type": row.leadType ?? "",
+    Notes: row.notes ?? "",
     Duration: formatDuration(row.mcDurationSeconds ?? row.durationSeconds),
     Recording: row.mcRecordingLink ? ensureAbsoluteUrl(row.mcRecordingLink) : "",
   };
@@ -285,6 +287,7 @@ export function AgentCallInspector() {
             Agent
           </p>
           <select
+            aria-label="Agent"
             value={selectedSlug}
             onChange={(e) => handleAgentChange(e.target.value)}
             className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 transition outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
@@ -479,6 +482,7 @@ export function AgentCallInspector() {
                         "Company",
                         "Outcome",
                         "Lead Type",
+                        "Notes",
                         "Duration",
                         "Recording",
                       ].map((h) => (
@@ -513,6 +517,11 @@ export function AgentCallInspector() {
                         </td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                           {row.leadType ?? "—"}
+                        </td>
+                        <td className="max-w-72 px-4 py-3 text-slate-600 dark:text-slate-300">
+                          <span className="line-clamp-3" title={row.notes ?? undefined}>
+                            {row.notes?.trim() || "—"}
+                          </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-400">
                           {formatDuration(row.mcDurationSeconds ?? row.durationSeconds)}
