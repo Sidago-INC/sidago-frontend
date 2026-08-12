@@ -91,7 +91,7 @@ export function AgentCallDetailsPanel({
           <table className="w-full text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
               <tr>
-                {["Time", "Lead", "Company", "Outcome", "Lead Type", "Duration", "Recording"].map(
+                {["Time", "Lead", "Company", "Outcome", "Lead Type", "Notes", "Duration", "Recording"].map(
                   (h) => (
                     <th
                       key={h}
@@ -125,6 +125,11 @@ export function AgentCallDetailsPanel({
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                     {row.leadType ?? "—"}
+                  </td>
+                  <td className="max-w-72 px-4 py-3 text-slate-600 dark:text-slate-300">
+                    <span className="line-clamp-3" title={row.notes ?? undefined}>
+                      {row.notes?.trim() || "—"}
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-400">
                     {formatDuration(row.mcDurationSeconds ?? row.durationSeconds)}
@@ -166,6 +171,7 @@ export function AgentCallDetailsPanel({
           <div className="flex gap-2">
             <button
               type="button"
+              aria-label="Previous call details page"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
               className="cursor-pointer rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:cursor-default disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
@@ -174,6 +180,7 @@ export function AgentCallDetailsPanel({
             </button>
             <button
               type="button"
+              aria-label="Next call details page"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
               className="cursor-pointer rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:cursor-default disabled:opacity-40 dark:border-slate-700 dark:hover:bg-slate-800"
