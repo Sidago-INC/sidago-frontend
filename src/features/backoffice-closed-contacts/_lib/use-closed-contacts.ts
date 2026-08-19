@@ -20,23 +20,37 @@ type ApiResponse = {
     per_page: number;
     current_page: number;
     total_pages: number;
+    groups?: { value: string; count: number }[];
   };
+};
+
+export type ClosedContactsGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
 };
 
 async function fetchClosedContracts(
   category: Category,
   page: number,
   perPage: number,
-  brand?: Brand,
+  brand: Brand | undefined,
+  grid: ClosedContactsGridQuery,
 ) {
   const extra: Record<string, string> = { category };
   if (brand) extra.brand = brand;
+  if (grid.search) extra.search = grid.search;
+  if (grid.filters) extra.filters = grid.filters;
+  if (grid.sort) extra.sort = grid.sort;
+  if (grid.groupBy) extra.groupBy = grid.groupBy;
 
   const params = buildPaginationParams(page, perPage, extra);
   const json = (await api.get(
     `/reports/closed-contracts?${params.toString()}`,
   )) as ApiResponse;
-  return parsePaginatedResponse<ClosedContactRow>(json);
+  const parsed = parsePaginatedResponse<ClosedContactRow>(json);
+  return { ...parsed, meta: { ...parsed.meta, groups: json.meta.groups } };
 }
 
 export function useClosedContracts(
@@ -44,10 +58,18 @@ export function useClosedContracts(
   brand: Brand | undefined,
   page: number,
   perPage = DEFAULT_PAGE_SIZE,
+  grid: ClosedContactsGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["closed-contracts", category, brand ?? "all", page, perPage],
-    queryFn: () => fetchClosedContracts(category, page, perPage, brand),
+    queryKey: [
+      "closed-contracts",
+      category,
+      brand ?? "all",
+      page,
+      perPage,
+      grid,
+    ],
+    queryFn: () => fetchClosedContracts(category, page, perPage, brand, grid),
     staleTime: 30_000,
   });
 }

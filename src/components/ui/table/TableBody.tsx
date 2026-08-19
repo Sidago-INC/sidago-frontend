@@ -54,7 +54,7 @@ function GroupedRows<T>({
               <span>{group.label}</span>
               {showCounts && (
                 <span className="rounded-md bg-slate-200 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                  {group.rows.length}
+                  {group.count ?? group.rows.length}
                 </span>
               )}
             </span>

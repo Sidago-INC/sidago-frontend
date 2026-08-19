@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import {
   type Column,
+  type ServerGridConfig,
   type ServerPaginationConfig,
   type ServerSearchConfig,
 } from "@/components/ui/Table";
@@ -29,6 +30,7 @@ type FixLeadsTableProps = {
   title: string;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 };
 
 // "Fix" is a brand-scoped lead_type — covered by the existing LEAD_TYPE
@@ -54,6 +56,7 @@ export function FixLeadsTable({
   title,
   serverPagination,
   serverSearch,
+  serverGrid,
 }: FixLeadsTableProps) {
   const navigate = useNavigate();
   const [contactsModalRow, setContactsModalRow] = useState<FixQueueRow | null>(
@@ -64,7 +67,7 @@ export function FixLeadsTable({
     () => [
       {
         title: "Lead ID",
-        key: "leadId",
+        key: "lead",
         getValue: (row) => getLeadGridLabel(row),
       },
       { title: "Company Name", key: "companyName" },
@@ -103,10 +106,14 @@ export function FixLeadsTable({
       { title: "Name", key: "fullName" },
       { title: "Phone", key: "phone" },
       {
+        // Not in the fix-queue endpoint's permitted filter/sort/group fields.
         title: "Fix Entry Date",
         key: "fixEntryDate",
         getValue: (row) => formatFixEntryDate(row.fixEntryDate),
         type: "date",
+        filterable: false,
+        sortable: false,
+        groupable: false,
       },
       { title: "Email", key: "email" },
       {
@@ -115,6 +122,9 @@ export function FixLeadsTable({
         getValue: (row) => row.svgLeadType ?? "",
         type: "select",
         options: FIX_LEAD_TYPE_OPTIONS,
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) =>
           row.svgLeadType ? (
             <TypeBadge value={row.svgLeadType} kind="lead" />
@@ -128,6 +138,9 @@ export function FixLeadsTable({
         getValue: (row) => row.bentonLeadType ?? "",
         type: "select",
         options: FIX_LEAD_TYPE_OPTIONS,
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) =>
           row.bentonLeadType ? (
             <TypeBadge value={row.bentonLeadType} kind="lead" />
@@ -141,6 +154,9 @@ export function FixLeadsTable({
         getValue: (row) => row.rm95LeadType ?? "",
         type: "select",
         options: FIX_LEAD_TYPE_OPTIONS,
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) =>
           row.rm95LeadType ? (
             <TypeBadge value={row.rm95LeadType} kind="lead" />
@@ -151,6 +167,9 @@ export function FixLeadsTable({
       {
         title: "Fix Lead",
         key: "fixLead",
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => (
           <Button
             onClick={() => navigate(`/fix-leads/${row.leadId}`)}
@@ -180,10 +199,13 @@ export function FixLeadsTable({
       },
       {
         // Count of OTHER leads in the same company (distinct from the field
-        // above) — opens the related-contacts modal.
+        // above) — opens the related-contacts modal. Not a backend grid field.
         title: "Related Leads",
         key: "otherContactsCount",
         getValue: (row) => row.otherContactsCount,
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => (
           <Button
             onClick={() => setContactsModalRow(row)}
@@ -208,6 +230,7 @@ export function FixLeadsTable({
           columns={columns}
           serverPagination={serverPagination}
           serverSearch={serverSearch}
+          serverGrid={serverGrid}
           title={title}
           showToolbarTitle={false}
           description=""

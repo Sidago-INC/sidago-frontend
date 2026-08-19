@@ -10,6 +10,7 @@ import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { LeadsDrawer } from "./LeadsDrawer";
 import {
@@ -24,18 +25,26 @@ export function Leads() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const [searchInput, setSearchInput] = useState("");
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
     setPage(1);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
 
   const { data: result, isLoading } = useLeadsDirectory(
     page,
     perPage,
     debouncedSearch,
+    url.grid,
   );
   const rows = result?.data ?? [];
   const serverPagination = result?.meta
@@ -171,8 +180,18 @@ export function Leads() {
         serverPagination={serverPagination}
         serverSearch={{
           value: searchInput,
-          onChange: handleSearchChange,
+          onChange: setSearchInput,
           placeholder: "Search name, symbol, or lead ID",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: result?.meta?.groups,
         }}
         title="Leads"
         description="All lead records across SVG, Benton, and 95RM"

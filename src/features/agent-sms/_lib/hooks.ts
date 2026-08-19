@@ -13,16 +13,28 @@ import type {
   SmsStatePatchBody,
 } from "./apiTypes";
 
+export type SmsQueueGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
+};
+
 export function useSmsQueue(
   agentSlug: string,
   page = 1,
   perPage = DEFAULT_PAGE_SIZE,
+  grid: SmsQueueGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["sms-queue", agentSlug, page, perPage],
+    queryKey: ["sms-queue", agentSlug, page, perPage, grid],
     queryFn: async () => {
       const params = buildPaginationParams(page, perPage, {
         agentSlug,
+        ...(grid.search ? { search: grid.search } : {}),
+        ...(grid.filters ? { filters: grid.filters } : {}),
+        ...(grid.sort ? { sort: grid.sort } : {}),
+        ...(grid.groupBy ? { groupBy: grid.groupBy } : {}),
       });
       const json = (await api.get(
         `/sms/queue?${params.toString()}`,
@@ -31,7 +43,7 @@ export function useSmsQueue(
       return {
         ...json,
         data: parsed.data,
-        meta: parsed.meta,
+        meta: { ...parsed.meta, groups: json.meta?.groups },
       };
     },
     staleTime: 30_000,

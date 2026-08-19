@@ -48,7 +48,15 @@ type LeadsResponse = {
     per_page: number;
     current_page: number;
     total_pages: number;
+    groups?: { value: string; count: number }[];
   };
+};
+
+export type LeadsGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
 };
 
 function asDateString(value: string | null | undefined): string {
@@ -143,21 +151,26 @@ export function useLeadsDirectory(
   page: number,
   perPage = DEFAULT_PAGE_SIZE,
   search?: string,
+  grid: LeadsGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["leads", "directory", page, perPage, search ?? ""],
+    // every param must be in the key, or cached rows from another query leak in
+    queryKey: ["leads", "directory", page, perPage, search ?? "", grid],
     queryFn: async () => {
       const params = buildPaginationParams(page, perPage);
       if (search?.trim()) {
         params.set("search", search.trim());
       }
+      if (grid.filters) params.set("filters", grid.filters);
+      if (grid.sort) params.set("sort", grid.sort);
+      if (grid.groupBy) params.set("groupBy", grid.groupBy);
       const json = (await api.get(
         `/leads?${params.toString()}`,
       )) as LeadsResponse;
       const parsed = parsePaginatedResponse<LeadsDirectoryApiRow>(json);
       return {
         data: parsed.data.map(apiRowToDirectoryRow),
-        meta: parsed.meta,
+        meta: { ...parsed.meta, groups: json.meta.groups },
       };
     },
     placeholderData: keepPreviousData,

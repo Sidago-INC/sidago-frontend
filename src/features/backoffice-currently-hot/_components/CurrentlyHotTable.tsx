@@ -1,7 +1,13 @@
 
 
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
-import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
+import {
+  Table,
+  type Column,
+  type ServerGridConfig,
+  type ServerPaginationConfig,
+  type ServerSearchConfig,
+} from "@/components/ui/Table";
 import { useCompanyOptions } from "@/features/companies/_lib/hooks";
 import React, { useEffect, useMemo, useState } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
@@ -24,6 +30,8 @@ type CurrentlyHotTableProps = {
   title: string;
   variant: "svg" | "95rm" | "benton";
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 };
 
 export function CurrentlyHotTable({
@@ -31,6 +39,8 @@ export function CurrentlyHotTable({
   title,
   variant,
   serverPagination,
+  serverSearch,
+  serverGrid,
 }: CurrentlyHotTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -139,8 +149,11 @@ export function CurrentlyHotTable({
           type: "date",
         },
         {
+          // Backend always returns "" on this report — not sortable/groupable.
           title: "Last Action Date (SVG, Benton)",
           key: "lastActionDate",
+          sortable: false,
+          groupable: false,
         },
       ];
     }
@@ -172,8 +185,11 @@ export function CurrentlyHotTable({
           type: "date",
         },
         {
+          // Backend always returns "" on this report — not sortable/groupable.
           title: "Last Action Date (95RM, SVG, Benton)",
           key: "lastActionDate",
+          sortable: false,
+          groupable: false,
         },
       ];
     }
@@ -222,8 +238,11 @@ export function CurrentlyHotTable({
         type: "date",
       },
       {
+        // Backend always returns "" on this report — not sortable/groupable.
         title: "Last Action Date (SVG, Benton)",
         key: "lastActionDate",
+        sortable: false,
+        groupable: false,
       },
     ];
   }, [companies, data, variant]);
@@ -235,6 +254,8 @@ export function CurrentlyHotTable({
         columns={columns}
         title={title}
         serverPagination={serverPagination}
+        serverSearch={serverSearch}
+        serverGrid={serverGrid}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);

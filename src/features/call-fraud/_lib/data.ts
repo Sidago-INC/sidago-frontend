@@ -20,22 +20,42 @@ export type SuspiciousCallRow = {
 
 export type FraudFlagValue = "CLEARED" | "CONFIRMED_FRAUD";
 
+export type CallFraudGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
+};
+
+type LegacyEnvelopeWithGroups = {
+  groups?: { value: string; count: number }[];
+};
+
 export function useSuspiciousCalls(
   page: number,
   perPage: number,
-  filters: { brandId?: string; userId?: string } = {},
+  brandFilters: { brandId?: string; userId?: string } = {},
+  grid: CallFraudGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["call-fraud-suspicious", page, perPage, filters],
+    queryKey: ["call-fraud-suspicious", page, perPage, brandFilters, grid],
     queryFn: async () => {
       const extra: Record<string, string> = {};
-      if (filters.brandId) extra.brandId = filters.brandId;
-      if (filters.userId) extra.userId = filters.userId;
+      if (brandFilters.brandId) extra.brandId = brandFilters.brandId;
+      if (brandFilters.userId) extra.userId = brandFilters.userId;
+      if (grid.search) extra.search = grid.search;
+      if (grid.filters) extra.filters = grid.filters;
+      if (grid.sort) extra.sort = grid.sort;
+      if (grid.groupBy) extra.groupBy = grid.groupBy;
       const params = buildPaginationParams(page, perPage, extra);
       const json = await api.get(`/call-fraud/suspicious?${params.toString()}`);
       const parsed = parsePaginatedResponse<SuspiciousCallRow>(json);
       return {
         ...parsed,
+        meta: {
+          ...parsed.meta,
+          groups: (json as LegacyEnvelopeWithGroups).groups,
+        },
         data: parsed.data.map((row) => ({
           ...row,
           mcRecordingLink: row.mcRecordingLink

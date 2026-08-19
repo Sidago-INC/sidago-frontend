@@ -14,6 +14,19 @@ export type ServerSearchConfig = {
   placeholder?: string;
 };
 
+/** When set, filter/sort/group are controlled by the parent and skip in-memory processing. */
+export type ServerGridConfig = {
+  filters: FilterItem[];
+  rootGate: FilterGate;
+  sort: SortRule[];
+  groupBy: string | null;
+  onFiltersChange: (items: FilterItem[], gate: FilterGate) => void;
+  onSortChange: (rules: SortRule[]) => void;
+  onGroupByChange: (field: string | null) => void;
+  /** True per-group counts from meta.groups, keyed by the group's raw value ("" = blank/NULL). */
+  groupCounts?: { value: string; count: number }[];
+};
+
 export type Column<T> = {
   key: keyof T | string;
   title: string;
@@ -21,6 +34,10 @@ export type Column<T> = {
   getValue?: (row: T) => React.ReactNode;
   type?: "text" | "select" | "date";
   options?: Array<{ label: string; value: string }>;
+  /** Set false when the backend doesn't accept this field for that grid control. Default true. */
+  filterable?: boolean;
+  sortable?: boolean;
+  groupable?: boolean;
 };
 
 export type TableProps<T> = {
@@ -31,6 +48,7 @@ export type TableProps<T> = {
   onRowsPerPageChange?: (rowsPerPage: number) => void;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
   emptyText?: string;
   emptyState?: React.ReactNode;
   /** @deprecated Toolbar/filters now always render when data is empty. */
@@ -78,6 +96,8 @@ export type GroupNode<T> = {
   level: number;
   rows: T[];
   children: GroupNode<T>[] | null;
+  /** True count from serverGrid.groupCounts; falls back to rows.length when absent. */
+  count?: number;
 };
 
 export type SelectableColumn = { value: string; label: string };

@@ -27,7 +27,11 @@ import {
   getPageNumbers,
   getPaginationRange,
 } from "@/lib/pagination";
-import type { ServerPaginationConfig, ServerSearchConfig } from "./types";
+import type {
+  ServerGridConfig,
+  ServerPaginationConfig,
+  ServerSearchConfig,
+} from "./types";
 
 interface UseTableStateOptions<T> {
   data: T[];
@@ -36,6 +40,7 @@ interface UseTableStateOptions<T> {
   initialRowsPerPage?: number;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 }
 
 export interface UseTableStateReturn<T> {
@@ -62,6 +67,8 @@ export interface UseTableStateReturn<T> {
   rowsPerPage: number;
   setRowsPerPage: React.Dispatch<React.SetStateAction<number>>;
   selectableColumns: SelectableColumn[];
+  sortableColumns: SelectableColumn[];
+  groupableColumns: SelectableColumn[];
   columnMap: Map<string, Column<T>>;
   processedData: T[];
   groupedData: GroupNode<T>[] | null;
@@ -89,20 +96,74 @@ export function useTableState<T>({
   initialRowsPerPage = DEFAULT_PAGE_SIZE,
   serverPagination,
   serverSearch,
+  serverGrid,
 }: UseTableStateOptions<T>): UseTableStateReturn<T> {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableElementRef = useRef<HTMLTableElement | null>(null);
 
-  const [groupRules, setGroupRules] = useState<GroupRule[]>([]);
-  const [sortRules, setSortRules] = useState<SortRule[]>([]);
+  const [localGroupRules, setLocalGroupRules] = useState<GroupRule[]>([]);
+  const [localSortRules, setLocalSortRules] = useState<SortRule[]>([]);
   const [showCounts, setShowCounts] = useState(true);
   const [collapsedGroups, setCollapsedGroups] = useState<
     Record<string, boolean>
   >({});
   const [filterSearch, setFilterSearch] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [rootFilterGate, setRootFilterGate] = useState<FilterGate>("AND");
-  const [filterItems, setFilterItems] = useState<FilterItem[]>([]);
+  const [localRootFilterGate, setLocalRootFilterGate] =
+    useState<FilterGate>("AND");
+  const [localFilterItems, setLocalFilterItems] = useState<FilterItem[]>([]);
+
+  const filterItems = serverGrid ? serverGrid.filters : localFilterItems;
+  const rootFilterGate = serverGrid ? serverGrid.rootGate : localRootFilterGate;
+  const sortRules = serverGrid ? serverGrid.sort : localSortRules;
+  const groupRules: GroupRule[] = serverGrid
+    ? serverGrid.groupBy
+      ? [{ field: serverGrid.groupBy, direction: "asc" }]
+      : []
+    : localGroupRules;
+
+  const setFilterItems: Dispatch<SetStateAction<FilterItem[]>> = (value) => {
+    if (serverGrid) {
+      const next =
+        typeof value === "function" ? value(serverGrid.filters) : value;
+      serverGrid.onFiltersChange(next, serverGrid.rootGate);
+      return;
+    }
+    setLocalFilterItems(value);
+  };
+
+  const setRootFilterGate: Dispatch<SetStateAction<FilterGate>> = (value) => {
+    if (serverGrid) {
+      const next =
+        typeof value === "function" ? value(serverGrid.rootGate) : value;
+      serverGrid.onFiltersChange(serverGrid.filters, next);
+      return;
+    }
+    setLocalRootFilterGate(value);
+  };
+
+  const setSortRules: Dispatch<SetStateAction<SortRule[]>> = (value) => {
+    if (serverGrid) {
+      const next = typeof value === "function" ? value(serverGrid.sort) : value;
+      serverGrid.onSortChange(next);
+      return;
+    }
+    setLocalSortRules(value);
+  };
+
+  const setGroupRules: Dispatch<SetStateAction<GroupRule[]>> = (value) => {
+    if (serverGrid) {
+      const next = typeof value === "function" ? value(groupRules) : value;
+      // The backend accepts a single groupBy field. GroupPanel's column list
+      // appends the clicked field rather than replacing (it's built for
+      // multi-level client grouping), so the most-recently-added rule is the
+      // one the user just picked — take the last item, not the first.
+      serverGrid.onGroupByChange(next[next.length - 1]?.field ?? null);
+      return;
+    }
+    setLocalGroupRules(value);
+  };
+
   const [rowsPerPage, setRowsPerPageState] = useState(
     serverPagination?.meta.per_page ?? initialRowsPerPage,
   );
@@ -122,10 +183,34 @@ export function useTableState<T>({
 
   const selectableColumns = useMemo(
     () =>
-      columns.map((column) => ({
-        value: String(column.key),
-        label: column.title,
-      })),
+      columns
+        .filter((column) => column.filterable !== false)
+        .map((column) => ({
+          value: String(column.key),
+          label: column.title,
+        })),
+    [columns],
+  );
+
+  const sortableColumns = useMemo(
+    () =>
+      columns
+        .filter((column) => column.sortable !== false)
+        .map((column) => ({
+          value: String(column.key),
+          label: column.title,
+        })),
+    [columns],
+  );
+
+  const groupableColumns = useMemo(
+    () =>
+      columns
+        .filter((column) => column.groupable !== false)
+        .map((column) => ({
+          value: String(column.key),
+          label: column.title,
+        })),
     [columns],
   );
 
@@ -135,6 +220,9 @@ export function useTableState<T>({
   );
 
   const filteredData = useMemo(() => {
+    // Filters (and search) are applied by the API; the page's rows need no local filtering.
+    if (serverGrid) return data;
+
     return data.filter((row) => {
       // Server search is applied by the API; do not filter the current page in memory.
       const searchMatches = serverSearch
@@ -260,10 +348,13 @@ export function useTableState<T>({
     filterItems,
     filterSearch,
     rootFilterGate,
+    serverGrid,
     serverSearch,
   ]);
 
   const processedData = useMemo(() => {
+    if (serverGrid) return filteredData;
+
     const activeSortRules = sortRules.filter((rule) => rule.field);
     if (activeSortRules.length === 0) return filteredData;
 
@@ -282,13 +373,24 @@ export function useTableState<T>({
       }
       return 0;
     });
-  }, [columnMap, filteredData, sortRules]);
+  }, [columnMap, filteredData, serverGrid, sortRules]);
 
   const groupedData = useMemo<GroupNode<T>[] | null>(() => {
     const activeGroupRules = groupRules.filter((rule) => rule.field);
     if (activeGroupRules.length === 0) return null;
-    return buildGroupNodes(processedData, activeGroupRules, columnMap);
-  }, [columnMap, groupRules, processedData]);
+    const nodes = buildGroupNodes(processedData, activeGroupRules, columnMap);
+
+    if (!serverGrid?.groupCounts) return nodes;
+
+    // True totals for the whole row-set, not just the rows loaded on this page.
+    const countByValue = new Map(
+      serverGrid.groupCounts.map((group) => [group.value, group.count]),
+    );
+    return nodes.map((node) => ({
+      ...node,
+      count: countByValue.get(node.label === "Unknown" ? "" : node.label),
+    }));
+  }, [columnMap, groupRules, processedData, serverGrid]);
 
   const paginationContextKey = useMemo(
     () =>
@@ -510,6 +612,8 @@ export function useTableState<T>({
     rowsPerPage,
     setRowsPerPage,
     selectableColumns,
+    sortableColumns,
+    groupableColumns,
     columnMap,
     processedData,
     groupedData,

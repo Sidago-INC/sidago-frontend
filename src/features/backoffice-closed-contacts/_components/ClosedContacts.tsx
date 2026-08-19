@@ -2,7 +2,9 @@
 
 import clsx from "clsx";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { closedContactsTabs, type ClosedContactsTabKey } from "../_lib/data";
 import { useClosedContracts } from "../_lib/use-closed-contacts";
@@ -32,11 +34,26 @@ export function ClosedContacts() {
 
   const { page, perPage, setPage, setPerPage } = useServerPagination();
 
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
   const { data: result, isLoading, isError, error } = useClosedContracts(
     activeView.category,
     activeView.brand,
     page,
     perPage,
+    url.grid,
   );
 
   const updateTab = (tabKey: ClosedContactsTabKey) => {
@@ -96,6 +113,21 @@ export function ClosedContacts() {
                 }
               : undefined
           }
+          serverSearch={{
+            value: searchInput,
+            onChange: setSearchInput,
+            placeholder: "Search lead, symbol, name, phone, or email",
+          }}
+          serverGrid={{
+            filters: url.filterItems,
+            rootGate: url.rootGate,
+            sort: url.sortRules,
+            groupBy: url.groupBy,
+            onFiltersChange: url.setFilters,
+            onSortChange: url.setSort,
+            onGroupByChange: url.setGroupBy,
+            groupCounts: result?.meta?.groups,
+          }}
           tabKey={activeView.key}
           title={activeView.title}
         />

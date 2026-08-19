@@ -1,16 +1,34 @@
 
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { useCurrentlyHot } from "../_lib/use-currently-hot";
 import { CurrentlyHotTable } from "./CurrentlyHotTable";
 
 export function CurrentlyHot95rm() {
   const { page, perPage, setPage, setPerPage } = useServerPagination();
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
   const { data: result, isLoading, isError, error } = useCurrentlyHot(
     "95rm",
     page,
     perPage,
+    url.grid,
   );
 
   if (isLoading) {
@@ -41,6 +59,21 @@ export function CurrentlyHot95rm() {
             }
           : undefined
       }
+      serverSearch={{
+        value: searchInput,
+        onChange: setSearchInput,
+        placeholder: "Search lead, symbol, name, phone, or email",
+      }}
+      serverGrid={{
+        filters: url.filterItems,
+        rootGate: url.rootGate,
+        sort: url.sortRules,
+        groupBy: url.groupBy,
+        onFiltersChange: url.setFilters,
+        onSortChange: url.setSort,
+        onGroupByChange: url.setGroupBy,
+        groupCounts: result?.meta?.groups,
+      }}
       title="Currently Hot Leads - 95RM"
       variant="95rm"
     />

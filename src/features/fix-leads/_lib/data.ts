@@ -143,7 +143,15 @@ type FixQueueResponse = {
     per_page: number;
     current_page: number;
     total_pages: number;
+    groups?: { value: string; count: number }[];
   };
+};
+
+export type FixQueueGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
 };
 type FullLeadResponse = { ok: true; lead: FullLead; brandStates: BrandStates };
 type RelatedResponse = { ok: true; count: number; data: RelatedLead[] };
@@ -179,6 +187,7 @@ export function useFixQueue(
   hasOtherContacts?: boolean,
   timezone?: string,
   search?: string,
+  grid: FixQueueGridQuery = {},
 ) {
   return useQuery({
     queryKey: [
@@ -189,6 +198,7 @@ export function useFixQueue(
       hasOtherContacts ?? null,
       timezone ?? null,
       search ?? "",
+      grid,
     ],
     queryFn: async () => {
       const params = buildPaginationParams(page, perPage);
@@ -196,13 +206,16 @@ export function useFixQueue(
       if (hasOtherContacts) params.set("hasOtherContacts", "true");
       if (timezone) params.set("timezone", timezone);
       if (search?.trim()) params.set("search", search.trim());
+      if (grid.filters) params.set("filters", grid.filters);
+      if (grid.sort) params.set("sort", grid.sort);
+      if (grid.groupBy) params.set("groupBy", grid.groupBy);
       const json = (await api.get(
         `/leads/fix-queue?${params.toString()}`,
       )) as FixQueueResponse;
       const parsed = parsePaginatedResponse<FixQueueApiRow>(json);
       return {
         data: parsed.data.map(normalizeFixQueueRow),
-        meta: parsed.meta,
+        meta: { ...parsed.meta, groups: json.meta.groups },
       };
     },
     placeholderData: keepPreviousData,

@@ -28,6 +28,13 @@ export type EmailQueueResponse = {
   brandCode: string;
   count: number;
   data: EmailQueueItem[];
+  meta?: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+    groups?: { value: string; count: number }[];
+  };
 };
 
 export type EmailHistoryEntry = {

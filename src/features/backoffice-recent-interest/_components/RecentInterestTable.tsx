@@ -1,7 +1,13 @@
 
 
 import { CampaignBadge, CompanySymbolBadge, TypeBadge } from "@/components/ui";
-import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
+import {
+  Table,
+  type Column,
+  type ServerGridConfig,
+  type ServerPaginationConfig,
+  type ServerSearchConfig,
+} from "@/components/ui/Table";
 import {
   getCompanySymbolOptions,
   getLeadGridLabel,
@@ -24,6 +30,8 @@ type RecentInterestTableProps = {
   title: string;
   brand: "svg" | "95rm" | "benton";
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 };
 
 function getRecentInterestLeadLabel(row: RecentInterestRow) {
@@ -39,6 +47,8 @@ export function RecentInterestTable({
   title,
   brand,
   serverPagination,
+  serverSearch,
+  serverGrid,
 }: RecentInterestTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -74,6 +84,7 @@ export function RecentInterestTable({
         render: (row) => getRecentInterestLeadLabel(row) || "-",
       },
       {
+        // Not a backend grid field for this report — display only.
         title: "Campaign Type",
         key: "campaignType",
         type: "select",
@@ -81,6 +92,9 @@ export function RecentInterestTable({
           label: value,
           value,
         })),
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => <CampaignBadge value={row.campaignType} />,
       },
       {
@@ -142,6 +156,8 @@ export function RecentInterestTable({
         columns={columns}
         title={title}
         serverPagination={serverPagination}
+        serverSearch={serverSearch}
+        serverGrid={serverGrid}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);

@@ -35,7 +35,15 @@ type ApiResponse = {
     per_page: number;
     current_page: number;
     total_pages: number;
+    groups?: { value: string; count: number }[];
   };
+};
+
+export type RecentInterestGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
 };
 
 function normalizeRecentInterestRow(raw: ApiRecentInterestRow): RecentInterestRow {
@@ -77,15 +85,22 @@ async function fetchRecentInterest(
   brand: Brand,
   page: number,
   perPage: number,
+  grid: RecentInterestGridQuery,
 ) {
-  const params = buildPaginationParams(page, perPage, { brand });
+  const params = buildPaginationParams(page, perPage, {
+    brand,
+    ...(grid.search ? { search: grid.search } : {}),
+    ...(grid.filters ? { filters: grid.filters } : {}),
+    ...(grid.sort ? { sort: grid.sort } : {}),
+    ...(grid.groupBy ? { groupBy: grid.groupBy } : {}),
+  });
   const json = (await api.get(
     `/reports/recent-interest?${params.toString()}`,
   )) as ApiResponse;
   const parsed = parsePaginatedResponse<ApiRecentInterestRow>(json);
   return {
     data: parsed.data.map(normalizeRecentInterestRow),
-    meta: parsed.meta,
+    meta: { ...parsed.meta, groups: json.meta.groups },
   };
 }
 
@@ -93,10 +108,11 @@ export function useRecentInterest(
   brand: Brand,
   page: number,
   perPage = DEFAULT_PAGE_SIZE,
+  grid: RecentInterestGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["recent-interest", brand, page, perPage],
-    queryFn: () => fetchRecentInterest(brand, page, perPage),
+    queryKey: ["recent-interest", brand, page, perPage, grid],
+    queryFn: () => fetchRecentInterest(brand, page, perPage, grid),
     staleTime: 30_000,
   });
 }

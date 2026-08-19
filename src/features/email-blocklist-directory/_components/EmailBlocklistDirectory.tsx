@@ -7,6 +7,8 @@ import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 import {
@@ -36,8 +38,23 @@ export function EmailBlocklistDirectory() {
   const { page, perPage, setPage, setPerPage } = useServerPagination(
     DEFAULT_ROWS_PER_PAGE,
   );
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
   const { data: result, isLoading, isError, error, refetch } =
-    useEmailBlacklistDirectory(page, perPage);
+    useEmailBlacklistDirectory(page, perPage, url.grid);
   const data = result?.data ?? [];
   const serverPagination = result?.meta
     ? {
@@ -104,7 +121,7 @@ export function EmailBlocklistDirectory() {
     () => [
       {
         title: "Lead ID",
-        key: "leadId",
+        key: "lead",
         getValue: (row) => getLeadGridLabel(row),
       },
       { title: "Company", key: "companyName" },
@@ -126,8 +143,10 @@ export function EmailBlocklistDirectory() {
           ),
       },
       {
+        // Key matches the backend/row field name (leadTypeSvg), not the
+        // display-oriented "svgLeadType" the client-only filter dropdown uses.
         title: "Lead Type",
-        key: "svgLeadType",
+        key: "leadTypeSvg",
         render: (row) =>
           row.leadTypeSvg ? (
             <TypeBadge value={row.leadTypeSvg} kind="lead" />
@@ -137,7 +156,7 @@ export function EmailBlocklistDirectory() {
       },
       {
         title: "Lead Type Benton",
-        key: "bentonLeadType",
+        key: "leadTypeBenton",
         render: (row) =>
           row.leadTypeBenton ? (
             <TypeBadge value={row.leadTypeBenton} kind="lead" />
@@ -147,7 +166,7 @@ export function EmailBlocklistDirectory() {
       },
       {
         title: "Lead Type 95RM",
-        key: "rm95LeadType",
+        key: "leadType95rm",
         render: (row) =>
           row.leadType95rm ? (
             <TypeBadge value={row.leadType95rm} kind="lead" />
@@ -156,9 +175,13 @@ export function EmailBlocklistDirectory() {
           ),
       },
       {
+        // Not a backend grid field for this report — display only.
         title: "Blacklisted Brands",
         key: "blacklistedBrands",
         getValue: (row) => row.blacklistedBrands.map(getBrandLabel).join(", "),
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => (
           <div className="flex flex-wrap gap-1.5">
             {row.blacklistedBrands.map((brand) => (
@@ -171,18 +194,27 @@ export function EmailBlocklistDirectory() {
         title: "SVG History",
         key: "svgHistory",
         getValue: (row) => String(row.callHistory.svg.length),
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => <HistoryCell count={row.callHistory.svg.length} />,
       },
       {
         title: "Benton History",
         key: "bentonHistory",
         getValue: (row) => String(row.callHistory.benton.length),
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => <HistoryCell count={row.callHistory.benton.length} />,
       },
       {
         title: "95RM History",
         key: "rm95History",
         getValue: (row) => String(row.callHistory["95rm"].length),
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => <HistoryCell count={row.callHistory["95rm"].length} />,
       },
     ],
@@ -208,6 +240,21 @@ export function EmailBlocklistDirectory() {
         data={filteredRows}
         columns={columns}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search lead, symbol, name, or email",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: result?.meta?.groups,
+        }}
         title="Email Blocklist Directory"
         description="Review leads blacklisted by terminal lead type across all brands"
         emptyText={

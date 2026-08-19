@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Wave } from "@/components/ui";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   Ban,
@@ -29,14 +30,21 @@ export function FixLeads() {
   const [contactsFilter, setContactsFilter] = useState<ContactsFilter | "">("");
   const [hasOtherContacts, setHasOtherContacts] = useState(false);
   const [timezone, setTimezone] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [socketStats, setSocketStats] = useState<LeadStatsSummary | null>(null);
 
-  const handleSearchChange = (value: string) => {
-    setSearchInput(value);
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
     setPage(1);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
 
   const today = useMemo(() => new Date(), []);
   const todayStr = toYMD(today);
@@ -57,6 +65,7 @@ export function FixLeads() {
     hasOtherContacts || undefined,
     timezone || undefined,
     debouncedSearch,
+    url.grid,
   );
   const serverPagination = result?.meta
     ? {
@@ -227,8 +236,18 @@ export function FixLeads() {
             serverPagination={serverPagination}
             serverSearch={{
               value: searchInput,
-              onChange: handleSearchChange,
+              onChange: setSearchInput,
               placeholder: "Search name, symbol, or lead ID",
+            }}
+            serverGrid={{
+              filters: url.filterItems,
+              rootGate: url.rootGate,
+              sort: url.sortRules,
+              groupBy: url.groupBy,
+              onFiltersChange: url.setFilters,
+              onSortChange: url.setSort,
+              onGroupByChange: url.setGroupBy,
+              groupCounts: result?.meta?.groups,
             }}
           />
         </div>

@@ -40,7 +40,15 @@ type CompaniesResponse = {
     per_page: number;
     current_page: number;
     total_pages: number;
+    groups?: { value: string; count: number }[];
   };
+};
+
+export type CompaniesGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
 };
 
 type RawCompanyRow = Record<string, unknown> & {
@@ -323,18 +331,27 @@ export function useCompanyIdSelectSource(
 // Companies list for picker dropdowns + the Companies directory. 5-min stale
 // time matches the lead picker — the company roster doesn't churn during a
 // working session.
-export function useCompanyOptions(page: number, perPage = DEFAULT_PAGE_SIZE) {
+export function useCompanyOptions(
+  page: number,
+  perPage = DEFAULT_PAGE_SIZE,
+  grid: CompaniesGridQuery = {},
+) {
   return useQuery({
-    queryKey: ["companies", "picker", page, perPage],
+    queryKey: ["companies", "picker", page, perPage, grid],
     queryFn: async () => {
-      const params = buildPaginationParams(page, perPage);
+      const params = buildPaginationParams(page, perPage, {
+        ...(grid.search ? { search: grid.search } : {}),
+        ...(grid.filters ? { filters: grid.filters } : {}),
+        ...(grid.sort ? { sort: grid.sort } : {}),
+        ...(grid.groupBy ? { groupBy: grid.groupBy } : {}),
+      });
       const json = (await api.get(
         `/companies?${params.toString()}`,
       )) as CompaniesResponse;
       const parsed = parsePaginatedResponse<RawCompanyRow>(json);
       return {
         data: normalizeCompaniesResponse(parsed.data),
-        meta: parsed.meta,
+        meta: { ...parsed.meta, groups: json.meta.groups },
       };
     },
     staleTime: 5 * 60_000,

@@ -8,6 +8,8 @@ import { toggleMarkVoid } from "@/features/agent-calls/_lib/markVoid";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { AgentEmailDrawer } from "./AgentEmailDrawer";
 import {
@@ -100,7 +102,27 @@ function LeadButton({
 export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
   const [searchParams] = useSearchParams();
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const { data: queueData, isLoading } = useEmailQueue(agentSlug, page, perPage);
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
+  const { data: queueData, isLoading } = useEmailQueue(
+    agentSlug,
+    page,
+    perPage,
+    url.grid,
+  );
   const serverPagination = queueData?.meta
     ? {
         meta: queueData.meta,
@@ -280,7 +302,8 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     () => [
       {
         title: "Lead ID",
-        key: "leadId",
+        key: "lead",
+        getValue: (row) => getLeadGridLabel(row),
         render: (row) => (
           <LeadButton
             leadId={row.leadId}
@@ -333,7 +356,8 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       },
       {
         title: "Email To Be Sent",
-        key: "emailToBeSent",
+        key: "emailStatus",
+        getValue: (row) => row.emailToBeSent,
         render: (row) => (
           <div className="px-2.5 py-1.5">
             <EmailPriorityBadge value={row.emailToBeSent} />
@@ -341,8 +365,12 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         ),
       },
       {
+        // Local free-text log, not a backend grid field.
         title: "History",
         key: "history",
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) =>
           editingRowId === row.id ? (
             <AgentEmailInlineTextCell
@@ -364,6 +392,9 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       {
         title: "Check To Log",
         key: "checkToLog",
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) =>
           editingRowId === row.id ? (
             <button
@@ -389,6 +420,9 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       {
         title: "missing/dead_email",
         key: "missingDeadEmail",
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => (
           <AgentEmailEditableTrigger
             onClick={() => {
@@ -538,6 +572,21 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         columns={columns}
         isLoading={isLoading}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search name, symbol, or lead ID",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: queueData?.meta?.groups,
+        }}
         title={`Email - ${agentName}`}
         description="Prioritized emails to be sent by agent"
         emptyText="No emails are queued for this agent."

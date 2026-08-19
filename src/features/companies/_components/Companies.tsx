@@ -10,6 +10,8 @@ import { type COMPANY } from "@/types/company.types";
 import { TIMEZONE_OPTIONS, type TIMEZONE } from "@/types/timezone.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { CompanyDrawer } from "./CompanyDrawer";
 import {
@@ -92,7 +94,22 @@ const EMPTY_COMPANY: COMPANY = {
 export function Companies() {
   const [searchParams] = useSearchParams();
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const { data: result, isLoading } = useCompanyOptions(page, perPage);
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
+  const { data: result, isLoading } = useCompanyOptions(page, perPage, url.grid);
   const updateCompany = useUpdateCompany();
   const serverPagination = result?.meta
     ? {
@@ -305,6 +322,21 @@ export function Companies() {
         data={companies}
         columns={columns}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search symbol, name, country, city, state, or description",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: result?.meta?.groups,
+        }}
         title="Companies"
         description="Company market and contact profile"
         isLoading={isLoading}

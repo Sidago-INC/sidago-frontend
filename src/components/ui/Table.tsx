@@ -11,6 +11,7 @@ import { useTableState } from "./table/useTableState";
 
 export type {
   Column,
+  ServerGridConfig,
   ServerPaginationConfig,
   ServerSearchConfig,
   TableProps,
@@ -44,6 +45,7 @@ export function Table<T>({
   onRowsPerPageChange,
   serverPagination,
   serverSearch,
+  serverGrid,
   title,
   description,
   emptyText = "No data found",
@@ -60,6 +62,7 @@ export function Table<T>({
     initialRowsPerPage,
     serverPagination,
     serverSearch,
+    serverGrid,
   });
 
   const {
@@ -84,6 +87,8 @@ export function Table<T>({
     rowsPerPage,
     setRowsPerPage,
     selectableColumns,
+    sortableColumns,
+    groupableColumns,
     columnMap,
     processedData,
     groupedData,
@@ -203,7 +208,7 @@ export function Table<T>({
             setGroupRules={setGroupRules}
             showCounts={showCounts}
             setShowCounts={setShowCounts}
-            selectableColumns={selectableColumns}
+            selectableColumns={groupableColumns}
             buttonClassName={TOOLBAR_BUTTON_CLASS}
           />
 
@@ -227,7 +232,7 @@ export function Table<T>({
           <SortPanel
             sortRules={sortRules}
             setSortRules={setSortRules}
-            selectableColumns={selectableColumns}
+            selectableColumns={sortableColumns}
             buttonClassName={TOOLBAR_BUTTON_CLASS}
           />
 

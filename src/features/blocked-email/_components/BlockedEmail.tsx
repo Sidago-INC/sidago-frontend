@@ -14,7 +14,9 @@ import {
   showSuccessToast,
 } from "@/lib/toast";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import { BlockedEmailDrawer } from "./BlockedEmailDrawer";
 import {
@@ -30,8 +32,23 @@ export function BlockedEmail() {
   const { page, perPage, setPage, setPerPage } = useServerPagination(
     DEFAULT_ROWS_PER_PAGE,
   );
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
   const { data: result, isLoading, isError, error, refetch } =
-    useBlockedEmails(page, perPage);
+    useBlockedEmails(page, perPage, url.grid);
   const data = result?.data ?? [];
   const serverPagination = result?.meta
     ? {
@@ -72,7 +89,7 @@ export function BlockedEmail() {
     () => [
       {
         title: "Lead ID",
-        key: "leadId",
+        key: "lead",
         getValue: (row) => getLeadGridLabel(row),
       },
       {
@@ -138,9 +155,13 @@ export function BlockedEmail() {
           ),
       },
       {
+        // Not a backend grid field for this report — display only.
         title: "Blocked Brands",
         key: "blockedBrands",
         getValue: (row) => row.blockedBrands.map(getBlockedBrandLabel).join(", "),
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => (
           <div className="flex flex-wrap gap-1.5">
             {row.blockedBrands.map((brand) => (
@@ -172,6 +193,21 @@ export function BlockedEmail() {
         columns={columns}
         isLoading={isLoading}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search lead, symbol, name, or email",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: result?.meta?.groups,
+        }}
         title="Blocked Email"
         description="Review blocked email leads across all brands and unblock them when needed"
         emptyText="No blocked emails found."

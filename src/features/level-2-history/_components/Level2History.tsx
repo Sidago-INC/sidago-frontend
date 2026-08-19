@@ -1,14 +1,31 @@
 
 import { CampaignBadge, Table, TypeBadge } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Level2HistoryRow } from "../_lib/data";
 import { useLevel2History } from "../_lib/hooks";
 
 export function Level2History() {
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const { data: result, isLoading } = useLevel2History(page, perPage);
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
+  const { data: result, isLoading } = useLevel2History(page, perPage, url.grid);
   const data = result?.data ?? [];
   const serverPagination = result?.meta
     ? {
@@ -57,6 +74,21 @@ export function Level2History() {
         columns={columns}
         isLoading={isLoading}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search lead, agent, result, or notes",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: result?.meta?.groups,
+        }}
         title="Level 2 History"
         description="Previously logged Level 2 updates"
       />

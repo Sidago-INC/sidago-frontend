@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ExternalLink, ShieldAlert } from "lucide-react";
 import { ErrorState, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { ensureAbsoluteUrl } from "@/lib/url";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   useSuspiciousCalls,
@@ -83,9 +85,25 @@ export function CallFraud() {
   const { page, perPage, setPage, setPerPage } = useServerPagination(DEFAULT_PAGE_SIZE);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
   const { data: result, isLoading, isError, error, refetch } = useSuspiciousCalls(
     page,
     perPage,
+    undefined,
+    url.grid,
   );
   const data = result?.data ?? [];
   const serverPagination = result?.meta
@@ -114,6 +132,7 @@ export function CallFraud() {
     {
       key: "calledAt",
       title: "Called At",
+      type: "date",
       render: (row) => (
         <span className="whitespace-nowrap text-sm">
           {new Date(row.calledAt).toLocaleString()}
@@ -177,8 +196,12 @@ export function CallFraud() {
       ),
     },
     {
+      // Not a backend grid field for this endpoint — display only.
       key: "mcRecordingLink",
       title: "Recording",
+      filterable: false,
+      sortable: false,
+      groupable: false,
       render: (row) =>
         row.mcRecordingLink ? (
           <a
@@ -243,6 +266,21 @@ export function CallFraud() {
         rowsPerPage={perPage}
         onRowsPerPageChange={setPerPage}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search lead, agent, brand, result, or MC status",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: result?.meta?.groups,
+        }}
         title="Suspicious Calls"
         emptyText="No suspicious calls found."
       />

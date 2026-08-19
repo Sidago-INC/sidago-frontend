@@ -1,7 +1,13 @@
 
 
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
-import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
+import {
+  Table,
+  type Column,
+  type ServerGridConfig,
+  type ServerPaginationConfig,
+  type ServerSearchConfig,
+} from "@/components/ui/Table";
 import React, { useMemo } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import {
@@ -23,6 +29,8 @@ type ClosedContactsTableProps = {
   tabKey: ClosedContactsTabKey;
   title: string;
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 };
 
 export function ClosedContactsTable({
@@ -30,6 +38,8 @@ export function ClosedContactsTable({
   tabKey,
   title,
   serverPagination,
+  serverSearch,
+  serverGrid,
 }: ClosedContactsTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -118,8 +128,15 @@ export function ClosedContactsTable({
         type: "select",
         options: assigneeOptions.map((value) => ({ label: value, value })),
       },
-      { title: "Call Back Date", key: "callBackDate" },
-      { title: "Last Action Date", key: "lastActionDate" },
+      {
+        // Not a backend grid field for this report — display only.
+        title: "Call Back Date",
+        key: "callBackDate",
+        filterable: false,
+        sortable: false,
+        groupable: false,
+      },
+      { title: "Last Action Date", key: "lastActionDate", type: "date" },
     ],
     [data],
   );
@@ -131,6 +148,8 @@ export function ClosedContactsTable({
         columns={columns}
         title={title}
         serverPagination={serverPagination}
+        serverSearch={serverSearch}
+        serverGrid={serverGrid}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);

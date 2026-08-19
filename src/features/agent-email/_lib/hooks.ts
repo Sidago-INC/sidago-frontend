@@ -15,16 +15,29 @@ import type {
   EmailStatePatchBody,
 } from "./apiTypes";
 
+export type EmailQueueGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
+};
+
 export function useEmailQueue(
   agentSlug: string,
   page = 1,
   perPage = DEFAULT_PAGE_SIZE,
+  grid: EmailQueueGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["email-queue", agentSlug, page, perPage],
+    // every param must be in the key, or you'll show cached rows from another query
+    queryKey: ["email-queue", agentSlug, page, perPage, grid],
     queryFn: async () => {
       const params = buildPaginationParams(page, perPage, {
         agentSlug,
+        ...(grid.search ? { search: grid.search } : {}),
+        ...(grid.filters ? { filters: grid.filters } : {}),
+        ...(grid.sort ? { sort: grid.sort } : {}),
+        ...(grid.groupBy ? { groupBy: grid.groupBy } : {}),
       });
       const json = (await api.get(
         `/email/queue?${params.toString()}`,
@@ -33,7 +46,7 @@ export function useEmailQueue(
       return {
         ...json,
         data: parsed.data,
-        meta: parsed.meta,
+        meta: { ...parsed.meta, groups: json.meta?.groups },
       };
     },
     staleTime: 30_000,

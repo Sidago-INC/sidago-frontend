@@ -6,6 +6,8 @@ import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useGridUrlState } from "@/lib/use-grid-url-state";
 import { useServerPagination } from "@/lib/use-server-pagination";
 import {
   AgentSmsEditableTrigger,
@@ -100,7 +102,27 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     brand: "Sidago" as const,
   };
   const { page, perPage, setPage, setPerPage } = useServerPagination();
-  const { data: queueData, isLoading } = useSmsQueue(agentSlug, page, perPage);
+
+  const url = useGridUrlState();
+  const [searchInput, setSearchInput] = useState(url.search);
+  const debouncedSearch = useDebouncedValue(searchInput, 300);
+
+  useEffect(() => {
+    url.setSearch(debouncedSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url.grid]);
+
+  const { data: queueData, isLoading } = useSmsQueue(
+    agentSlug,
+    page,
+    perPage,
+    url.grid,
+  );
   const serverPagination = queueData?.meta
     ? {
         meta: queueData.meta,
@@ -286,7 +308,8 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
     () => [
       {
         title: "Lead ID",
-        key: "leadId",
+        key: "lead",
+        getValue: (row) => getLeadGridLabel(row),
         render: (row) => (
           <LeadButton
             leadId={row.leadId}
@@ -373,6 +396,9 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
       {
         title: "SMS Log",
         key: "smsLogged",
+        filterable: false,
+        sortable: false,
+        groupable: false,
         render: (row) => (
           <SmsLogButton
             checked={row.smsLogged}
@@ -439,6 +465,21 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         columns={columns}
         isLoading={isLoading}
         serverPagination={serverPagination}
+        serverSearch={{
+          value: searchInput,
+          onChange: setSearchInput,
+          placeholder: "Search name, symbol, or lead ID",
+        }}
+        serverGrid={{
+          filters: url.filterItems,
+          rootGate: url.rootGate,
+          sort: url.sortRules,
+          groupBy: url.groupBy,
+          onFiltersChange: url.setFilters,
+          onSortChange: url.setSort,
+          onGroupByChange: url.setGroupBy,
+          groupCounts: queueData?.meta?.groups,
+        }}
         title={`SMS - ${agentName}`}
         description="SMS activity and logs tied to assigned leads"
         emptyText="No SMS activity found for this agent."

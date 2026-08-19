@@ -20,22 +20,37 @@ type ApiResponse = {
     per_page: number;
     current_page: number;
     total_pages: number;
+    groups?: { value: string; count: number }[];
   };
+};
+
+export type UnassignedHotGridQuery = {
+  search?: string;
+  filters?: string;
+  sort?: string;
+  groupBy?: string;
 };
 
 async function fetchUnassignedHot(
   brand: Brand,
   page: number,
   perPage: number,
+  grid: UnassignedHotGridQuery,
 ) {
-  const params = buildPaginationParams(page, perPage, { brand });
+  const params = buildPaginationParams(page, perPage, {
+    brand,
+    ...(grid.search ? { search: grid.search } : {}),
+    ...(grid.filters ? { filters: grid.filters } : {}),
+    ...(grid.sort ? { sort: grid.sort } : {}),
+    ...(grid.groupBy ? { groupBy: grid.groupBy } : {}),
+  });
   const json = (await api.get(
     `/reports/unassigned-hot?${params.toString()}`,
   )) as ApiResponse;
   const parsed = parsePaginatedResponse<HotLeadRow>(json);
   return {
     data: parsed.data.map(normalizeHotLeadRow),
-    meta: parsed.meta,
+    meta: { ...parsed.meta, groups: json.meta.groups },
   };
 }
 
@@ -43,10 +58,11 @@ export function useUnassignedHot(
   brand: Brand,
   page: number,
   perPage = DEFAULT_PAGE_SIZE,
+  grid: UnassignedHotGridQuery = {},
 ) {
   return useQuery({
-    queryKey: ["unassigned-hot", brand, page, perPage],
-    queryFn: () => fetchUnassignedHot(brand, page, perPage),
+    queryKey: ["unassigned-hot", brand, page, perPage, grid],
+    queryFn: () => fetchUnassignedHot(brand, page, perPage, grid),
     staleTime: 30_000,
   });
 }

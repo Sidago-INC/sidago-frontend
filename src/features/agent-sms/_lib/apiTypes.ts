@@ -25,6 +25,13 @@ export type SmsQueueResponse = {
   brandCode: string;
   count: number;
   data: SmsQueueItem[];
+  meta?: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
+    groups?: { value: string; count: number }[];
+  };
 };
 
 export type SmsHistoryEntry = {

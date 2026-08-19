@@ -6,7 +6,13 @@ import {
   TimezoneBadge,
   TypeBadge,
 } from "@/components/ui";
-import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
+import {
+  Table,
+  type Column,
+  type ServerGridConfig,
+  type ServerPaginationConfig,
+  type ServerSearchConfig,
+} from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 import {
@@ -29,6 +35,8 @@ type UnassignedHotLeadsTableProps = {
   title: string;
   variant: "svg" | "95rm" | "benton";
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 };
 
 export function UnassignedHotTable({
@@ -36,6 +44,8 @@ export function UnassignedHotTable({
   title,
   variant,
   serverPagination,
+  serverSearch,
+  serverGrid,
 }: UnassignedHotLeadsTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -168,8 +178,11 @@ export function UnassignedHotTable({
           type: "date",
         },
         {
+          // Backend always returns "" on this report — not sortable/groupable.
           title: "Last Action Date (SVG, Benton, 95RM)",
           key: "lastActionDate",
+          sortable: false,
+          groupable: false,
         },
       ];
     }
@@ -201,8 +214,11 @@ export function UnassignedHotTable({
           type: "date",
         },
         {
+          // Backend always returns "" on this report — not sortable/groupable.
           title: "Last Action Date (95RM, SVG, Benton)",
           key: "lastActionDate",
+          sortable: false,
+          groupable: false,
         },
       ];
     }
@@ -251,8 +267,11 @@ export function UnassignedHotTable({
         type: "date",
       },
       {
+        // Backend always returns "" on this report — not sortable/groupable.
         title: "Last Action Date (SVG, Benton, 95RM)",
         key: "lastActionDate",
+        sortable: false,
+        groupable: false,
       },
     ];
   }, [
@@ -270,6 +289,8 @@ export function UnassignedHotTable({
         columns={columns}
         title={title}
         serverPagination={serverPagination}
+        serverSearch={serverSearch}
+        serverGrid={serverGrid}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);

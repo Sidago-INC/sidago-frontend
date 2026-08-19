@@ -1,7 +1,13 @@
 
 
 import { CompanySymbolBadge, TimezoneBadge, TypeBadge } from "@/components/ui";
-import { Table, type Column, type ServerPaginationConfig } from "@/components/ui/Table";
+import {
+  Table,
+  type Column,
+  type ServerGridConfig,
+  type ServerPaginationConfig,
+  type ServerSearchConfig,
+} from "@/components/ui/Table";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 import {
@@ -24,6 +30,8 @@ type EverBeenHotTableProps = {
   title: string;
   variant: "svg" | "95rm" | "benton";
   serverPagination?: ServerPaginationConfig;
+  serverSearch?: ServerSearchConfig;
+  serverGrid?: ServerGridConfig;
 };
 
 export function EverBeenHotTable({
@@ -31,6 +39,8 @@ export function EverBeenHotTable({
   title,
   variant,
   serverPagination,
+  serverSearch,
+  serverGrid,
 }: EverBeenHotTableProps) {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
@@ -111,8 +121,11 @@ export function EverBeenHotTable({
           render: (row) => <TypeBadge value={row.svgLeadType} kind="lead" />,
         },
         {
+          // Hot-phase data: backend keys this on the unified `phaseAgent`
+          // field, not the brand-specific svgToBeCalledBy.
           title: "To Be Called (Sidago)",
-          key: "svgToBeCalledBy",
+          key: "phaseAgent",
+          getValue: (row) => row.svgToBeCalledBy,
           type: "select",
           options: svgAgentsQuery.options,
         },
@@ -129,10 +142,14 @@ export function EverBeenHotTable({
           render: (row) => <TypeBadge value={row.bentonLeadType} kind="lead" />,
         },
         {
+          // Not a backend grid field for this report — display only.
           title: "To Be Called (Benton)",
           key: "bentonToBeCalledBy",
           type: "select",
           options: bentonAgentsQuery.options,
+          filterable: false,
+          sortable: false,
+          groupable: false,
         },
         {
           title: "Benton - Last Called Date",
@@ -140,13 +157,19 @@ export function EverBeenHotTable({
           type: "date",
         },
         {
+          // Hot-phase data: backend keys this on the unified `dateBecameHot`
+          // field, not the brand-specific svgDateBecomeHot.
           title: "Date Become Hot",
-          key: "svgDateBecomeHot",
+          key: "dateBecameHot",
+          getValue: (row) => row.svgDateBecomeHot,
           type: "date",
         },
         {
+          // Backend always returns "" on this report — not sortable/groupable.
           title: "Last Action Date (SVG, Benton)",
           key: "lastActionDate",
+          sortable: false,
+          groupable: false,
         },
       ];
     }
@@ -163,7 +186,8 @@ export function EverBeenHotTable({
         },
         {
           title: "95RM - To Be Called By",
-          key: "rm95ToBeCalledBy",
+          key: "phaseAgent",
+          getValue: (row) => row.rm95ToBeCalledBy,
           type: "select",
           options: rm95AgentsQuery.options,
         },
@@ -174,12 +198,16 @@ export function EverBeenHotTable({
         },
         {
           title: "95RM - Date Become Hot",
-          key: "rm95DateBecomeHot",
+          key: "dateBecameHot",
+          getValue: (row) => row.rm95DateBecomeHot,
           type: "date",
         },
         {
+          // Backend always returns "" on this report — not sortable/groupable.
           title: "Last Action Date (95RM, SVG, Benton)",
           key: "lastActionDate",
+          sortable: false,
+          groupable: false,
         },
       ];
     }
@@ -194,10 +222,14 @@ export function EverBeenHotTable({
         render: (row) => <TypeBadge value={row.svgLeadType} kind="lead" />,
       },
       {
+        // Not a backend grid field for this report — display only.
         title: "SVG - To Be Called By",
         key: "svgToBeCalledBy",
         type: "select",
         options: svgAgentsQuery.options,
+        filterable: false,
+        sortable: false,
+        groupable: false,
       },
       {
         title: "SVG - Last Called Date",
@@ -213,7 +245,8 @@ export function EverBeenHotTable({
       },
       {
         title: "Benton - To Be Called By",
-        key: "bentonToBeCalledBy",
+        key: "phaseAgent",
+        getValue: (row) => row.bentonToBeCalledBy,
         type: "select",
         options: bentonAgentsQuery.options,
       },
@@ -224,12 +257,16 @@ export function EverBeenHotTable({
       },
       {
         title: "Date Become Hot (Benton)",
-        key: "bentonDateBecomeHot",
+        key: "dateBecameHot",
+        getValue: (row) => row.bentonDateBecomeHot,
         type: "date",
       },
       {
+        // Backend always returns "" on this report — not sortable/groupable.
         title: "Last Action Date (SVG, Benton)",
         key: "lastActionDate",
+        sortable: false,
+        groupable: false,
       },
     ];
   }, [bentonAgentsQuery.options, data, rm95AgentsQuery.options, svgAgentsQuery.options, variant]);
@@ -241,6 +278,8 @@ export function EverBeenHotTable({
         columns={columns}
         title={title}
         serverPagination={serverPagination}
+        serverSearch={serverSearch}
+        serverGrid={serverGrid}
         onRowClick={(row) => {
           const index = data.findIndex((item) => item.email === row.email);
           setSelectedIndex(index >= 0 ? index : null);
