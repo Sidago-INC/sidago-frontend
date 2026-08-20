@@ -19,11 +19,10 @@ import { AgentCalls } from "@/features/agent-calls/AgentCalls";
 import { AgentCallLogs } from "@/features/agent-call-logs/AgentCallLogs";
 import { Leads } from "@/features/leads/_components/Leads";
 import { AddLeadForm } from "@/features/leads/_components/AddLeadForm";
-import { BulkLeadImport } from "@/features/leads/_components/BulkLeadImport";
+import { BulkLeadImport } from "@/features/leads/_components/bulk-import/BulkLeadImport";
 import { LeadManualUpdateForm } from "@/features/lead-manual-update/LeadManualUpdateForm";
 import { Companies } from "@/features/companies/_components/Companies";
 import { AddCompanyForm } from "@/features/companies/_components/AddCompanyForm";
-import { BulkCompanyImport } from "@/features/companies/_components/BulkCompanyImport";
 import { AdditionalContactsForm } from "@/features/additional-contacts/_components/AdditionalContactsForm";
 import { Level2Update } from "@/features/level-2-update/_components/Level2Update";
 import { Level2History } from "@/features/level-2-history/_components/Level2History";
@@ -91,7 +90,6 @@ export default function App() {
                 {/* Companies */}
                 <Route path="/companies/update" element={<P><Companies /></P>} />
                 <Route path="/companies/add" element={<P><AddCompanyForm /></P>} />
-                <Route path="/companies/bulk-import" element={<P><BulkCompanyImport /></P>} />
 
                 {/* SMS */}
                 <Route path="/sms" element={<P><SmsPage /></P>} />
