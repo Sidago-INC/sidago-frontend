@@ -226,11 +226,6 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
         icon: UserPlus,
       },
       {
-        label: "Bulk Import",
-        href: "/companies/bulk-import",
-        icon: Upload,
-      },
-      {
         label: "Update",
         href: "/companies/update",
         icon: Building2,
@@ -480,7 +475,6 @@ const ROUTE_LABEL_FALLBACKS: Record<string, string> = {
   "/leads/bulk-import": "Bulk Import Leads",
   "/companies/update": "Update Company",
   "/companies/add": "Add Company",
-  "/companies/bulk-import": "Bulk Import Companies",
   "/sms": "SMS",
   "/email": "Email",
   "/blocked-email": "Blocked Email",
