@@ -21,6 +21,7 @@ import {
   useUpdateLead,
   type LeadPatchBody,
 } from "@/features/backoffice-shared/use-update-lead";
+import { useUpdateCompany } from "@/features/companies/_lib/hooks";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -53,6 +54,13 @@ import type { RelatedLead } from "@/features/fix-leads/_lib/data";
 import { useRelatedLeads } from "@/features/fix-leads/_lib/data";
 
 const NESTED_DRAWER_Z = 210;
+
+// The subset of the company PATCH body this drawer can send.
+type CompanyPatchFields = {
+  companySymbol?: string;
+  companyName?: string;
+  timezone?: string;
+};
 
 type LeadsDrawerProps = {
   data: LeadDirectoryRow[];
@@ -97,11 +105,7 @@ function applyFormToDirectoryRow(
       rm95ToBeCalledBy: form.rm95ToBeCalledBy,
       notWorked: form.notWorked,
     },
-    {
-      firstName: form.firstName,
-      lastName: form.lastName,
-      phoneExtension: form.phoneExtension,
-    },
+    { phoneExtension: form.phoneExtension },
   );
 }
 
@@ -162,11 +166,16 @@ export function LeadsDrawer({
   const [rm95ToBeCalledOnError, setRm95ToBeCalledOnError] = useState<string>();
   const [nestedContact, setNestedContact] = useState<RelatedLead | null>(null);
   const [editModeKey, setEditModeKey] = useState<string | null>(null);
+  const [companyEdits, setCompanyEdits] = useState<{
+    key: string;
+    value: { symbol: string; name: string; timezone: string };
+  } | null>(null);
   const [formState, setFormState] = useState<{
     key: string;
     value: LeadDrawerFormState;
   } | null>(null);
   const updateLead = useUpdateLead();
+  const updateCompany = useUpdateCompany();
   const svgAgentsQuery = useAgentSelectOptions("svg");
   const bentonAgentsQuery = useAgentSelectOptions("benton");
   const rm95AgentsQuery = useAgentSelectOptions("95rm");
@@ -296,6 +305,8 @@ export function LeadsDrawer({
     displayCompanySymbol,
     displayTimezone,
     handleCompanyChange,
+    selectedCompanyId,
+    selectedCompanyName,
   } = useDrawerCompanySelect({
     drawerOpen,
     rowKey,
@@ -306,6 +317,42 @@ export function LeadsDrawer({
     rowTimezone: displayRow?.timezone,
     onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
   });
+
+  // Symbol / name / timezone live on `companies`, so they are edited against a
+  // separate baseline and saved with a separate PATCH. Keyed by company rather
+  // than by lead: re-pointing the picker at another company must reseed them.
+  const companyBaseline = useMemo(
+    () => ({
+      symbol: displayCompanySymbol ?? "",
+      name: selectedCompanyName || form?.companyName || "",
+      timezone: displayTimezone ?? "",
+    }),
+    [displayCompanySymbol, displayTimezone, form?.companyName, selectedCompanyName],
+  );
+
+  // `selectedCompanyId` resolves from the company fetched by symbol, which is
+  // briefly undefined on first paint. While the picker still points at the
+  // lead's own company, the detail payload already knows the id — so fall back
+  // to it and the inputs are live immediately. Once the picker has been moved
+  // to a different company that fallback is wrong, so it is dropped.
+  const companyUnchanged = form?.companyName === initialForm?.companyName;
+  const companyIdForEdit =
+    selectedCompanyId ??
+    (companyUnchanged ? (detailPayload?.lead.companyId ?? null) : null);
+
+  const companyForm =
+    companyEdits?.key === companyIdForEdit ? companyEdits.value : companyBaseline;
+
+  const updateCompanyForm = (
+    key: "symbol" | "name" | "timezone",
+    value: string,
+  ) => {
+    if (!companyIdForEdit) return;
+    setCompanyEdits({
+      key: companyIdForEdit,
+      value: { ...companyForm, [key]: value },
+    });
+  };
 
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
@@ -352,6 +399,7 @@ export function LeadsDrawer({
   useEffect(() => {
     setFormState(null);
     setEditModeKey(null);
+    setCompanyEdits(null);
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
     setRm95ToBeCalledOnError(undefined);
@@ -459,6 +507,7 @@ export function LeadsDrawer({
 
   const handleReset = () => {
     setFormState(null);
+    setCompanyEdits(null);
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
     setRm95ToBeCalledOnError(undefined);
@@ -484,18 +533,15 @@ export function LeadsDrawer({
     const leadDiff: NonNullable<LeadPatchBody["lead"]> = {};
 
     if (form.fullName !== initialForm.fullName) leadDiff.full_name = form.fullName;
-    if (form.firstName !== initialForm.firstName) {
-      leadDiff.first_name = form.firstName;
-    }
-    if (form.lastName !== initialForm.lastName) {
-      leadDiff.last_name = form.lastName;
-    }
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
     if (form.phoneExtension !== initialForm.phoneExtension) {
       leadDiff.phone_extension = form.phoneExtension;
     }
     if (form.role !== initialForm.role) leadDiff.role = form.role;
+    if (form.otherContacts !== initialForm.otherContacts) {
+      leadDiff.other_contacts = form.otherContacts;
+    }
     if (form.contactType !== initialForm.contactType) {
       leadDiff.contact_type = form.contactType;
     }
@@ -505,6 +551,10 @@ export function LeadsDrawer({
 
     if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
 
+    // "To Be Called On" is the call-back date -> lead_brand_state.follow_up_date,
+    // the column the Calls queue reads for its "Hot, follow-up is today" block.
+    // It used to be written to last_called_date, which put a future date into
+    // the lead's call history.
     const brandStates: NonNullable<LeadPatchBody["brandStates"]> = {};
 
     if (form.svgLeadType !== initialForm.svgLeadType) {
@@ -525,7 +575,7 @@ export function LeadsDrawer({
     if (form.svgToBeCalledOn !== initialForm.svgToBeCalledOn) {
       brandStates.svg = {
         ...brandStates.svg,
-        last_called_date: form.svgToBeCalledOn || null,
+        follow_up_date: form.svgToBeCalledOn || null,
       };
     }
     if (form.bentonToBeCalledBy !== initialForm.bentonToBeCalledBy) {
@@ -537,7 +587,7 @@ export function LeadsDrawer({
     if (form.bentonToBeCalledOn !== initialForm.bentonToBeCalledOn) {
       brandStates.benton = {
         ...brandStates.benton,
-        last_called_date: form.bentonToBeCalledOn || null,
+        follow_up_date: form.bentonToBeCalledOn || null,
       };
     }
     if (form.rm95ToBeCalledBy !== initialForm.rm95ToBeCalledBy) {
@@ -549,20 +599,50 @@ export function LeadsDrawer({
     if (form.rm95ToBeCalledOn !== initialForm.rm95ToBeCalledOn) {
       brandStates["95rm"] = {
         ...brandStates["95rm"],
-        last_called_date: form.rm95ToBeCalledOn || null,
+        follow_up_date: form.rm95ToBeCalledOn || null,
       };
     }
 
     if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
 
-    if (!body.lead && !body.brandStates) {
+    // Company fields go to /companies/:id, not /leads/:id — they are columns on
+    // `companies`. The backend cascades a timezone change down to every lead at
+    // the company, so the copy on `leads.timezone` cannot drift back out of sync.
+    const companyDiff: CompanyPatchFields = {};
+    if (companyForm.symbol.trim() !== companyBaseline.symbol.trim()) {
+      companyDiff.companySymbol = companyForm.symbol.trim();
+    }
+    if (companyForm.name.trim() !== companyBaseline.name.trim()) {
+      companyDiff.companyName = companyForm.name.trim();
+    }
+    if (companyForm.timezone.trim() !== companyBaseline.timezone.trim()) {
+      companyDiff.timezone = companyForm.timezone.trim();
+    }
+    const hasCompanyChanges = Object.keys(companyDiff).length > 0;
+
+    if (hasCompanyChanges && !companyIdForEdit) {
+      showErrorToast(
+        new Error("Cannot save company details: this lead has no company."),
+      );
+      return;
+    }
+
+    if (!body.lead && !body.brandStates && !hasCompanyChanges) {
       showSuccessToast("No changes to save.");
       setEditModeKey(null);
       return;
     }
 
     try {
-      await updateLead.mutateAsync({ leadId: row.leadId, body });
+      if (hasCompanyChanges && companyIdForEdit) {
+        await updateCompany.mutateAsync({
+          companyId: companyIdForEdit,
+          body: companyDiff,
+        });
+      }
+      if (body.lead || body.brandStates) {
+        await updateLead.mutateAsync({ leadId: row.leadId, body });
+      }
       const savedRow = applyFormToDirectoryRow(displayRow, form);
 
       queryClient.setQueriesData<
@@ -593,7 +673,11 @@ export function LeadsDrawer({
         queryClient.invalidateQueries({
           queryKey: ["lead-related", row.leadId],
         }),
+        // The symbol/name/timezone shown here come from the company caches, so
+        // they have to be dropped or the drawer re-renders the old values.
+        queryClient.invalidateQueries({ queryKey: ["companies"] }),
       ]);
+      setCompanyEdits(null);
       showSuccessToast("Lead changes saved successfully.");
     } catch (error) {
       showErrorToast(error);
@@ -697,6 +781,15 @@ export function LeadsDrawer({
             companyOptions={companyOptions}
             companySelectSource={companySelectSource}
             onCompanyChange={handleCompanyChange}
+            companyEdit={{
+              symbol: companyForm.symbol,
+              name: companyForm.name,
+              timezone: companyForm.timezone,
+              leadCount: relatedContacts.length + 1,
+              onSymbolChange: (value) => updateCompanyForm("symbol", value),
+              onNameChange: (value) => updateCompanyForm("name", value),
+              onTimezoneChange: (value) => updateCompanyForm("timezone", value),
+            }}
           />
         </DetailCard>
 
@@ -705,20 +798,6 @@ export function LeadsDrawer({
             <TextInput
               value={form.fullName}
               onChange={(event) => updateForm("fullName", event.target.value)}
-              className="text-xs font-semibold"
-            />
-          </EditableField>
-          <EditableField label="First Name">
-            <TextInput
-              value={form.firstName}
-              onChange={(event) => updateForm("firstName", event.target.value)}
-              className="text-xs font-semibold"
-            />
-          </EditableField>
-          <EditableField label="Last Name">
-            <TextInput
-              value={form.lastName}
-              onChange={(event) => updateForm("lastName", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>

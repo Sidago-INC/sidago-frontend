@@ -288,6 +288,9 @@ export function useDrawerCompanySelect({
     const lookupCompanies = [...companyRows, ...allCompanies];
     const activeCompany = pinnedCompanyRow ?? selectedCompany;
 
+    // companyBySymbol is the authoritative company row fetched by symbol, so it
+    // leads. getLeadCompanyTimezone falls back through the loaded company rows
+    // and, last of all, the lead's own denormalized copy.
     return (
       companyBySymbol?.timezone?.trim() ||
       getLeadCompanyTimezone(leadContext, lookupCompanies, activeCompany)
@@ -394,11 +397,23 @@ export function useDrawerCompanySelect({
     onCompanyNameChange(stringValue);
   };
 
+  // Identity of the company the drawer is currently pointed at. Callers that
+  // let the user edit company fields (symbol / name / timezone) need the id to
+  // PATCH, and the name to seed the form when the picker re-links the lead to a
+  // different company.
+  const activeCompany = pinnedCompanyRow ?? selectedCompany ?? null;
+  const selectedCompanyId =
+    (companyBySymbol?.id || activeCompany?.id || "") || null;
+  const selectedCompanyName =
+    activeCompany?.name?.trim() || companyName?.trim() || "";
+
   return {
     companyOptions,
     companySelectSource,
     displayCompanySymbol,
     displayTimezone,
     handleCompanyChange,
+    selectedCompanyId,
+    selectedCompanyName,
   };
 }

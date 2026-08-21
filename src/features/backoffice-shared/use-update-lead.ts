@@ -9,15 +9,18 @@ export type LeadPatchBody = {
   fix_submit?: boolean;
   lead?: {
     full_name?: string;
-    first_name?: string;
-    last_name?: string;
     phone?: string;
     phone_extension?: string;
     email?: string;
     role?: string;
     contact_type?: string;
+    other_contacts?: string;
     not_work_anymore?: boolean;
     company_name?: string;
+    // No first_name / last_name: `leads` has no such columns (only full_name),
+    // and the global ValidationPipe runs forbidNonWhitelisted, so sending them
+    // failed the whole PATCH with "property first_name should not exist".
+    // The drawer's First/Last Name fields were removed rather than faked.
   };
   brandStates?: Partial<
     Record<
@@ -26,6 +29,8 @@ export type LeadPatchBody = {
         lead_type?: string;
         to_be_called_by?: string | null;
         last_called_date?: string | null;
+        // The call-back date: lead_brand_state.follow_up_date.
+        follow_up_date?: string | null;
       }
     >
   >;

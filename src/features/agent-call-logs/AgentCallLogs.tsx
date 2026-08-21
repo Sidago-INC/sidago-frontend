@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Ban,
@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronUp,
   Clock3,
+  Loader2,
   MessageCircleWarning,
   MessageSquareText,
   PhoneCall,
@@ -13,6 +14,7 @@ import {
   Search,
   ThumbsDown,
   ThumbsUp,
+  X,
 } from "lucide-react";
 import {
   Button,
@@ -56,20 +58,33 @@ import {
   formatRelatedContacts,
 } from "./_lib/format";
 import {
-  buildCallLogGroups,
-  flattenCallsLogLeads,
   getCallLogLeadLabel,
   getCallLogPathKey,
-  matchesCallLogSearch,
+  getTimezoneBucketLabel,
 } from "./_lib/grouping";
 import {
+  flattenBucketPages,
   useCallLogDetail,
   useCallLogFollowUp,
   useCallLogMarkVoid,
-  useCallsLogQueue,
+  useCallsLogBucket,
+  useCallsLogSummary,
   useLogCallResult,
   usePatchCallLogLead,
 } from "./_lib/hooks";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+
+// A co-worker at the same company, as served by the detail endpoint. Only the
+// fields the "All Company Contacts" card renders — clicking one loads its own
+// detail payload, so nothing more needs carrying here.
+type CompanyContact = {
+  leadId: string;
+  fullName: string;
+  companyName: string;
+  companySymbol: string | null;
+  contactType: string;
+  leadType: string;
+};
 
 type EditableCallLogState = {
   fullName: string;
@@ -238,6 +253,34 @@ function buildLeadPatchBody(
   return Object.keys(body).length > 0 ? body : null;
 }
 
+// Builds the QueueLead-shaped object the detail panel renders its header from.
+// The nested company-contact drawer has no row to point at — related contacts
+// come from the detail endpoint, not from the sidebar's loaded page — so it is
+// derived from the contact's own detail payload instead.
+function leadFromDetail(detail: LeadDetailResponse): QueueLead {
+  return {
+    leadId: detail.lead.id,
+    leadIdExternal: detail.lead.leadIdExternal,
+    fullName: detail.lead.fullName,
+    phone: detail.lead.phone,
+    phoneExtension: detail.lead.phoneExtension,
+    email: detail.lead.email,
+    role: detail.lead.role,
+    // Company-first, matching how every server-side read now resolves it.
+    timezone: detail.company?.timezone?.trim() || detail.lead.timezone || "",
+    contactType: detail.lead.contactType,
+    leadType: detail.brandState?.leadType ?? "",
+    lastCalledDate: detail.brandState?.lastCalledDate ?? null,
+    followUpDate: detail.brandState?.followUpDate ?? null,
+    companyId: detail.lead.companyId,
+    companyName: detail.company?.companyName ?? "",
+    companySymbol: detail.company?.companySymbol ?? null,
+    notWorkAnymore: detail.lead.notWorkAnymore,
+    matchedBlock: 0,
+    timezonePriority: "",
+  };
+}
+
 export function AgentCallLogs() {
   const [searchParams] = useSearchParams();
   const agentSlug =
@@ -245,26 +288,37 @@ export function AgentCallLogs() {
     searchParams.get("agentId") ??
     resolveAgentSlug(getAgentKeyFromCookie());
 
-  const {
-    data: queueData,
-    isLoading: queueLoading,
-    isError: queueError,
-    refetch: refetchQueue,
-  } = useCallsLogQueue(agentSlug);
+  // Search runs in the DB, scoped to this agent's row-set, matching company
+  // symbol and full name. It used to filter only the rows already in the
+  // browser — which meant it could never find a lead outside the loaded page,
+  // and the loaded page was one timezone deep.
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebouncedValue(searchInput, 300);
 
-  const brandCode = queueData?.brandCode ?? "svg";
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isFetching: summaryFetching,
+    isError: summaryError,
+    refetch: refetchSummary,
+  } = useCallsLogSummary(agentSlug, search);
+
+  const groups = useMemo(() => summary?.groups ?? [], [summary]);
+  const brandCode = summary?.brandCode ?? "svg";
   const brandKey = toBrandKey(brandCode);
 
-  const rows = useMemo(
-    () => (queueData ? flattenCallsLogLeads(queueData.data) : []),
-    [queueData],
-  );
-
-  const [search, setSearch] = useState("");
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [expandedLeadTypes, setExpandedLeadTypes] = useState<string[]>([]);
-  const [expandedTimezones, setExpandedTimezones] = useState<string[]>([]);
+  // Exactly one bucket is open at a time, and it is the only thing fetched.
+  // `null` means "nothing chosen yet" — resolved below to the first bucket the
+  // summary reports, so the page lands on real rows instead of an empty panel.
+  const [openLeadType, setOpenLeadType] = useState<string | null>(null);
+  const [openTimezone, setOpenTimezone] = useState<string | null>(null);
+  // Distinguishes "nothing chosen yet" (fall through to the first bucket) from
+  // "the user collapsed it" (show nothing). Without this the auto-opened first
+  // group could not be closed — clearing the selection just re-derived it.
+  const [collapsed, setCollapsed] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   const [formState, setFormState] = useState<{
     key: string;
     value: EditableCallLogState;
@@ -280,62 +334,116 @@ export function AgentCallLogs() {
   const [companyContactCallBackDateError, setCompanyContactCallBackDateError] =
     useState<string>();
 
-  const filteredRows = useMemo(
-    () => rows.filter((row) => matchesCallLogSearch(row, search)),
-    [rows, search],
-  );
-  const groups = useMemo(() => buildCallLogGroups(filteredRows), [filteredRows]);
-
-  const defaultLead = useMemo(
-    () => groups[0]?.timezones[0]?.leads[0] ?? filteredRows[0] ?? null,
-    [groups, filteredRows],
-  );
-
-  useEffect(() => {
-    setSelectedLeadId(null);
-    setExpandedLeadTypes([]);
-    setExpandedTimezones([]);
-  }, [agentSlug]);
-
-  useEffect(() => {
-    if (!defaultLead) {
-      return;
+  // The bucket to show: whatever the user opened, falling back to the first one
+  // the summary lists (Hot when the agent has any, else the leading General
+  // timezone). Falls back again whenever a search makes the open bucket vanish.
+  const activeBucket = useMemo(() => {
+    if (collapsed) return null;
+    const chosen = groups.find((group) => group.leadType === openLeadType);
+    const chosenTimezone = chosen?.timezones.find(
+      (item) => item.timezone === openTimezone,
+    );
+    if (chosen && chosenTimezone) {
+      return { leadType: chosen.leadType, timezone: chosenTimezone.timezone };
     }
-
-    setSelectedLeadId((current) => current ?? defaultLead.leadId);
 
     const firstGroup = groups[0];
     const firstTimezone = firstGroup?.timezones[0];
-    if (!firstGroup) {
-      return;
-    }
+    if (!firstGroup || !firstTimezone) return null;
+    return { leadType: firstGroup.leadType, timezone: firstTimezone.timezone };
+  }, [collapsed, groups, openLeadType, openTimezone]);
 
-    setExpandedLeadTypes((current) =>
-      current.length > 0 ? current : [firstGroup.leadType],
+  const bucketQuery = useCallsLogBucket({
+    agentSlug,
+    leadType: activeBucket?.leadType ?? "",
+    timezone: activeBucket?.timezone ?? "",
+    search,
+    enabled: Boolean(activeBucket),
+  });
+
+  const rows = useMemo(
+    () => flattenBucketPages(bucketQuery.data?.pages),
+    [bucketQuery.data],
+  );
+
+  const {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: bucketLoading,
+    isFetching: bucketFetching,
+  } = bucketQuery;
+
+  // True only while a *new* search/bucket is in flight and previous results are
+  // still on screen. Drives a quiet spinner instead of a layout swap.
+  const isRefreshing =
+    (summaryFetching && !summaryLoading) ||
+    (bucketFetching && !bucketLoading && !isFetchingNextPage);
+
+  // Infinite scroll: General buckets run to five figures for a single agent, so
+  // rows arrive 500 at a time as the list is scrolled. Hot is returned whole —
+  // there are 27 Hot rows across the entire system.
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const leadListRef = useRef<HTMLDivElement | null>(null);
+
+  const tryLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  useEffect(() => {
+    const root = leadListRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!root || !sentinel || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) tryLoadMore();
+      },
+      { root, rootMargin: "128px", threshold: 0 },
     );
 
-    if (firstTimezone) {
-      setExpandedTimezones((current) =>
-        current.length > 0
-          ? current
-          : [getCallLogPathKey(firstGroup.leadType, firstTimezone.timezone)],
-      );
-    }
-  }, [defaultLead, groups]);
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, rows.length, tryLoadMore]);
+
+  // Switching agents resets the whole view — the previous agent's bucket
+  // selection means nothing here.
+  useEffect(() => {
+    setOpenLeadType(null);
+    setOpenTimezone(null);
+    setSelectedLeadId(null);
+    setLastLead(null);
+    setCollapsed(false);
+  }, [agentSlug]);
+
+  // Keep a selection on screen: hold the user's pick while it is still in the
+  // loaded rows, otherwise fall to the first row of the open bucket. `lastLead`
+  // is the final fallback so collapsing the tree — which unloads the bucket —
+  // leaves the detail panel showing what the agent was last looking at rather
+  // than blanking it. It deliberately ranks below `rows[0]`, so a lead that
+  // genuinely left the bucket (logged an outcome, moved Hot -> General) still
+  // hands the panel over to the next lead.
+  const [lastLead, setLastLead] = useState<QueueLead | null>(null);
 
   const selectedLead = useMemo(() => {
     if (selectedLeadId) {
-      return (
-        filteredRows.find((row) => row.leadId === selectedLeadId) ?? defaultLead
-      );
+      const match = rows.find((row) => row.leadId === selectedLeadId);
+      if (match) return match;
     }
-    return defaultLead;
-  }, [filteredRows, selectedLeadId, defaultLead]);
+    return rows[0] ?? lastLead;
+  }, [lastLead, rows, selectedLeadId]);
+
+  useEffect(() => {
+    if (selectedLead && selectedLead.leadId !== lastLead?.leadId) {
+      setLastLead(selectedLead);
+    }
+  }, [lastLead?.leadId, selectedLead]);
 
   const {
     data: detail,
     isLoading: detailLoading,
-    isFetching: detailFetching,
   } = useCallLogDetail(selectedLead?.leadId, agentSlug);
 
   const logResult = useLogCallResult(agentSlug);
@@ -401,62 +509,41 @@ export function AgentCallLogs() {
     return hasSavableChanges(form, baselineForm);
   }, [form, baselineForm]);
 
-  const allCompanyContacts = useMemo(() => {
-    if (!selectedLead) {
-      return [];
-    }
+  // Co-workers at the same company, straight from the detail endpoint. This was
+  // previously assembled from the page's own rows, so it only listed the
+  // colleagues that happened to be in the loaded window — and with rows now
+  // arriving one timezone at a time, that window never spans a company whose
+  // contacts sit in different buckets.
+  const allCompanyContacts = useMemo<CompanyContact[]>(() => {
+    if (!detail) return [];
+    return detail.relatedContacts.map((contact) => ({
+      leadId: contact.id,
+      fullName: contact.fullName,
+      companyName: contact.companyName ?? detail.company?.companyName ?? "",
+      companySymbol:
+        contact.companySymbol ?? detail.company?.companySymbol ?? null,
+      contactType: contact.contactType ?? "",
+      leadType: contact.leadType ?? "",
+    }));
+  }, [detail]);
 
-    return rows
-      .filter((row) => row.companyId === selectedLead.companyId)
-      .sort((a, b) =>
-        getCallLogLeadLabel(a).localeCompare(getCallLogLeadLabel(b)),
-      );
-  }, [rows, selectedLead]);
-
-  const selectedCompanyContact = useMemo(
-    () =>
-      companyContactLeadId
-        ? rows.find((row) => row.leadId === companyContactLeadId) ?? null
-        : null,
-    [companyContactLeadId, rows],
-  );
-
-  const selectedCompanyContactIndex = selectedCompanyContact
+  const selectedCompanyContactIndex = companyContactLeadId
     ? allCompanyContacts.findIndex(
-        (row) => row.leadId === selectedCompanyContact.leadId,
+        (contact) => contact.leadId === companyContactLeadId,
       )
     : -1;
 
+  const selectedCompanyContact = companyContactDetail
+    ? leadFromDetail(companyContactDetail)
+    : null;
+
   const selectedCompanyContactForm =
-    selectedCompanyContact &&
-    companyContactFormState?.key === selectedCompanyContact.leadId
+    companyContactLeadId &&
+    companyContactFormState?.key === companyContactLeadId
       ? companyContactFormState.value
       : companyContactDetail
         ? formFromDetail(companyContactDetail)
         : null;
-
-  const visibleLeadTypes = useMemo(
-    () => new Set(groups.map((group) => group.leadType)),
-    [groups],
-  );
-  const visibleTimezoneKeys = useMemo(
-    () =>
-      new Set(
-        groups.flatMap((group) =>
-          group.timezones.map((timezoneGroup) =>
-            getCallLogPathKey(group.leadType, timezoneGroup.timezone),
-          ),
-        ),
-      ),
-    [groups],
-  );
-
-  const activeExpandedLeadTypes = expandedLeadTypes.filter((leadType) =>
-    visibleLeadTypes.has(leadType),
-  );
-  const activeExpandedTimezones = expandedTimezones.filter((key) =>
-    visibleTimezoneKeys.has(key),
-  );
 
   const contactTypeOptions = useMemo(
     () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
@@ -494,12 +581,12 @@ export function AgentCallLogs() {
     key: Key,
     value: EditableCallLogState[Key],
   ) => {
-    if (!selectedCompanyContact || !selectedCompanyContactForm) {
+    if (!companyContactLeadId || !selectedCompanyContactForm) {
       return;
     }
 
     setCompanyContactFormState({
-      key: selectedCompanyContact.leadId,
+      key: companyContactLeadId,
       value: {
         ...selectedCompanyContactForm,
         [key]: value,
@@ -670,44 +757,45 @@ export function AgentCallLogs() {
     }
   };
 
+  // Opening a lead type opens its leading timezone with it, so a click always
+  // lands on rows rather than on a second thing to click. Selection is cleared
+  // so the detail panel follows the new bucket's first row.
+  const openBucket = (leadType: string, timezone: string) => {
+    setCollapsed(false);
+    setOpenLeadType(leadType);
+    setOpenTimezone(timezone);
+    setSelectedLeadId(null);
+    setLastLead(null);
+    leadListRef.current?.scrollTo({ top: 0 });
+  };
+
   const toggleLeadType = (leadType: string) => {
-    const isOpen = activeExpandedLeadTypes.includes(leadType);
-    setExpandedLeadTypes(isOpen ? [] : [leadType]);
-
-    if (!isOpen) {
-      const targetGroup = groups.find((group) => group.leadType === leadType);
-      const firstTimezone = targetGroup?.timezones[0];
-      setExpandedTimezones(
-        firstTimezone
-          ? [getCallLogPathKey(leadType, firstTimezone.timezone)]
-          : [],
-      );
-
-      const firstLead = firstTimezone?.leads[0];
-      if (firstLead) {
-        setSelectedLeadId(firstLead.leadId);
-      }
+    if (activeBucket?.leadType === leadType) {
+      setCollapsed(true);
+      return;
     }
+    const target = groups.find((group) => group.leadType === leadType);
+    const firstTimezone = target?.timezones[0];
+    if (!firstTimezone) return;
+    openBucket(leadType, firstTimezone.timezone);
   };
 
   const toggleTimezone = (leadType: string, timezone: string) => {
-    const key = getCallLogPathKey(leadType, timezone);
-    const isOpen = activeExpandedTimezones.includes(key);
-    setExpandedTimezones(isOpen ? [] : [key]);
-
-    if (!isOpen) {
-      const targetGroup = groups.find((group) => group.leadType === leadType);
-      const timezoneGroup = targetGroup?.timezones.find(
-        (item) => item.timezone === timezone,
-      );
-      const firstLead = timezoneGroup?.leads[0];
-      if (firstLead) {
-        setSelectedLeadId(firstLead.leadId);
-      }
+    if (
+      activeBucket?.leadType === leadType &&
+      activeBucket?.timezone === timezone
+    ) {
+      setCollapsed(true);
+      return;
     }
+    openBucket(leadType, timezone);
   };
 
-  if (queueLoading) {
+
+  // Only the summary gates the whole page: it is what the tree is built from.
+  // A bucket still loading shows a spinner inside the list, so the sidebar and
+  // the search box stay usable while rows arrive.
+  if (summaryLoading && !summary) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Wave />
@@ -715,17 +803,13 @@ export function AgentCallLogs() {
     );
   }
 
-  if (queueError) {
+  if (summaryError) {
     return (
       <ErrorState
         title="Failed to load call logs"
-        onRetry={() => refetchQueue()}
+        onRetry={() => refetchSummary()}
       />
     );
-  }
-
-  if (!rows.length) {
-    return <EmptyState message="No leads found for call logs." />;
   }
 
   return (
@@ -756,33 +840,59 @@ export function AgentCallLogs() {
                     },
                   )}
                 >
-                  <CardShell className="flex flex-col gap-4">
-                    <div className="space-y-4">
-                      <div className="relative">
+                  <CardShell className="flex min-h-0 flex-1 flex-col gap-4">
+                    <div className="flex min-h-0 flex-1 flex-col space-y-4">
+                      <div className="relative shrink-0">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                         <TextInput
-                          value={search}
-                          onChange={(event) => setSearch(event.target.value)}
-                          placeholder="Search..."
-                          className="pl-9"
+                          value={searchInput}
+                          onChange={(event) =>
+                            setSearchInput(event.target.value)
+                          }
+                          placeholder="Search symbol or name..."
+                          className="pl-9 pr-9"
                         />
+                        {/* Feedback lives inside the field so the page never
+                            swaps layout mid-keystroke. */}
+                        <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center">
+                          {isRefreshing ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-slate-400 dark:text-slate-500" />
+                          ) : searchInput ? (
+                            <button
+                              type="button"
+                              onClick={() => setSearchInput("")}
+                              aria-label="Clear search"
+                              className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <div
+                        className={clsx(
+                          "flex min-h-0 flex-1 flex-col space-y-3 transition-opacity",
+                          isRefreshing && "opacity-60",
+                        )}
+                      >
                         {groups.length ? (
-                          <div className="space-y-2">
+                          <div className="flex min-h-0 flex-1 flex-col space-y-2">
                             {groups.map((group) => {
                               const isLeadTypeExpanded =
-                                activeExpandedLeadTypes.includes(group.leadType);
+                                activeBucket?.leadType === group.leadType;
 
                               return (
                                 <div
                                   key={group.leadType}
-                                  className="rounded border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/50"
+                                  className={clsx(
+                                    "flex min-h-0 flex-col rounded border border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-900/50",
+                                    isLeadTypeExpanded && "flex-1",
+                                  )}
                                 >
                                   <Button
                                     onClick={() => toggleLeadType(group.leadType)}
-                                    className="flex w-full items-center justify-between gap-3 rounded p-2 text-left cursor-pointer hover:bg-white dark:hover:bg-slate-800"
+                                    className="flex w-full shrink-0 items-center justify-between gap-3 rounded p-2 text-left cursor-pointer hover:bg-white dark:hover:bg-slate-800"
                                   >
                                     <div className="flex min-w-0 items-center gap-3">
                                       {isLeadTypeExpanded ? (
@@ -796,101 +906,132 @@ export function AgentCallLogs() {
                                         kind="lead"
                                       />
                                     </div>
+                                    {/* Server-side total for the whole bucket,
+                                        not the number of rows loaded. */}
                                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                      {group.timezones.reduce(
-                                        (count, timezoneGroup) =>
-                                          count + timezoneGroup.leads.length,
-                                        0,
-                                      )}
+                                      {group.total.toLocaleString()}
                                     </span>
                                   </Button>
 
                                   {isLeadTypeExpanded ? (
-                                    <div className="mt-2 space-y-2 px-2 pb-2">
-                                      {group.timezones.map(
-                                        (timezoneGroup) => {
-                                          const timezoneKey = getCallLogPathKey(
-                                            group.leadType,
-                                            timezoneGroup.timezone,
-                                          );
-                                          const isTimezoneExpanded =
-                                            activeExpandedTimezones.includes(
-                                              timezoneKey,
-                                            );
+                                    <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2 px-2 pb-2">
+                                      {group.timezones.map((timezoneGroup) => {
+                                        const timezoneKey = getCallLogPathKey(
+                                          group.leadType,
+                                          timezoneGroup.timezone,
+                                        );
+                                        const isTimezoneExpanded =
+                                          activeBucket?.timezone ===
+                                          timezoneGroup.timezone;
 
-                                          return (
-                                            <div
-                                              key={timezoneKey}
-                                              className="rounded border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950/60"
+                                        return (
+                                          <div
+                                            key={timezoneKey}
+                                            className={clsx(
+                                              "flex min-h-0 flex-col rounded border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950/60",
+                                              isTimezoneExpanded && "flex-1",
+                                            )}
+                                          >
+                                            <Button
+                                              onClick={() =>
+                                                toggleTimezone(
+                                                  group.leadType,
+                                                  timezoneGroup.timezone,
+                                                )
+                                              }
+                                              className="flex w-full shrink-0 items-center justify-between gap-3 rounded px-2 py-2 text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
                                             >
-                                              <Button
-                                                onClick={() =>
-                                                  toggleTimezone(
-                                                    group.leadType,
-                                                    timezoneGroup.timezone,
-                                                  )
-                                                }
-                                                className="flex w-full items-center justify-between gap-3 rounded px-2 py-2 text-left cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900"
-                                              >
-                                                <div className="flex min-w-0 items-center gap-3">
-                                                  {isTimezoneExpanded ? (
-                                                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
-                                                  ) : (
-                                                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
-                                                  )}
-                                                  <span className="text-xs">
-                                                    Timezone
-                                                  </span>
-                                                  <TimezoneBadge
-                                                    timezone={
-                                                      timezoneGroup.timezone
-                                                    }
-                                                  />
-                                                </div>
-                                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                                  {timezoneGroup.leads.length}
+                                              <div className="flex min-w-0 items-center gap-3">
+                                                {isTimezoneExpanded ? (
+                                                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                                                ) : (
+                                                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+                                                )}
+                                                <span className="text-xs">
+                                                  Timezone
                                                 </span>
-                                              </Button>
-
-                                              {isTimezoneExpanded ? (
-                                                <div className="mt-2 flex flex-col gap-1 px-2 pb-2">
-                                                  {timezoneGroup.leads.map(
-                                                    (lead) => {
-                                                      const isSelected =
-                                                        selectedLead?.leadId ===
-                                                        lead.leadId;
-
-                                                      return (
-                                                        <Button
-                                                          key={lead.leadId}
-                                                          onClick={() => {
-                                                            setSelectedLeadId(
-                                                              lead.leadId,
-                                                            );
-                                                            setIsMobileSidebarOpen(
-                                                              false,
-                                                            );
-                                                          }}
-                                                          className={clsx(
-                                                            "w-full rounded border px-2.5 py-1.5 text-left text-xs leading-snug transition cursor-pointer whitespace-normal wrap-break-word",
-                                                            isSelected
-                                                              ? "border-indigo-300 bg-indigo-50 font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100"
-                                                              : "border-slate-200 bg-white font-normal text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800",
-                                                          )}
-                                                        >
-                                                          {getCallLogLeadLabel(
-                                                            lead,
-                                                          )}
-                                                        </Button>
-                                                      );
-                                                    },
+                                                <TimezoneBadge
+                                                  timezone={getTimezoneBucketLabel(
+                                                    timezoneGroup.timezone,
                                                   )}
-                                                </div>
-                                              ) : null}
-                                            </div>
-                                          );
-                                        },
-                                      )}
+                                                />
+                                              </div>
+                                              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                                {timezoneGroup.count.toLocaleString()}
+                                              </span>
+                                            </Button>
+
+                                            {isTimezoneExpanded ? (
+                                              <div
+                                                ref={leadListRef}
+                                                className="mt-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2"
+                                              >
+                                                {bucketLoading && !rows.length ? (
+                                                  <div className="flex justify-center py-6">
+                                                    <Wave />
+                                                  </div>
+                                                ) : null}
+
+                                                {rows.map((lead) => {
+                                                  const isSelected =
+                                                    selectedLead?.leadId ===
+                                                    lead.leadId;
+
+                                                  return (
+                                                    <Button
+                                                      key={lead.leadId}
+                                                      onClick={() => {
+                                                        setSelectedLeadId(
+                                                          lead.leadId,
+                                                        );
+                                                        setIsMobileSidebarOpen(
+                                                          false,
+                                                        );
+                                                      }}
+                                                      className={clsx(
+                                                        "w-full shrink-0 rounded border px-2.5 py-1.5 text-left text-xs leading-snug transition cursor-pointer whitespace-normal wrap-break-word",
+                                                        isSelected
+                                                          ? "border-indigo-300 bg-indigo-50 font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100"
+                                                          : "border-slate-200 bg-white font-normal text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800",
+                                                      )}
+                                                    >
+                                                      {getCallLogLeadLabel(lead)}
+                                                    </Button>
+                                                  );
+                                                })}
+
+                                                {/* Trips the observer that
+                                                    pulls the next 500 rows. */}
+                                                <div
+                                                  ref={loadMoreSentinelRef}
+                                                  className="h-px shrink-0"
+                                                />
+
+                                                {isFetchingNextPage ? (
+                                                  <p className="shrink-0 py-2 text-center text-xs text-slate-400">
+                                                    Loading more...
+                                                  </p>
+                                                ) : null}
+
+                                                {!bucketLoading &&
+                                                hasNextPage ? (
+                                                  <Button
+                                                    onClick={tryLoadMore}
+                                                    className="shrink-0 cursor-pointer rounded border border-slate-200 px-2 py-1 text-center text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                                                  >
+                                                    Load more (
+                                                    {(
+                                                      timezoneGroup.count -
+                                                      rows.length
+                                                    ).toLocaleString()}{" "}
+                                                    left)
+                                                  </Button>
+                                                ) : null}
+                                              </div>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   ) : null}
                                 </div>
@@ -899,7 +1040,9 @@ export function AgentCallLogs() {
                           </div>
                         ) : (
                           <div className="rounded border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            No leads match the current search.
+                            {search
+                              ? "No leads match the current search."
+                              : "No leads found for call logs."}
                           </div>
                         )}
                       </div>
@@ -911,7 +1054,10 @@ export function AgentCallLogs() {
 
             <section className="flex min-h-0 min-w-0 flex-col border-t border-slate-200 dark:border-slate-700 lg:h-[calc(100vh-8.5rem)] lg:border-t-0">
               <div className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-5">
-                {(detailLoading || detailFetching) && selectedLead ? (
+                {/* Only while a *different* lead's detail is loading. Including
+                    isFetching here flashed the overlay on every background
+                    revalidation, which read as the panel reloading. */}
+                {detailLoading && selectedLead ? (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-gray-900/60">
                     <Wave />
                   </div>
@@ -1157,8 +1303,8 @@ function CallLogDetailContent({
   historyEditable?: boolean;
   showAllCompanyContacts: boolean;
   isDrawer: boolean;
-  allCompanyContacts: QueueLead[];
-  onOpenCompanyContact: (lead: QueueLead) => void;
+  allCompanyContacts: CompanyContact[];
+  onOpenCompanyContact: (contact: CompanyContact) => void;
   contactTypeOptions: Array<{ label: string; value: string }>;
   leadTypeOptions: Array<{ label: string; value: string }>;
 }) {
