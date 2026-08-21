@@ -1,4 +1,3 @@
-import { formatRelatedContacts } from "@/features/agent-call-logs/_lib/format";
 import type {
   BrandState,
   HistoryEntry,
@@ -52,8 +51,6 @@ export type LeadDrawerFormState = {
   companyName: string;
   contactType: string;
   fullName: string;
-  firstName: string;
-  lastName: string;
   role: string;
   email: string;
   phone: string;
@@ -210,10 +207,7 @@ export function mapLeadDetailResponseToPayload(
       role: lead.role,
       timezone: lead.timezone,
       contactType: lead.contactType,
-      // The All-Leads detail endpoint does not return the per-lead
-      // other_contacts free-text field; it is surfaced on the Fix Lead form
-      // (via /leads/:id). Kept null here to satisfy the shared FullLead type.
-      otherContacts: null,
+      otherContacts: lead.otherContacts ?? null,
       notWorkAnymore: lead.notWorkAnymore,
       companyId: company.id,
       companyName: company.companyName,
@@ -317,8 +311,6 @@ export function directoryRowToFormState(row: LeadDirectoryRow): LeadDrawerFormSt
     companyName: row.companyName,
     contactType: row.contactType,
     fullName: row.fullName,
-    firstName: row.firstName,
-    lastName: row.lastName,
     role: row.role ?? "",
     email: row.email,
     phone: row.phone,
@@ -392,6 +384,12 @@ export function leadDetailToDirectoryRow(
   );
 }
 
+// `*ToBeCalledOn` is the call-back date and maps to
+// `lead_brand_state.follow_up_date` on both read and write. It used to be
+// seeded from `nextFollowUpDate` — a legacy override column no code has ever
+// written — and saved to `last_called_date`, so setting a call-back date wrote
+// a future date into the lead's call history and pushed it out of the Hot
+// queue's "stale for 7 days" block.
 export function leadDetailToFormState(
   detail: LeadDetailPayload,
   related: RelatedLead[] = [],
@@ -403,36 +401,31 @@ export function leadDetailToFormState(
     companyName: row.companyName,
     contactType: row.contactType,
     fullName: row.fullName,
-    firstName: row.firstName,
-    lastName: row.lastName,
     role: row.role ?? "",
     email: row.email,
     phone: row.phone,
     phoneExtension: row.phoneExtension,
     notWorked: row.notWorked ?? false,
-    otherContacts: formatRelatedContacts(
-      related.map((contact) => ({
-        id: contact.id,
-        fullName: contact.fullName ?? "",
-        role: contact.role ?? "",
-        phone: contact.phone ?? "",
-        email: contact.email ?? "",
-      })),
-    ),
+    // The lead's own `other_contacts` column. This box used to be seeded with a
+    // rendered list of the company's OTHER lead records, which meant the field
+    // displayed one thing and the database stored another — and made the field
+    // unsafe to save. Related leads have their own section further down the
+    // drawer (AssociatedContactsSection).
+    otherContacts: detail.lead.otherContacts ?? "",
     svgLeadType: row.svgLeadType,
     svgToBeCalledBy: row.svgToBeCalledBy,
     svgHistoryCalls: formatBrandCallsHistory(getCallHistory(extended.svg)),
     svgHistoryNotes: formatBrandNotesHistory(getCallHistory(extended.svg)),
-    svgToBeCalledOn: isoToDate(detail.brandStates.svg?.nextFollowUpDate),
+    svgToBeCalledOn: isoToDate(detail.brandStates.svg?.followUpDate),
     bentonLeadType: row.bentonLeadType,
     bentonToBeCalledBy: row.bentonToBeCalledBy,
     bentonHistoryCalls: formatBrandCallsHistory(getCallHistory(extended.benton)),
     bentonHistoryNotes: formatBrandNotesHistory(getCallHistory(extended.benton)),
-    bentonToBeCalledOn: isoToDate(detail.brandStates.benton?.nextFollowUpDate),
+    bentonToBeCalledOn: isoToDate(detail.brandStates.benton?.followUpDate),
     rm95LeadType: row.rm95LeadType,
     rm95ToBeCalledBy: row.rm95ToBeCalledBy,
     rm95HistoryCalls: formatBrandCallsHistory(getCallHistory(extended["95rm"])),
     rm95HistoryNotes: formatBrandNotesHistory(getCallHistory(extended["95rm"])),
-    rm95ToBeCalledOn: isoToDate(detail.brandStates["95rm"]?.nextFollowUpDate),
+    rm95ToBeCalledOn: isoToDate(detail.brandStates["95rm"]?.followUpDate),
   };
 }

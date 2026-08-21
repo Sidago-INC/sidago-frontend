@@ -28,14 +28,35 @@ export type QueueResponse = {
   data: QueueLead[];
 };
 
-export type CallsLogResponse = {
+// The Calls Log sidebar. Counts span the agent's WHOLE row-set, not the loaded
+// page — the page used to render "500" for a bucket holding 10,818 leads
+// because it counted what had arrived rather than what exists.
+export type CallsLogSummaryResponse = {
   ok: boolean;
   agentSlug: string;
   brandCode: string;
-  counts: { hot: number; general: number };
-  data: {
-    hot: QueueLead[];
-    general: QueueLead[];
+  groups: CallsLogGroup[];
+  total: number;
+};
+
+export type CallsLogGroup = {
+  leadType: string;
+  total: number;
+  /** Ordered EST, CST, MST, PST, then the no-timezone bucket ("") last. */
+  timezones: { timezone: string; count: number }[];
+};
+
+// One page of one (leadType, timezone) bucket.
+export type CallsLogPageResponse = {
+  ok: boolean;
+  agentSlug: string;
+  brandCode: string;
+  data: QueueLead[];
+  meta: {
+    total_count: number;
+    per_page: number;
+    current_page: number;
+    total_pages: number;
   };
 };
 
@@ -58,6 +79,12 @@ export type RelatedContact = {
   role: string;
   phone: string;
   email: string;
+  // Served by the detail endpoint so the "All Company Contacts" card no longer
+  // has to be stitched together from whichever rows the page happens to hold.
+  contactType?: string | null;
+  leadType?: string | null;
+  companyName?: string | null;
+  companySymbol?: string | null;
 };
 
 export type BrandState = {
@@ -90,6 +117,8 @@ export type LeadDetailResponse = {
     role: string;
     timezone: string;
     contactType: string;
+    /** The lead's own free-text secondary contacts — NOT the related-lead list. */
+    otherContacts: string | null;
     notWorkAnymore: boolean;
     companyId: string;
     counterB: number;

@@ -89,12 +89,28 @@ export function getTimezoneBadgeStyle(tz: string): string {
   return TIMEZONE_FALLBACK_STYLE;
 }
 
+/**
+ * The timezone to show for a lead.
+ *
+ * The COMPANY owns the timezone — every lead at a company is in that company's
+ * timezone. `leads.timezone` is a denormalized copy of it (an Airtable lookup,
+ * flattened when the data was exported) which the backend keeps in sync
+ * whenever a company is edited, and which is only consulted when the company
+ * has no value of its own.
+ *
+ * The argument order is unchanged (lead first) because every call site reads
+ * `(row.timezone, row.companyTimezone)`; only the precedence flipped. Before,
+ * the stale lead copy won, so a PST company with a lead frozen at EST showed
+ * two different timezones on two different screens.
+ *
+ * Mirrors `resolvedTimezoneSql` on the backend — keep the two in step.
+ */
 export function resolveLeadTimezone(
   leadTimezone?: string | null,
   companyTimezone?: string | null,
 ): string | null {
-  const timezone = leadTimezone?.trim() || companyTimezone?.trim();
-  return timezone || null;
+  const timezone = companyTimezone?.trim() || leadTimezone?.trim();
+  return timezone ? stripTimezonePrefix(timezone) : null;
 }
 
 export function getRandomTimezone(): TIMEZONE {
