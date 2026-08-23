@@ -78,7 +78,11 @@ export function AgentCallDetailsPanel({
         </div>
       }
     >
-      <div className="overflow-x-auto">
+      {/* Bounded height + overflow-auto. Without a height limit the scroll
+          container is as tall as the whole table, so its horizontal
+          scrollbar sits at the very bottom of the page — you had to scroll
+          all the way down before you could discover it. */}
+      <div className="max-h-[65vh] overflow-auto">
         {isLoading ? (
           <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
             Loading…
@@ -89,7 +93,7 @@ export function AgentCallDetailsPanel({
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50">
+            <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
               <tr>
                 {["Time", "Lead", "Company", "Outcome", "Lead Type", "Notes", "Duration", "Recording"].map(
                   (h) => (
@@ -140,14 +144,6 @@ export function AgentCallDetailsPanel({
                         href={ensureAbsoluteUrl(row.mcRecordingLink)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          window.open(
-                            ensureAbsoluteUrl(row.mcRecordingLink!),
-                            "_blank",
-                            "noopener,noreferrer",
-                          );
-                        }}
                         className="text-xs font-medium text-violet-600 hover:text-violet-500 hover:underline dark:text-violet-400 dark:hover:text-violet-300"
                       >
                         Listen

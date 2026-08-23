@@ -20,8 +20,10 @@ import {
   isFilterConditionActive,
   normalizeDateValue,
   parseDateRangeFilterValue,
+  parseMultiValue,
   updateFilterGroup,
 } from "./utils";
+import { escapePrintHtml, printHtml } from "@/lib/print-html";
 import {
   DEFAULT_PAGE_SIZE,
   getPageNumbers,
@@ -80,11 +82,12 @@ export interface UseTableStateReturn<T> {
   paginationEnd: number;
   totalCount: number;
   activeFilterConditionCount: number;
+  hasActiveSearch: boolean;
   paginationContextKey: string;
   closeSearch: () => void;
   handlePrintPage: () => void;
   handlePrintData: () => void;
-  handleExportSvg: () => void;
+  handleExportCsv: () => void;
   setPageState: React.Dispatch<React.SetStateAction<PageState>>;
   appendFilterItemToGroup: (groupId: string, item: FilterItem) => void;
 }
@@ -285,6 +288,18 @@ export function useTableState<T>({
           }
         }
 
+        if (
+          condition.operator === "is_any_of" ||
+          condition.operator === "is_none_of"
+        ) {
+          const choices = parseMultiValue(condition.value).map((choice) =>
+            choice.toLowerCase(),
+          );
+          if (choices.length === 0) return true;
+          const hit = choices.includes(value.trim());
+          return condition.operator === "is_any_of" ? hit : !hit;
+        }
+
         switch (condition.operator) {
           case "contains":
             return value.includes(query);
@@ -378,18 +393,56 @@ export function useTableState<T>({
   const groupedData = useMemo<GroupNode<T>[] | null>(() => {
     const activeGroupRules = groupRules.filter((rule) => rule.field);
     if (activeGroupRules.length === 0) return null;
+
     const nodes = buildGroupNodes(processedData, activeGroupRules, columnMap);
+    const serverGroups = serverGrid?.groupCounts;
 
-    if (!serverGrid?.groupCounts) return nodes;
+    if (!serverGroups?.length) return nodes;
 
-    // True totals for the whole row-set, not just the rows loaded on this page.
-    const countByValue = new Map(
-      serverGrid.groupCounts.map((group) => [group.value, group.count]),
+    // Which groups EXIST comes from the server; which rows are on screen comes
+    // from this page. Both matter, and they have to be presented in the same
+    // order or the result is nonsense — the API returns groups sorted by size
+    // (EST 18,383 first) while the rows come back sorted by group VALUE, so
+    // page 1 of All Leads is 34 blanks + 66 CST. Rendering the big groups first
+    // showed EST and PST expanded and empty.
+    //
+    // So: order the groups the way the rows are ordered, and let a group whose
+    // rows live on another page render collapsed with its true count.
+    const rule = activeGroupRules[0];
+    const loadedByLabel = new Map(nodes.map((node) => [node.label, node]));
+
+    const ordered = [...serverGroups].sort((left, right) =>
+      left.value.localeCompare(right.value, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
     );
-    return nodes.map((node) => ({
-      ...node,
-      count: countByValue.get(node.label === "Unknown" ? "" : node.label),
-    }));
+
+    const seen = new Set<string>();
+    const fromServer = ordered.map((group) => {
+      // buildGroupNodes labels NULL/blank as "Unknown"; the API sends "".
+      const label = group.value === "" ? "Unknown" : group.value;
+      seen.add(label);
+      const loaded = loadedByLabel.get(label);
+
+      return {
+        ...(loaded ?? {
+          id: `${rule.field}:${label}`,
+          label,
+          level: 0,
+          rows: [] as T[],
+          children: null,
+        }),
+        count: group.count,
+        /** The raw value, so "show only this group" can build a filter. */
+        value: group.value,
+      } as GroupNode<T>;
+    });
+
+    // Anything on the page the server did not enumerate still has to appear.
+    const extras = nodes.filter((node) => !seen.has(node.label));
+
+    return [...fromServer, ...extras];
   }, [columnMap, groupRules, processedData, serverGrid]);
 
   const paginationContextKey = useMemo(
@@ -482,9 +535,11 @@ export function useTableState<T>({
   };
 
   const activeSearchValue = serverSearch?.value ?? filterSearch;
-  const activeFilterConditionCount =
-    countActiveFilterItems(filterItems) +
-    Number(Boolean(activeSearchValue.trim()));
+  // Only real filter conditions count. The search term used to be added here,
+  // which showed "1" on the filter badge while the panel said "No conditions
+  // yet" — the search box has its own indicator.
+  const activeFilterConditionCount = countActiveFilterItems(filterItems);
+  const hasActiveSearch = Boolean(activeSearchValue.trim());
 
   const closeSearch = () => {
     setIsSearchOpen(false);
@@ -501,80 +556,47 @@ export function useTableState<T>({
   };
 
   const handlePrintData = () => {
-    if (typeof window === "undefined") return;
     const tableMarkup = tableElementRef.current?.outerHTML;
     if (!tableMarkup) return;
 
-    const printWindow = window.open("", "_blank", "width=1200,height=800");
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
-            h1 { margin-bottom: 16px; font-size: 20px; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-size: 12px; vertical-align: top; }
-            th { background: #f8fafc; text-transform: uppercase; }
-          </style>
-        </head>
-        <body>
-          <h1>${title}</h1>
-          ${tableMarkup}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
+    // Landscape, because these grids are wide. The markup always contained
+    // every column — the QA report that off-screen columns "were not printed"
+    // was the sheet being too narrow for them, not missing data.
+    printHtml({
+      title,
+      orientation: "landscape",
+      body: `<h1>${escapePrintHtml(title)}</h1>${tableMarkup}`,
+    });
   };
 
-  const handleExportSvg = () => {
+  // This used to build an SVG image and download it as .svg, while the menu
+  // above said "Export the data as CSV". No CSV writer existed at all.
+  const handleExportCsv = () => {
     if (typeof window === "undefined") return;
 
-    const headers = columns.map((column) => column.title);
-    const rowLines = processedData.map((row) =>
-      columns
-        .map(
-          (column) =>
-            `${column.title}: ${String(getCellValue(row, column) ?? "")}`,
-        )
-        .join(" | "),
-    );
-    const lines = [title, headers.join(" | "), ...rowLines];
-    const lineHeight = 22;
-    const padding = 24;
-    const svgWidth = 1600;
-    const svgHeight = Math.max(160, padding * 2 + lines.length * lineHeight);
-    const escapedLines = lines.map((line) =>
-      line
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;"),
+    // RFC 4180: wrap every field and double any quote inside it. Wrapping
+    // unconditionally is what keeps a value containing a comma or a newline
+    // in a single cell.
+    const toField = (value: React.ReactNode): string => {
+      const text = value === null || value === undefined ? "" : String(value);
+      return '"' + text.replaceAll('"', '""') + '"';
+    };
+
+    const header = columns.map((column) => toField(column.title)).join(",");
+    const body = processedData.map((row) =>
+      columns.map((column) => toField(getCellValue(row, column))).join(","),
     );
 
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
-        <rect width="100%" height="100%" fill="#ffffff" />
-        ${escapedLines
-          .map(
-            (line, index) => `
-              <text x="${padding}" y="${padding + (index + 1) * lineHeight}" font-family="Arial, sans-serif" font-size="${index === 0 ? 18 : 12}" fill="#0f172a">
-                ${line}
-              </text>`,
-          )
-          .join("")}
-      </svg>
-    `;
+    // CRLF line endings for Excel, and a BOM so it reads the file as UTF-8
+    // rather than the local codepage — without it accented names arrive
+    // mangled.
+    const csv = "\ufeff" + [header, ...body].join("\r\n");
 
-    const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${title.toLowerCase().replace(/\s+/g, "-")}.svg`;
+    link.download = title.toLowerCase().replace(/\s+/g, "-") + ".csv";
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -625,11 +647,12 @@ export function useTableState<T>({
     paginationEnd,
     totalCount,
     activeFilterConditionCount,
+    hasActiveSearch,
     paginationContextKey,
     closeSearch,
     handlePrintPage,
     handlePrintData,
-    handleExportSvg,
+    handleExportCsv,
     setPageState: handleSetPageState,
     appendFilterItemToGroup,
   };

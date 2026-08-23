@@ -9,6 +9,7 @@ import {
   TimezoneSelect,
 } from "@/components/ui";
 import { COMPANY } from "@/types/company.types";
+import { openPrintFrame } from "@/lib/print-html";
 import type { TIMEZONE } from "@/types/timezone.types";
 import { useEffect, useState } from "react";
 import { CountryPicker } from "./CountryPicker";
@@ -91,7 +92,7 @@ export function CompanyDrawer({
   const handlePrint = () => {
     if (typeof window === "undefined") return;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) return;
 
     const rows = Object.entries(company)

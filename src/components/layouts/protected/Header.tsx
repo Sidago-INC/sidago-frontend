@@ -1,7 +1,6 @@
 
 import { ChevronRight, Menu } from "lucide-react";
 import { Button } from "@/components/ui";
-import Notification from "./Notification";
 import Profile from "./Profile";
 import ThemeToggle from "./ThemeToggle";
 import { useRouteMeta } from "@/hooks/useRouteMeta";
@@ -63,7 +62,6 @@ export const Header = ({ onMenuClick }: Props) => {
       </div>
 
       <div className="flex items-center gap-3">
-        <Notification />
         <Profile />
         <ThemeToggle />
       </div>

@@ -1,419 +1,64 @@
-import { useEffect, useMemo, useState } from "react";
 import { getRowCompanySymbol } from "@/features/backoffice-shared/constants";
-import {
-  findCompanyPickerRow,
-  parseCompanySymbolFromLabel,
-  resolveCompanyFromDirectory,
-  resolveCompanyTimezone,
-  useCompanyBySymbol,
-  useCompanyOptions,
-  useDrawerCompanyNameSelectSource,
-  type CompanyRow,
-} from "@/features/companies/_lib/hooks";
+import { useCompanyBySymbol } from "@/features/companies/_lib/hooks";
 import { resolveLeadTimezone } from "@/types/timezone.types";
 
-type LeadCompanyContext = {
-  companyName: string;
-  companySymbol?: string | null;
-  timezone?: string | null;
-};
-
-function buildLeadCompanyRow(context: LeadCompanyContext): CompanyRow | null {
-  const name = context.companyName?.trim();
-  if (!name) return null;
-
-  const symbol = context.companySymbol?.trim() || null;
-
-  return {
-    id: "",
-    symbol,
-    name,
-    label: symbol ? `${symbol} - ${name}` : name,
-    timezone: context.timezone ?? null,
-    country: null,
-    description: null,
-    estimatedMarketcap: null,
-    city: null,
-    state: null,
-    zip: null,
-    website: null,
-    twitter: null,
-    createdAt: null,
-    updatedAt: null,
-  };
-}
-
-function findCompanyForLead(
-  row: LeadCompanyContext,
-  companies: CompanyRow[],
-): CompanyRow | undefined {
-  const symbol = getRowCompanySymbol(row);
-  if (symbol) {
-    const normalizedSymbol = symbol.trim().toUpperCase();
-    const bySymbol = companies.find(
-      (company) =>
-        company.symbol?.trim().toUpperCase() === normalizedSymbol ||
-        parseCompanySymbolFromLabel(company.label ?? company.name ?? "")
-          ?.trim()
-          .toUpperCase() === normalizedSymbol,
-    );
-    if (bySymbol) return bySymbol;
-  }
-
-  if (row.companyName?.trim()) {
-    const normalizedName = row.companyName.trim().toLowerCase();
-    return companies.find((company) => {
-      if (company.name?.trim().toLowerCase() === normalizedName) return true;
-      if (company.label?.trim().toLowerCase() === normalizedName) return true;
-      return false;
-    });
-  }
-
-  return undefined;
-}
-
-function getLeadCompanyTimezone(
-  lead: LeadCompanyContext,
-  companies: CompanyRow[],
-  activeCompany?: CompanyRow | null,
-): string {
-  const companyTimezone =
-    resolveCompanyTimezone(activeCompany, companies) ||
-    findCompanyForLead(lead, companies)?.timezone?.trim() ||
-    "";
-
-  return resolveLeadTimezone(lead.timezone, companyTimezone) ?? "";
-}
-
-type UseDrawerCompanySelectOptions = {
+/**
+ * Resolves the company identity a lead drawer needs to display, and the
+ * company id it needs to PATCH.
+ *
+ * This replaced a 370-line hook that also drove a searchable company picker.
+ * That picker held its own pinned copy of the selected company, written by
+ * four `useEffect`s and three queries that could resolve in any order, and it
+ * was the direct cause of four QA findings: the panel lagged a lead behind the
+ * Next button, arrow keys misbehaved inside the dropdown, changing the company
+ * left the previous lead's name and phone on screen, and every drawer open
+ * fired three extra requests.
+ *
+ * The picker was removed on the customer's instruction ("remove that section
+ * altogether… let the manual arrow keys remain"). Re-pointing a lead at a
+ * different company is not something the detail panel does any more.
+ * Correcting a company's own symbol, name or timezone still is — see
+ * `DrawerCompanyField`'s `companyEdit` prop — and that is what `companyId`
+ * below is for.
+ */
+type UseDrawerCompanyIdentityOptions = {
+  /** Skip the lookup while the drawer is closed. */
   drawerOpen: boolean;
-  rowKey: string;
-  companyName: string;
-  initialCompanyName: string;
+  /** The row's company symbol, as rendered in the grid. */
   rowCompanySymbol?: string | null;
+  /** The row's company name. */
   rowCompanyName?: string | null;
+  /** The lead's own denormalized timezone, used only as a fallback. */
   rowTimezone?: string | null;
-  onCompanyNameChange: (companyName: string) => void;
 };
 
-export function useDrawerCompanySelect({
+export function useDrawerCompanyIdentity({
   drawerOpen,
-  rowKey,
-  companyName,
-  initialCompanyName,
   rowCompanySymbol,
   rowCompanyName,
   rowTimezone,
-  onCompanyNameChange,
-}: UseDrawerCompanySelectOptions) {
-  const [pinnedCompanyOption, setPinnedCompanyOption] = useState<{
-    label: string;
-    value: string;
-  } | null>(null);
-  const [pinnedCompanyRow, setPinnedCompanyRow] = useState<CompanyRow | null>(
-    null,
+}: UseDrawerCompanyIdentityOptions) {
+  const displayCompanySymbol = getRowCompanySymbol({
+    companySymbol: rowCompanySymbol,
+    companyName: rowCompanyName,
+  });
+
+  // One lookup, by symbol. The company owns the timezone; the lead's own copy
+  // is a flattened Airtable lookup that can be stale, so it only fills in when
+  // the company has none.
+  const { data: company } = useCompanyBySymbol(
+    displayCompanySymbol,
+    drawerOpen && Boolean(displayCompanySymbol.trim()),
   );
 
-  const companyChanged = companyName !== initialCompanyName;
-
-  const extraCompanyOptions = useMemo(() => {
-    const currentName = companyName?.trim();
-    if (!currentName) return [];
-
-    if (
-      pinnedCompanyOption &&
-      String(pinnedCompanyOption.value) === currentName
-    ) {
-      return [pinnedCompanyOption];
-    }
-
-    return [
-      {
-        value: currentName,
-        label: rowCompanySymbol
-          ? `${rowCompanySymbol} - ${currentName}`
-          : currentName,
-      },
-    ];
-  }, [companyName, pinnedCompanyOption, rowCompanySymbol]);
-
-  const companySelectSource = useDrawerCompanyNameSelectSource(
-    extraCompanyOptions,
-    drawerOpen,
-  );
-  const { data: companyResult } = useCompanyOptions(1);
-  const allCompanies = companyResult?.data ?? [];
-
-  const companyOptions = useMemo(() => {
-    const currentName = companyName?.trim();
-    if (!currentName || !pinnedCompanyOption) {
-      return companySelectSource.options;
-    }
-
-    if (String(pinnedCompanyOption.value) !== currentName) {
-      return companySelectSource.options;
-    }
-
-    const exists = companySelectSource.options.some(
-      (option) => String(option.value) === currentName,
-    );
-
-    if (exists) {
-      return companySelectSource.options;
-    }
-
-    return [pinnedCompanyOption, ...companySelectSource.options];
-  }, [companySelectSource.options, companyName, pinnedCompanyOption]);
-
-  const loadedCompanyRows = useMemo(
-    () => [
-      ...companySelectSource.browseItems,
-      ...companySelectSource.remoteItems,
-    ],
-    [companySelectSource.browseItems, companySelectSource.remoteItems],
-  );
-
-  const companyRows = useMemo(() => {
-    let rows = [...loadedCompanyRows];
-
-    if (!companyChanged) {
-      const leadCompany = buildLeadCompanyRow({
-        companyName: rowCompanyName ?? companyName,
-        companySymbol: rowCompanySymbol,
-        timezone: rowTimezone,
-      });
-      if (
-        leadCompany &&
-        !findCompanyPickerRow(leadCompany.name, leadCompany.symbol, rows)
-      ) {
-        rows = [leadCompany, ...rows];
-      }
-    }
-
-    if (
-      pinnedCompanyRow &&
-      !findCompanyPickerRow(
-        pinnedCompanyRow.name,
-        pinnedCompanyRow.symbol,
-        rows,
-      )
-    ) {
-      rows = [pinnedCompanyRow, ...rows];
-    }
-
-    return rows;
-  }, [
-    companyChanged,
-    companyName,
-    loadedCompanyRows,
-    pinnedCompanyRow,
-    rowCompanyName,
-    rowCompanySymbol,
-    rowTimezone,
-  ]);
-
-  const selectedCompany = useMemo(() => {
-    if (pinnedCompanyRow) {
-      return pinnedCompanyRow;
-    }
-
-    return findCompanyPickerRow(
-      companyName,
-      getRowCompanySymbol({
-        companySymbol: rowCompanySymbol,
-        companyName: companyName || rowCompanyName,
-      }),
-      companyRows,
-    );
-  }, [
-    companyName,
-    companyRows,
-    pinnedCompanyRow,
-    rowCompanyName,
-    rowCompanySymbol,
-  ]);
-
-  const activeCompanySymbol = useMemo(
-    () =>
-      getRowCompanySymbol({
-        companySymbol:
-          pinnedCompanyRow?.symbol ||
-          selectedCompany?.symbol ||
-          rowCompanySymbol,
-        companyName: companyName || rowCompanyName || "",
-      }),
-    [
-      companyName,
-      pinnedCompanyRow?.symbol,
-      rowCompanyName,
-      rowCompanySymbol,
-      selectedCompany?.symbol,
-    ],
-  );
-
-  const { data: companyBySymbol } = useCompanyBySymbol(
-    activeCompanySymbol,
-    drawerOpen && Boolean(activeCompanySymbol.trim()),
-  );
-
-  const displayCompanySymbol = useMemo(() => {
-    if (companyChanged) {
-      return (
-        selectedCompany?.symbol ||
-        getRowCompanySymbol({
-          companyName,
-          companySymbol: "",
-        })
-      );
-    }
-
-    return getRowCompanySymbol({
-      companySymbol: rowCompanySymbol,
-      companyName: companyName || rowCompanyName,
-    });
-  }, [
-    companyChanged,
-    companyName,
-    rowCompanyName,
-    rowCompanySymbol,
-    selectedCompany?.symbol,
-  ]);
-
-  const displayTimezone = useMemo(() => {
-    const leadContext = {
-      companyName: companyName || rowCompanyName || "",
-      companySymbol: activeCompanySymbol,
-      timezone: rowTimezone || "",
-    };
-    const lookupCompanies = [...companyRows, ...allCompanies];
-    const activeCompany = pinnedCompanyRow ?? selectedCompany;
-
-    // companyBySymbol is the authoritative company row fetched by symbol, so it
-    // leads. getLeadCompanyTimezone falls back through the loaded company rows
-    // and, last of all, the lead's own denormalized copy.
-    return (
-      companyBySymbol?.timezone?.trim() ||
-      getLeadCompanyTimezone(leadContext, lookupCompanies, activeCompany)
-    );
-  }, [
-    activeCompanySymbol,
-    allCompanies,
-    companyBySymbol?.timezone,
-    companyName,
-    companyRows,
-    pinnedCompanyRow,
-    rowCompanyName,
-    rowTimezone,
-    selectedCompany,
-  ]);
-
-  useEffect(() => {
-    setPinnedCompanyOption(null);
-    setPinnedCompanyRow(null);
-    companySelectSource.onSearchChange("");
-  }, [rowKey, companySelectSource.onSearchChange]);
-
-  useEffect(() => {
-    if (!pinnedCompanyOption || allCompanies.length === 0) return;
-
-    const resolved = resolveCompanyFromDirectory(
-      pinnedCompanyOption,
-      pinnedCompanyRow ?? undefined,
-      allCompanies,
-    );
-
-    if (!resolved?.timezone?.trim()) return;
-
-    setPinnedCompanyRow((current) => {
-      if (
-        current?.id &&
-        resolved.id &&
-        current.id !== resolved.id &&
-        current.timezone?.trim()
-      ) {
-        return current;
-      }
-
-      if (current?.timezone?.trim() === resolved.timezone?.trim()) {
-        return current;
-      }
-
-      return resolved;
-    });
-  }, [allCompanies, pinnedCompanyOption, pinnedCompanyRow]);
-
-  useEffect(() => {
-    if (!companyBySymbol?.timezone?.trim()) return;
-
-    setPinnedCompanyRow((current) => {
-      if (
-        current?.symbol &&
-        companyBySymbol.symbol &&
-        current.symbol.trim().toUpperCase() !==
-          companyBySymbol.symbol.trim().toUpperCase()
-      ) {
-        return current;
-      }
-
-      if (current?.timezone?.trim() === companyBySymbol.timezone?.trim()) {
-        return current;
-      }
-
-      return {
-        ...(current ?? companyBySymbol),
-        ...companyBySymbol,
-      };
-    });
-  }, [companyBySymbol]);
-
-  const handleCompanyChange = (value: string | number) => {
-    const stringValue = String(value);
-    const selectedOption = companyOptions.find(
-      (option) => String(option.value) === stringValue,
-    );
-    const selectedSymbol =
-      parseCompanySymbolFromLabel(selectedOption?.label ?? "") ??
-      parseCompanySymbolFromLabel(stringValue) ??
-      undefined;
-    const selectedRow = findCompanyPickerRow(
-      stringValue,
-      selectedSymbol,
-      loadedCompanyRows,
-    );
-    const resolvedRow =
-      resolveCompanyFromDirectory(
-        selectedOption,
-        selectedRow,
-        allCompanies,
-      ) ?? selectedRow;
-
-    if (selectedOption) {
-      setPinnedCompanyOption(selectedOption);
-    }
-    if (resolvedRow) {
-      setPinnedCompanyRow(resolvedRow);
-    }
-
-    onCompanyNameChange(stringValue);
-  };
-
-  // Identity of the company the drawer is currently pointed at. Callers that
-  // let the user edit company fields (symbol / name / timezone) need the id to
-  // PATCH, and the name to seed the form when the picker re-links the lead to a
-  // different company.
-  const activeCompany = pinnedCompanyRow ?? selectedCompany ?? null;
-  const selectedCompanyId =
-    (companyBySymbol?.id || activeCompany?.id || "") || null;
-  const selectedCompanyName =
-    activeCompany?.name?.trim() || companyName?.trim() || "";
+  const displayTimezone =
+    resolveLeadTimezone(rowTimezone, company?.timezone) ?? "";
 
   return {
-    companyOptions,
-    companySelectSource,
     displayCompanySymbol,
     displayTimezone,
-    handleCompanyChange,
-    selectedCompanyId,
-    selectedCompanyName,
+    /** For `PATCH /companies/:id` when the drawer edits company fields. */
+    selectedCompanyId: company?.id || null,
+    selectedCompanyName: company?.name?.trim() || rowCompanyName?.trim() || "",
   };
 }

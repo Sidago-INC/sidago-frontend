@@ -5,9 +5,7 @@ import type { Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { ensureAbsoluteUrl } from "@/lib/url";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import {
   useSuspiciousCalls,
   useResolveFraudFlag,
@@ -82,22 +80,18 @@ function ActionButtons({
 }
 
 export function CallFraud() {
-  const { page, perPage, setPage, setPerPage } = useServerPagination(DEFAULT_PAGE_SIZE);
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage({ initialPerPage: DEFAULT_PAGE_SIZE });
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading, isError, error, refetch } = useSuspiciousCalls(
     page,
@@ -208,14 +202,6 @@ export function CallFraud() {
             href={ensureAbsoluteUrl(row.mcRecordingLink)}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(event) => {
-              event.preventDefault();
-              window.open(
-                ensureAbsoluteUrl(row.mcRecordingLink!),
-                "_blank",
-                "noopener,noreferrer",
-              );
-            }}
             className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline dark:text-indigo-400"
           >
             Listen <ExternalLink className="h-3 w-3" />

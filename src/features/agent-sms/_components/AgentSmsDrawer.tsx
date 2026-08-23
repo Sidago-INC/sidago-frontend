@@ -12,6 +12,7 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import { printHtml } from "@/lib/print-html";
 import {
   contactTypeOptions,
   leadTypeOptions,
@@ -256,26 +257,18 @@ export function AgentSmsDrawer({
       )
       .join("");
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (!printWindow) {
-      return;
-    }
-
-    printWindow.document.title = `${escapeHtml(row.companyName)} | SMS Activity`;
-    printWindow.document.body.style.cssText =
-      "font-family:Arial,sans-serif;padding:24px;color:#0f172a;";
-    printWindow.document.body.innerHTML = `
-      <h1>${escapeHtml(row.companyName)}</h1>
-      <p style="margin-bottom:20px;color:#475569;">
-        ${escapeHtml(row.fullName)} | ${escapeHtml(row.email)}
-      </p>
-      <table style="width:100%;border-collapse:collapse;">
-        ${rows}
-      </table>
-    `;
-
-    printWindow.focus();
-    printWindow.print();
+    printHtml({
+      title: `${escapeHtml(row.companyName)} | SMS Activity`,
+      body: `
+        <h1>${escapeHtml(row.companyName)}</h1>
+        <p style="margin-bottom:20px;color:#475569;">
+          ${escapeHtml(row.fullName)} | ${escapeHtml(row.email)}
+        </p>
+        <table style="width:100%;border-collapse:collapse;">
+          ${rows}
+        </table>
+      `,
+    });
   };
 
   return (

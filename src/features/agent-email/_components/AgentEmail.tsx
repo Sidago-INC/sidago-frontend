@@ -8,9 +8,7 @@ import { toggleMarkVoid } from "@/features/agent-calls/_lib/markVoid";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { AgentEmailDrawer } from "./AgentEmailDrawer";
 import {
   AgentEmailBooleanRead,
@@ -21,6 +19,7 @@ import {
 import {
   type AgentEmailRow,
   mapEmailQueueItem,
+  EMAIL_PRIORITY_OPTIONS,
 } from "../_lib/data";
 import {
   useEmailHistory,
@@ -101,21 +100,16 @@ function LeadButton({
 
 export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
   const [searchParams] = useSearchParams();
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage({ resetKey: agentSlug });
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
-
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: queueData, isLoading } = useEmailQueue(
     agentSlug,
@@ -315,49 +309,25 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
       {
         title: "Full Name",
         key: "fullName",
-        render: (row) =>
-          editingRowId === row.id ? (
-            <AgentEmailInlineTextCell
-              value={row.fullName}
-              placeholder="Full name"
-              onChange={(value) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  fullName: value,
-                }))
-              }
-            />
-          ) : (
-            <AgentEmailEditableTrigger onClick={() => setEditingRowId(row.id)}>
-              <AgentEmailReadText value={row.fullName} />
-            </AgentEmailEditableTrigger>
-          ),
+        // Read-only: identity fields are corrected from All Leads or Fix
+        // Leads, not from the email queue.
+        render: (row) => <AgentEmailReadText value={row.fullName} />,
       },
       {
         title: "Email",
         key: "email",
-        render: (row) =>
-          editingRowId === row.id ? (
-            <AgentEmailInlineTextCell
-              value={row.email}
-              placeholder="Email"
-              onChange={(value) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  email: value,
-                }))
-              }
-            />
-          ) : (
-            <AgentEmailEditableTrigger onClick={() => setEditingRowId(row.id)}>
-              <AgentEmailReadText value={row.email} />
-            </AgentEmailEditableTrigger>
-          ),
+        // Read-only: identity fields are corrected from All Leads or Fix
+        // Leads, not from the email queue.
+        render: (row) => <AgentEmailReadText value={row.email} />,
       },
       {
         title: "Email To Be Sent",
         key: "emailStatus",
         getValue: (row) => row.emailToBeSent,
+        // A closed set, so it filters from a list rather than by typing a
+        // substring of a value the user cannot see ("send_contract").
+        type: "select",
+        options: EMAIL_PRIORITY_OPTIONS,
         render: (row) => (
           <div className="px-2.5 py-1.5">
             <EmailPriorityBadge value={row.emailToBeSent} />

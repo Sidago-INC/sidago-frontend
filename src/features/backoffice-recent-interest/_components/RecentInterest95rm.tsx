@@ -1,28 +1,21 @@
 
 
 import React, { useEffect, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { useRecentInterest } from "../_lib/use-recent-interest";
 import { RecentInterestTable } from "./RecentInterestTable";
 
 export function RecentInterest95rm() {
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage();
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
-
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading, isError, error } = useRecentInterest(
     "95rm",
@@ -31,7 +24,10 @@ export function RecentInterest95rm() {
     url.grid,
   );
 
-  if (isLoading) {
+  // Only blank the page on the genuine cold start. Every later fetch keeps
+  // the previous rows on screen (see `keepPreviousData`), so returning early
+  // here would unmount the table — and the search box — on every keystroke.
+  if (isLoading && !result) {
     return (
       <div className="flex min-h-[200px] items-center justify-center text-sm text-gray-500">
         Loading recent interest…

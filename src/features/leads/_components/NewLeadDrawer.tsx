@@ -17,14 +17,21 @@ import { useMemo, useState } from "react";
 type NewLeadDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (values: LeadCreateFormValues) => void;
+  onCreate: (values: LeadCreateFormValues) => void | Promise<void>;
+  /**
+   * Opened from a lead's own page, the company is already known and must not
+   * be changed — the point is to add a colleague AT this company. Passing it
+   * here shows it as a read-only row and pre-fills the payload, so the
+   * drawer needs no company picker.
+   */
+  fixedCompany?: { id: string; label: string };
+  /** Set while the create request is in flight, to disable the footer. */
+  isSaving?: boolean;
 };
 
 const blankForm: LeadCreateFormValues = {
   companyId: "",
   fullName: "",
-  firstName: "",
-  lastName: "",
   phone: "",
   phoneExtension: "",
   email: "",
@@ -38,6 +45,8 @@ export function NewLeadDrawer({
   isOpen,
   onClose,
   onCreate,
+  fixedCompany,
+  isSaving = false,
 }: NewLeadDrawerProps) {
   const [form, setForm] = useState<LeadCreateFormValues>(blankForm);
   const [errors, setErrors] = useState<
@@ -47,16 +56,14 @@ export function NewLeadDrawer({
 
   const normalizedForm = useMemo(
     () => ({
-      companyId: form.companyId,
+      companyId: fixedCompany?.id ?? form.companyId,
       fullName: form.fullName.trim(),
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
       phone: form.phone.trim(),
       phoneExtension: form.phoneExtension.trim(),
       email: form.email.trim(),
       role: form.role.trim(),
     }),
-    [form],
+    [fixedCompany?.id, form],
   );
 
   const updateField = (field: keyof LeadCreateFormValues, value: string) => {
@@ -65,7 +72,7 @@ export function NewLeadDrawer({
   };
 
   const handleReset = () => {
-    setForm(blankForm);
+    setForm({ ...blankForm, companyId: fixedCompany?.id ?? "" });
     setErrors({});
     setConfirmOpen(false);
   };
@@ -82,8 +89,15 @@ export function NewLeadDrawer({
     setConfirmOpen(true);
   };
 
-  const handleConfirmSave = () => {
-    onCreate(normalizedForm);
+  const handleConfirmSave = async () => {
+    try {
+      // Await it: if the request fails the drawer has to stay open with the
+      // user's input intact, rather than closing and losing everything typed.
+      await onCreate(normalizedForm);
+    } catch {
+      setConfirmOpen(false);
+      return;
+    }
     handleReset();
     onClose();
   };
@@ -110,10 +124,20 @@ export function NewLeadDrawer({
             onCancel={onClose}
             onReset={handleReset}
             onSave={handleSave}
+            saveDisabled={isSaving}
+            saveLabel={isSaving ? "Saving…" : undefined}
           />
         }
       >
         <div className="grid gap-4 md:grid-cols-2">
+          {fixedCompany && (
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <span className="text-sm font-medium">Company</span>
+              <div className="rounded border border-gray-300 bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:border-gray-600 dark:bg-slate-800 dark:text-slate-200">
+                {fixedCompany.label}
+              </div>
+            </div>
+          )}
           <TextInput
             label="Full Name"
             value={form.fullName}
@@ -121,20 +145,6 @@ export function NewLeadDrawer({
             error={errors.fullName}
             className={inputClassName}
             wrapperClassName="md:col-span-2"
-          />
-          <TextInput
-            label="First Name"
-            value={form.firstName}
-            onChange={(event) => updateField("firstName", event.target.value)}
-            error={errors.firstName}
-            className={inputClassName}
-          />
-          <TextInput
-            label="Last Name"
-            value={form.lastName}
-            onChange={(event) => updateField("lastName", event.target.value)}
-            error={errors.lastName}
-            className={inputClassName}
           />
           <TextInput
             label="Phone"

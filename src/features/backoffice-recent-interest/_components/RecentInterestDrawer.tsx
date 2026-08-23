@@ -9,27 +9,28 @@ import {
   TextInput,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { openPrintFrame } from "@/lib/print-html";
 import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import {
   getLeadGridLabel,
   getLeadId,
 } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
-import { useDrawerCompanySelect } from "@/features/backoffice-shared/use-drawer-company-select";
+import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
 import {
   getCallBackDateError,
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
 import {
-  recentInterestCallResultOptions,
-  recentInterestLeadTypeOptions,
   type RecentInterestRow,
 } from "../_lib/data";
-import { ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { showSuccessToast } from "@/lib/toast";
 import Revisions from "@/features/backoffice-shared/Revisions";
+import { CALL_RESULT_OPTIONS } from "@/types/call-result.types";
+import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 
 type RecentInterestDrawerProps = {
   data: RecentInterestRow[];
@@ -70,16 +71,8 @@ function getEditableState(row: RecentInterestRow): EditableRecentInterestState {
   };
 }
 
-const callResultSelectOptions = recentInterestCallResultOptions.map(
-  (value) => ({
-    label: value,
-    value,
-  }),
-);
-const leadTypeSelectOptions = recentInterestLeadTypeOptions.map((value) => ({
-  label: value,
-  value,
-}));
+const callResultSelectOptions = CALL_RESULT_OPTIONS;
+const leadTypeSelectOptions = LEAD_TYPE_OPTIONS;
 
 function escapeHtml(value: string) {
   return value
@@ -134,20 +127,13 @@ export function RecentInterestDrawer({
   };
 
   const {
-    companyOptions,
-    companySelectSource,
     displayCompanySymbol,
     displayTimezone,
-    handleCompanyChange,
-  } = useDrawerCompanySelect({
+  } = useDrawerCompanyIdentity({
     drawerOpen,
-    rowKey,
-    companyName: form?.companyName ?? "",
-    initialCompanyName: initialForm?.companyName ?? "",
     rowCompanySymbol: row?.companySymbol,
     rowCompanyName: row?.companyName,
     rowTimezone: row?.timezone,
-    onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
   });
 
   const detailItems = useMemo(() => {
@@ -239,7 +225,7 @@ export function RecentInterestDrawer({
       return;
     }
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) {
       return;
     }
@@ -340,42 +326,32 @@ export function RecentInterestDrawer({
             </button>
             <button
               onClick={handleCopyUrl}
-              title="Copy URL"
+              title={copied ? "Copied!" : "Copy URL"}
+              aria-label={copied ? "Link copied" : "Copy link to this lead"}
               className="group flex h-7 w-7 cursor-pointer items-center justify-center rounded border border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <Link
-                className={`${iconClass} group-hover:scale-110 transition`}
-              />
+              {copied ? (
+                <Check className={`${iconClass} text-emerald-500`} />
+              ) : (
+                <Link className={`${iconClass} group-hover:scale-110 transition`} />
+              )}
             </button>
           </div>
         </div>
       }
-      footer={
-        isEditMode ? (
-          <EditableDrawerFooter
-            onCancel={() => {
-              setEditModeKey(null);
-              onClose();
-            }}
-            onReset={handleReset}
-            onSave={handleSave}
-          />
-        ) : (
-          <Revisions leadId={row?.leadId} />
-        )
-      }
+      footer={<Revisions leadId={row?.leadId} />}
     >
-      <div className="space-y-5" onFocus={handleEditStart}>
+      {/* Recent Interest is a reporting view. The Save / Cancel / Reset footer
+          used to appear the moment a field took focus; the customer asked for
+          it to go. The fields are disabled to match, so nothing can be typed
+          here and then silently lost with no way to save it. */}
+      <fieldset disabled className="space-y-5 border-0 p-0 m-0">
         <DetailCard>
           <DrawerCompanyField
-            rowKey={rowKey}
             badgeIndex={data.findIndex((item) => item.email === row.email)}
             companyName={form.companyName}
             displayCompanySymbol={displayCompanySymbol}
             displayTimezone={displayTimezone}
-            companyOptions={companyOptions}
-            companySelectSource={companySelectSource}
-            onCompanyChange={handleCompanyChange}
           />
         </DetailCard>
 
@@ -462,7 +438,7 @@ export function RecentInterestDrawer({
             />
           </EditableField>
         </DetailCard>
-      </div>
+      </fieldset>
     </Drawer>
   );
 }

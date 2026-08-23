@@ -9,6 +9,7 @@ import {
   TypeBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { openPrintFrame } from "@/lib/print-html";
 import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import { getLeadId, type EverBeenHotRow } from "../_lib/data";
 import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
@@ -16,7 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
-import { useDrawerCompanySelect } from "@/features/backoffice-shared/use-drawer-company-select";
+import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -198,20 +199,13 @@ export function EverBeenHotDrawer({
   };
 
   const {
-    companyOptions,
-    companySelectSource,
     displayCompanySymbol,
     displayTimezone,
-    handleCompanyChange,
-  } = useDrawerCompanySelect({
+  } = useDrawerCompanyIdentity({
     drawerOpen,
-    rowKey,
-    companyName: form?.companyName ?? "",
-    initialCompanyName: initialForm?.companyName ?? "",
     rowCompanySymbol: row?.companySymbol,
     rowCompanyName: row?.companyName,
     rowTimezone: row?.timezone,
-    onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
   });
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
@@ -367,7 +361,7 @@ export function EverBeenHotDrawer({
   const handlePrint = () => {
     if (typeof window === "undefined") return;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) return;
 
     const rowsMarkup = detailItems
@@ -459,12 +453,15 @@ export function EverBeenHotDrawer({
             </button>
             <button
               onClick={handleCopyUrl}
-              title="Copy URL"
+              title={copied ? "Copied!" : "Copy URL"}
+              aria-label={copied ? "Link copied" : "Copy link to this lead"}
               className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <Link
-                className={`${iconClass} group-hover:scale-110 transition`}
-              />
+              {copied ? (
+                <Check className={`${iconClass} text-emerald-500`} />
+              ) : (
+                <Link className={`${iconClass} group-hover:scale-110 transition`} />
+              )}
             </button>
           </div>
         </div>
@@ -493,14 +490,10 @@ export function EverBeenHotDrawer({
       <div className="space-y-5">
         <DetailCard>
           <DrawerCompanyField
-            rowKey={rowKey}
             badgeIndex={data.findIndex((item) => item.email === row.email)}
             companyName={form.companyName}
             displayCompanySymbol={displayCompanySymbol}
             displayTimezone={displayTimezone}
-            companyOptions={companyOptions}
-            companySelectSource={companySelectSource}
-            onCompanyChange={handleCompanyChange}
           />
         </DetailCard>
 

@@ -2,7 +2,7 @@
 
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import clsx from "clsx";
-import { CircleHelp, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Plus, Trash2 } from "lucide-react";
 import React, { type Dispatch, type SetStateAction } from "react";
 import { DateInput } from "../DateInput";
 import { DateRangePicker } from "../DateRangePicker";
@@ -17,15 +17,19 @@ import type {
 } from "./types";
 import {
   GROUP_DEPTH_CAN_CREATE_CHILD_GROUPS,
+  convertFilterValue,
   createFilterGroup,
   createFilterItem,
   getColumnType,
   getDefaultOperatorForColumnType,
   getFilterOperatorOptions,
+  isMultiValueOperator,
   operatorNeedsValue,
   parseDateRangeFilterValue,
+  parseMultiValue,
   removeFilterItem,
   serializeDateRangeFilterValue,
+  serializeMultiValue,
   updateFilterCondition,
   updateFilterGroup,
 } from "./utils";
@@ -54,6 +58,16 @@ function FilterConditionRow({
 }: FilterConditionRowProps) {
   const selectedColumn = columnMap.get(condition.field);
   const selectedColumnType = getColumnType(selectedColumn);
+  // A closed set (Timezone, Lead Type, Contact Type) can be picked from a
+  // list. Open-ended columns like Lead ID or Company Symbol declare `options`
+  // built from the rows on screen — on a server-paged grid that is only the
+  // current 100 of 36,000, so those keep the free-text box.
+  const selectOptions =
+    selectedColumnType === "select" && selectedColumn?.options?.length
+      ? selectedColumn.options
+      : null;
+  const useSelectValue =
+    Boolean(selectOptions) && selectOptions!.length <= SELECT_FILTER_MAX_OPTIONS;
   const filterOperatorOptions = getFilterOperatorOptions(selectedColumnType);
   const selectedRange = parseDateRangeFilterValue(condition.value);
 
@@ -86,11 +100,20 @@ function FilterConditionRow({
             onChange({
               ...condition,
               operator,
-              value: operatorNeedsValue(operator) ? condition.value : "",
+              // Carry the value across where it still means something: moving
+              // "is EST" to "is any of" should keep EST ticked, not blank the
+              // condition. Moving the other way keeps the first choice.
+              value: convertFilterValue(
+                condition.value,
+                condition.operator,
+                operator,
+              ),
             });
           }}
           options={filterOperatorOptions}
           placeholder=""
+          searchable
+          searchPlaceholder="Find an operator"
           className="h-10 rounded-none border-0 border-r border-slate-200 text-xs dark:border-slate-700"
           floatingOptions
         />
@@ -114,6 +137,23 @@ function FilterConditionRow({
               className="h-8 rounded-sm border-0 px-2"
             />
           </div>
+        ) : useSelectValue && isMultiValueOperator(condition.operator) ? (
+          <MultiValuePicker
+            options={selectOptions!}
+            value={condition.value}
+            onChange={(next) => onChange({ ...condition, value: next })}
+          />
+        ) : useSelectValue ? (
+          <Select
+            value={condition.value}
+            onChange={(value) =>
+              onChange({ ...condition, value: String(value) })
+            }
+            options={selectOptions!}
+            placeholder="Select a value"
+            className="h-10 rounded-none border-0 border-r border-slate-200 bg-white px-4 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-gray-100"
+            floatingOptions
+          />
         ) : selectedColumnType === "date" ? (
           <DateInput
             value={condition.value}
@@ -405,6 +445,65 @@ interface FilterPanelProps {
   activeFilterConditionCount: number;
   buttonClassName: string;
   onAppendToGroup: (groupId: string, item: FilterItem) => void;
+}
+
+// Above this many distinct values a dropdown stops being easier than typing,
+// and it is a sign the list came from the loaded page rather than a real
+// enumeration.
+const SELECT_FILTER_MAX_OPTIONS = 60;
+
+/** Tick-list for "is any of" / "is none of". */
+function MultiValuePicker({
+  options,
+  value,
+  onChange,
+}: {
+  options: Array<{ label: string; value: string }>;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const selected = new Set(parseMultiValue(value));
+
+  const toggle = (option: string) => {
+    const next = new Set(selected);
+    if (next.has(option)) next.delete(option);
+    else next.add(option);
+    onChange(serializeMultiValue([...next]));
+  };
+
+  return (
+    <Popover className="relative border-r border-slate-200 dark:border-slate-700">
+      <PopoverButton className="flex h-10 w-full cursor-pointer items-center justify-between gap-2 px-4 text-left text-xs text-slate-900 dark:text-gray-100">
+        <span className="truncate">
+          {selected.size === 0
+            ? "Select values"
+            : selected.size === 1
+              ? [...selected][0]
+              : `${selected.size} selected`}
+        </span>
+        <ChevronDown size={13} className="shrink-0 text-slate-400" />
+      </PopoverButton>
+
+      <PopoverPanel
+        anchor="bottom start"
+        className="z-[500] max-h-64 w-56 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950"
+      >
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => toggle(option.value)}
+            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            <span className="truncate">{option.label}</span>
+            {selected.has(option.value) && (
+              <Check size={13} className="shrink-0 text-emerald-500" />
+            )}
+          </button>
+        ))}
+      </PopoverPanel>
+    </Popover>
+  );
 }
 
 export function FilterPanel({

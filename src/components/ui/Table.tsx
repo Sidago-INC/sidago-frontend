@@ -1,6 +1,13 @@
 
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
-import { Ellipsis, FileDown, Printer, Search, X } from "lucide-react";
+import {
+  Ellipsis,
+  FileDown,
+  Loader2,
+  Printer,
+  Search,
+  X,
+} from "lucide-react";
 import React, { useEffect } from "react";
 import { FilterPanel } from "./table/FilterPanel";
 import { GroupPanel } from "./table/GroupPanel";
@@ -100,11 +107,12 @@ export function Table<T>({
     paginationEnd,
     totalCount,
     activeFilterConditionCount,
+    hasActiveSearch,
     paginationContextKey,
     closeSearch,
     handlePrintPage,
     handlePrintData,
-    handleExportSvg,
+    handleExportCsv,
     setPageState,
     appendFilterItemToGroup,
   } = state;
@@ -112,6 +120,19 @@ export function Table<T>({
   useEffect(() => {
     onRowsPerPageChange?.(rowsPerPage);
   }, [onRowsPerPageChange, rowsPerPage]);
+
+  // A grouped grid is paginated, so a group of 18,383 rows can never be
+  // "expanded" on a 100-row page. Clicking one therefore OPENS it: the grid
+  // filters to that group and you page inside it. That is why the other groups
+  // disappear — they have no rows once the filter is on. This finds that
+  // filter so the grid can offer a way back out.
+  const groupField = groupRules[0]?.field;
+  const openedGroup =
+    groupField && filterItems.length === 1 && filterItems[0].type === "condition"
+      ? filterItems[0].condition.field === groupField
+        ? filterItems[0].condition.value || "(blank)"
+        : null
+      : null;
 
   const handleTableScrollKeys = (
     event: React.KeyboardEvent<HTMLDivElement>,
@@ -171,7 +192,15 @@ export function Table<T>({
     scrollContainerRef.current?.focus({ preventScroll: true });
   };
 
-  if (isLoading) {
+  // The skeleton replaces the whole table, toolbar included. Show it only on
+  // the cold start, when there is genuinely nothing to display. Doing it on
+  // every load unmounted the search input the user was typing into, which is
+  // what made typing look like a page reload.
+  const hasRows = data.length > 0;
+  const showSkeleton = Boolean(isLoading) && !hasRows;
+  const isRefreshing = Boolean(isLoading) && hasRows;
+
+  if (showSkeleton) {
     return (
       <div className="space-y-3 rounded-2xl bg-white p-4 dark:bg-slate-900">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -201,6 +230,13 @@ export function Table<T>({
         )}
 
         <div className="flex w-full min-w-0 items-center justify-end gap-1 sm:gap-2 md:w-auto">
+          {isRefreshing && (
+            <Loader2
+              size={15}
+              className="animate-spin text-slate-400 dark:text-slate-500"
+              aria-label="Refreshing"
+            />
+          )}
           {headerContent}
 
           <GroupPanel
@@ -271,10 +307,15 @@ export function Table<T>({
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className={TOOLBAR_ICON_BUTTON_CLASS}
-              aria-label="Open search"
+              className={`relative ${TOOLBAR_ICON_BUTTON_CLASS}`}
+              aria-label={
+                hasActiveSearch ? "Open search (active)" : "Open search"
+              }
             >
               <Search size={15} />
+              {hasActiveSearch && (
+                <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-sky-500" />
+              )}
             </button>
           )}
 
@@ -305,7 +346,7 @@ export function Table<T>({
               </button>
               <button
                 type="button"
-                onClick={handleExportSvg}
+                onClick={handleExportCsv}
                 className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
               >
                 <FileDown size={16} />
@@ -316,6 +357,24 @@ export function Table<T>({
         </div>
       </div>
 
+      {openedGroup && (
+        <div className="mb-2 flex shrink-0 items-center gap-2 px-4 text-xs text-slate-600 dark:text-slate-300">
+          <span>
+            Showing only{" "}
+            <strong className="font-semibold text-slate-900 dark:text-slate-100">
+              {openedGroup}
+            </strong>
+          </span>
+          <button
+            type="button"
+            onClick={() => setFilterItems([])}
+            className="cursor-pointer rounded-md border border-slate-300 px-2 py-0.5 font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Show all groups
+          </button>
+        </div>
+      )}
+
       <div
         ref={scrollContainerRef}
         tabIndex={0}
@@ -324,7 +383,12 @@ export function Table<T>({
         className="min-h-0 flex-1 overflow-auto px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
         aria-label="Scrollable table"
       >
-        <table ref={tableElementRef} className="min-w-240 w-full">
+        <table
+          ref={tableElementRef}
+          className={`min-w-240 w-full transition-opacity ${
+            isRefreshing ? "opacity-60" : "opacity-100"
+          }`}
+        >
           <thead className="text-xs uppercase tracking-wide text-gray-500 transition-colors dark:text-white">
             <tr>
               {columns.map((col) => (
@@ -354,11 +418,40 @@ export function Table<T>({
             emptyState={emptyState}
             emptyText={emptyText}
             safeCurrentPage={safeCurrentPage}
+            onShowOnlyGroup={
+              // Only meaningful for a server grid, where "show only this group"
+              // means adding a filter the API can apply across every page.
+              serverGrid && groupRules[0]?.field
+                ? (group) => {
+                    const field = groupRules[0].field;
+                    const value = group.value ?? "";
+                    // Keep the grouping. Scoping to a group used to clear it,
+                    // which made clicking EST look like grouping had switched
+                    // itself off. With the filter applied AND groupBy still on,
+                    // the server returns one group — EST with its real total —
+                    // and the pages you now page through are all EST.
+                    setFilterItems([
+                      {
+                        id: `only-${field}`,
+                        type: "condition",
+                        condition: {
+                          id: `only-${field}-c`,
+                          field,
+                          operator: value ? "is" : "is_empty",
+                          value,
+                        },
+                      },
+                    ]);
+                  }
+                : undefined
+            }
           />
         </table>
       </div>
 
-      {!groupedData && (processedData.length > 0 || serverPagination) && (
+      {/* Pagination used to be hidden whenever grouping was on, which left
+          the user stuck on page 1 of a grouped view on every page in the CRM. */}
+      {(processedData.length > 0 || serverPagination) && (
         <div className="shrink-0">
           <TablePagination
             paginationStart={paginationStart}

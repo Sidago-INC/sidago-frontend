@@ -16,6 +16,7 @@ import type { CallsFormState, CallsModalState } from "@/types";
 import { getAgentKeyFromCookie, getCallBackDateError, getDialErrorMessage } from "./_lib/utils";
 import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
+import { QueuePriorityNotice } from "./_components/QueuePriorityNotice";
 import {
   formatCallsHistory,
   formatNotesHistory,
@@ -351,6 +352,8 @@ export function AgentCalls() {
       />
 
       <main className="space-y-3 px-4 py-4 sm:space-y-4 sm:px-4 sm:py-6">
+        <QueuePriorityNotice leads={leads} />
+
         <HeroCard
           currentLead={currentLead}
           onCall={handleCallCurrentLead}

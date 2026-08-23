@@ -22,6 +22,17 @@ interface GroupedRowsProps<T> {
   onToggleGroup: (id: string) => void;
   showCounts: boolean;
   pageKey: string;
+  onShowOnlyGroup?: (group: GroupNode<T>) => void;
+}
+
+/**
+ * True when the server counted rows for this group but none of them are on the
+ * page currently loaded. Such a group renders collapsed with its real total,
+ * and clicking it filters down to that group rather than expanding onto
+ * nothing.
+ */
+function isEmptyHere<T>(group: GroupNode<T>): boolean {
+  return group.rows.length === 0 && (group.count ?? 0) > 0;
 }
 
 function GroupedRows<T>({
@@ -32,6 +43,7 @@ function GroupedRows<T>({
   onToggleGroup,
   showCounts,
   pageKey,
+  onShowOnlyGroup,
 }: GroupedRowsProps<T>): React.ReactNode {
   return groups.map((group) => (
     <React.Fragment key={group.id}>
@@ -39,14 +51,23 @@ function GroupedRows<T>({
         <td colSpan={columns.length} className="px-4 py-2">
           <button
             type="button"
-            onClick={() => onToggleGroup(group.id)}
+            onClick={() =>
+              isEmptyHere(group) && onShowOnlyGroup
+                ? onShowOnlyGroup(group)
+                : onToggleGroup(group.id)
+            }
+            title={
+              isEmptyHere(group)
+                ? `Show only ${group.label} (${group.count ?? 0} rows)`
+                : undefined
+            }
             className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100 cursor-pointer dark:text-slate-200 dark:hover:bg-slate-800"
           >
             <span
               className="flex items-center gap-2"
               style={{ paddingLeft: `${group.level * 16}px` }}
             >
-              {collapsedGroups[group.id] ? (
+              {isEmptyHere(group) || collapsedGroups[group.id] ? (
                 <ChevronRight size={16} />
               ) : (
                 <ChevronDown size={16} />
@@ -57,12 +78,18 @@ function GroupedRows<T>({
                   {group.count ?? group.rows.length}
                 </span>
               )}
+              {isEmptyHere(group) && onShowOnlyGroup && (
+                <span className="text-xs font-normal text-indigo-500 dark:text-indigo-400">
+                  Open
+                </span>
+              )}
             </span>
           </button>
         </td>
       </tr>
 
-      {!collapsedGroups[group.id] &&
+      {!isEmptyHere(group) &&
+        !collapsedGroups[group.id] &&
         (group.children && group.children.length > 0 ? (
           <GroupedRows
             groups={group.children}
@@ -72,6 +99,7 @@ function GroupedRows<T>({
             onToggleGroup={onToggleGroup}
             showCounts={showCounts}
             pageKey={pageKey}
+            onShowOnlyGroup={onShowOnlyGroup}
           />
         ) : (
           group.rows.map((row, index) => (
@@ -111,6 +139,7 @@ interface TableBodyProps<T> {
   emptyState?: React.ReactNode;
   emptyText: string;
   safeCurrentPage: number;
+  onShowOnlyGroup?: (group: GroupNode<T>) => void;
 }
 
 export function TableBody<T>({
@@ -124,6 +153,7 @@ export function TableBody<T>({
   emptyState,
   emptyText,
   safeCurrentPage,
+  onShowOnlyGroup,
 }: TableBodyProps<T>) {
   return (
     <tbody className="divide-y divide-slate-200/80 dark:divide-slate-600">
@@ -136,6 +166,7 @@ export function TableBody<T>({
           onToggleGroup={onToggleGroup}
           showCounts={showCounts}
           pageKey={String(safeCurrentPage)}
+          onShowOnlyGroup={onShowOnlyGroup}
         />
       ) : paginatedData.length === 0 ? (
         <tr>

@@ -1,9 +1,12 @@
+// Exactly the values present in lead_brand_state.lead_type. This list used
+// to say "Fixed", which does not exist in the column — filtering by it
+// returned nothing and setting it produced a lead type nothing else knew.
 export const LEAD_TYPE_VALUES = [
   "Can't Locate",
   "Company Not Found",
   "Contract Closed",
   "DNC",
-  "Fixed",
+  "Fix",
   "General",
   "Hot",
   "Ignore",

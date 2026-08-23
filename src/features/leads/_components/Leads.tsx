@@ -9,9 +9,7 @@ import {
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { LeadsDrawer } from "./LeadsDrawer";
 import {
   assigneeOptions,
@@ -24,21 +22,18 @@ import { useLeadsDirectory } from "../_lib/hooks";
 export function Leads() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+    debouncedSearch,
+  } = useGridPage();
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading } = useLeadsDirectory(
     page,

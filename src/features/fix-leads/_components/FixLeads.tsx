@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Wave } from "@/components/ui";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import {
   Ban,
   CheckCircle2,
@@ -26,25 +24,22 @@ import {
 import { FixLeadsTable } from "./FixLeadsTable";
 
 export function FixLeads() {
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+    debouncedSearch,
+  } = useGridPage();
   const [contactsFilter, setContactsFilter] = useState<ContactsFilter | "">("");
   const [hasOtherContacts, setHasOtherContacts] = useState(false);
   const [timezone, setTimezone] = useState("");
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
   const [socketStats, setSocketStats] = useState<LeadStatsSummary | null>(null);
 
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const today = useMemo(() => new Date(), []);
   const todayStr = toYMD(today);

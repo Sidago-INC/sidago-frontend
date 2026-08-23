@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
   buildPaginationParams,
@@ -50,6 +50,10 @@ export function useLevel2History(
       const parsed = parsePaginatedResponse<Level2HistoryRow>(json);
       return { ...parsed, meta: { ...parsed.meta, groups: json.meta.groups } };
     },
+    // Grid data: hold the previous page on screen while the next one loads.
+    // Without this the hook drops to isLoading/undefined between keystrokes and
+    // the page unmounts itself, taking the search box with it.
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 }
