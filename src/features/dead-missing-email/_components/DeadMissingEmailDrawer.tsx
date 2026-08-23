@@ -8,6 +8,7 @@ import {
   TypeBadge,
 } from "@/components/ui";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { openPrintFrame } from "@/lib/print-html";
 import { useEffect, useMemo, useState } from "react";
 import {
   getDeadEmailBrandLabel,
@@ -108,7 +109,7 @@ export function DeadMissingEmailDrawer({
   const handlePrint = () => {
     if (!row || typeof window === "undefined") return;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) return;
 
     const rows = [

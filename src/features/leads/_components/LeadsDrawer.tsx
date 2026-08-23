@@ -7,16 +7,16 @@ import {
   Select,
   Textarea,
   TextInput,
-  TypeBadge,
   Wave,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { openPrintFrame } from "@/lib/print-html";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import Revisions from "@/features/backoffice-shared/Revisions";
 import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
-import { useDrawerCompanySelect } from "@/features/backoffice-shared/use-drawer-company-select";
+import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
 import {
   useUpdateLead,
   type LeadPatchBody,
@@ -300,22 +300,15 @@ export function LeadsDrawer({
   };
 
   const {
-    companyOptions,
-    companySelectSource,
     displayCompanySymbol,
     displayTimezone,
-    handleCompanyChange,
     selectedCompanyId,
     selectedCompanyName,
-  } = useDrawerCompanySelect({
+  } = useDrawerCompanyIdentity({
     drawerOpen,
-    rowKey,
-    companyName: form?.companyName ?? "",
-    initialCompanyName: initialForm?.companyName ?? "",
     rowCompanySymbol: displayRow?.companySymbol,
     rowCompanyName: displayRow?.companyName,
     rowTimezone: displayRow?.timezone,
-    onCompanyNameChange: (companyName) => updateForm("companyName", companyName),
   });
 
   // Symbol / name / timezone live on `companies`, so they are edited against a
@@ -471,8 +464,14 @@ export function LeadsDrawer({
           <button
             onClick={handleCopyUrl}
             className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      title={copied ? "Copied!" : "Copy URL"}
+            aria-label={copied ? "Link copied" : "Copy link to this lead"}
           >
-            <Link className={`${iconClass} group-hover:scale-110 transition`} />
+            {copied ? (
+              <Check className={`${iconClass} text-emerald-500`} />
+            ) : (
+              <Link className={`${iconClass} group-hover:scale-110 transition`} />
+            )}
           </button>
         </div>
       ) : null}
@@ -686,7 +685,7 @@ export function LeadsDrawer({
 
   const handlePrint = () => {
     if (typeof window === "undefined") return;
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) return;
 
     const rowsMarkup = detailItems
@@ -773,14 +772,10 @@ export function LeadsDrawer({
       <div className="space-y-5" onFocus={handleEditStart}>
         <DetailCard>
           <DrawerCompanyField
-            rowKey={rowKey}
             badgeIndex={data.findIndex((item) => item.leadId === row.leadId)}
             companyName={form.companyName}
             displayCompanySymbol={displayCompanySymbol}
             displayTimezone={displayTimezone}
-            companyOptions={companyOptions}
-            companySelectSource={companySelectSource}
-            onCompanyChange={handleCompanyChange}
             companyEdit={{
               symbol: companyForm.symbol,
               name: companyForm.name,

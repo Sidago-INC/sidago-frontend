@@ -27,40 +27,6 @@ export const recentInterestLeadOptions = [
   "Hot Lead",
 ];
 
-export const recentInterestCampaignOptions = [
-  "Current Interest",
-  "Reactivation",
-  "Inbound",
-  "Outbound",
-  "Referral",
-];
-
-export const recentInterestAssigneeOptions = [
-  "Hasib",
-  "Nafis",
-  "Asha",
-  "Rafi",
-  "Maliha",
-  "Tanvir",
-];
-
-export const recentInterestCallResultOptions = [
-  "Interested",
-  "Call Lead Back",
-  "No Answer",
-  "Left Message",
-  "Meeting Booked",
-  "Qualified",
-];
-
-export const recentInterestLeadTypeOptions = [
-  "Hot",
-  "Warm",
-  "Cold",
-  "General",
-  "Referral",
-];
-
 export const svgRecentInterestData: RecentInterestRow[] =
   generateRecentInterestRows(10);
 export const rm95RecentInterestData: RecentInterestRow[] =

@@ -15,8 +15,6 @@ import { useMemo, useState } from "react";
 const blankForm: LeadCreateFormValues = {
   companyId: "",
   fullName: "",
-  firstName: "",
-  lastName: "",
   phone: "",
   phoneExtension: "",
   email: "",
@@ -50,8 +48,6 @@ export function AddLeadForm() {
     () => ({
       companyId: form.companyId,
       fullName: form.fullName.trim(),
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
       phone: form.phone.trim(),
       phoneExtension: form.phoneExtension.trim(),
       email: form.email.trim(),
@@ -83,8 +79,6 @@ export function AddLeadForm() {
       const response = await createLead({
         companyId: normalizedForm.companyId,
         fullName: normalizedForm.fullName,
-        firstName: normalizedForm.firstName,
-        lastName: normalizedForm.lastName,
         phone: normalizedForm.phone,
         phoneExtension: normalizedForm.phoneExtension,
         email: normalizedForm.email,
@@ -155,24 +149,6 @@ export function AddLeadForm() {
                 error={errors.fullName}
                 className={inputClassName}
                 wrapperClassName="md:col-span-2"
-              />
-              <TextInput
-                label="First Name"
-                value={form.firstName}
-                onChange={(event) =>
-                  updateField("firstName", event.target.value)
-                }
-                error={errors.firstName}
-                className={inputClassName}
-              />
-              <TextInput
-                label="Last Name"
-                value={form.lastName}
-                onChange={(event) =>
-                  updateField("lastName", event.target.value)
-                }
-                error={errors.lastName}
-                className={inputClassName}
               />
               <PhoneInputField
                 value={form.phone}

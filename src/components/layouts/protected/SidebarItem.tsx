@@ -4,7 +4,7 @@ import { type NavigationItem } from "@/lib/navigation";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 
 export type Props = {
@@ -90,10 +90,16 @@ export const SidebarItem = ({
     routeSignature,
     value: null,
   });
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
   const isOpen =
     manualOpenState.routeSignature === routeSignature
       ? (manualOpenState.value ?? isBranchActive)
       : isBranchActive;
+  // Any navigation closes the flyout, otherwise it hangs over the new page.
+  useEffect(() => {
+    setFlyoutOpen(false);
+  }, [currentPath, currentSearch]);
+
   const showIcon = depth === 0;
   const labelClassName =
     depth === 0
@@ -158,10 +164,55 @@ export const SidebarItem = ({
   return (
     <div className={clsx("space-y-1", !isCollapsed && depth > 0 && "ml-4")}>
       {hasChildren ? (
-        <button
-          type="button"
-          onClick={() => {
-            if (!isCollapsed) {
+        isCollapsed ? (
+          // Collapsed, the label is hidden and there is no room to expand in
+          // place, so the children open in a flyout beside the icon. Before
+          // this the button's handler was wrapped in `if (!isCollapsed)` and
+          // the child list in `!isCollapsed &&`, so a collapsed Reports menu
+          // was a button that did nothing and could never reveal its pages.
+          <div
+            className="relative"
+            onMouseEnter={() => setFlyoutOpen(true)}
+            onMouseLeave={() => setFlyoutOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setFlyoutOpen((open) => !open)}
+              aria-expanded={flyoutOpen}
+              aria-haspopup="menu"
+              title={item.label}
+              className={clsx(baseClasses, "cursor-pointer")}
+            >
+              {content}
+            </button>
+
+            {flyoutOpen && (
+              <div
+                role="menu"
+                className="absolute left-full top-0 z-50 ml-2 min-w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+              >
+                <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  {item.label}
+                </p>
+                {item.children!.map((child, index) => (
+                  <SidebarItem
+                    key={`${resolvedKey}-flyout-${child.href ?? child.label}-${index}`}
+                    item={child}
+                    isCollapsed={false}
+                    currentPath={currentPath}
+                    currentSearch={currentSearch}
+                    allowLabelWrap={allowLabelWrap}
+                    depth={depth + 1}
+                    itemKey={`${resolvedKey}-${child.label}-${index}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
               setManualOpenState((current) => ({
                 routeSignature,
                 value:
@@ -169,13 +220,13 @@ export const SidebarItem = ({
                     ? !(current.value ?? isBranchActive)
                     : !isBranchActive,
               }));
-            }
-          }}
-          title={item.label}
-          className={clsx(baseClasses, "cursor-pointer")}
-        >
-          {content}
-        </button>
+            }}
+            title={item.label}
+            className={clsx(baseClasses, "cursor-pointer")}
+          >
+            {content}
+          </button>
+        )
       ) : item.href ? (
         <Link to={item.href} title={item.label} className={baseClasses}>
           {content}

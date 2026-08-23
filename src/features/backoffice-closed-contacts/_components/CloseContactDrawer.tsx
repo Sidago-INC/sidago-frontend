@@ -11,6 +11,7 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { openPrintFrame } from "@/lib/print-html";
 import type { ClosedContactRow } from "../_lib/data";
 import {
   type ClosedContactsTabKey,
@@ -346,7 +347,7 @@ export function ClosedContactDrawer({
   const handlePrint = () => {
     if (typeof window === "undefined") return;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) return;
 
     const rowsMarkup = detailItems

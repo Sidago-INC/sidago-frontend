@@ -1,16 +1,16 @@
 import { getCompanySymbol } from "@/features/backoffice-shared/constants";
 import type { EmailQueueItem } from "./apiTypes";
 
+// Exactly the values `lead_brand_state_email_status_check` permits. "4th" and
+// "5th" used to be listed here and would be rejected by that constraint.
 export const EMAIL_PRIORITY_VALUES = [
   "1st",
   "2nd",
   "3rd",
-  "4th",
-  "5th",
+  "finished",
   "send_contract",
   "resend_contract",
   "lukewarm",
-  "finished",
 ] as const;
 
 export type EmailPriority = (typeof EMAIL_PRIORITY_VALUES)[number];
@@ -19,13 +19,18 @@ export const EMAIL_STATUS_LABELS: Record<string, string> = {
   "1st": "1st",
   "2nd": "2nd",
   "3rd": "3rd",
-  "4th": "4th",
-  "5th": "5th",
   send_contract: "Send Contract",
   resend_contract: "Resend Contract",
   lukewarm: "Lukewarm",
   finished: "Finished",
 };
+
+/** Filter/select options, label-formatted. */
+export const EMAIL_PRIORITY_OPTIONS: { value: string; label: string }[] =
+  EMAIL_PRIORITY_VALUES.map((value) => ({
+    value,
+    label: EMAIL_STATUS_LABELS[value] ?? value,
+  }));
 
 export function formatEmailStatusLabel(value: string | null | undefined): string {
   const normalized = (value ?? "").trim();

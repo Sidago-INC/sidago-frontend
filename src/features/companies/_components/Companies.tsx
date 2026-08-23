@@ -10,9 +10,7 @@ import { type COMPANY } from "@/types/company.types";
 import { TIMEZONE_OPTIONS, type TIMEZONE } from "@/types/timezone.types";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { CompanyDrawer } from "./CompanyDrawer";
 import {
   useCompanyOptions,
@@ -93,21 +91,17 @@ const EMPTY_COMPANY: COMPANY = {
 
 export function Companies() {
   const [searchParams] = useSearchParams();
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage();
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading } = useCompanyOptions(page, perPage, url.grid);
   const updateCompany = useUpdateCompany();

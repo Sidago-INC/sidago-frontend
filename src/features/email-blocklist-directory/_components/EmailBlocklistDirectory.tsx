@@ -7,9 +7,7 @@ import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 import {
   getBrandLabel,
@@ -35,23 +33,17 @@ function HistoryCell({ count }: { count: number }) {
 export function EmailBlocklistDirectory() {
   const [searchParams] = useSearchParams();
   const selectedLead = searchParams.get("lead");
-  const { page, perPage, setPage, setPerPage } = useServerPagination(
-    DEFAULT_ROWS_PER_PAGE,
-  );
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage({ initialPerPage: DEFAULT_ROWS_PER_PAGE });
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading, isError, error, refetch } =
     useEmailBlacklistDirectory(page, perPage, url.grid);

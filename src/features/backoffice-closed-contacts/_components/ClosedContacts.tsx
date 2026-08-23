@@ -3,9 +3,7 @@
 import clsx from "clsx";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import React, { useEffect, useMemo, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { closedContactsTabs, type ClosedContactsTabKey } from "../_lib/data";
 import { useClosedContracts } from "../_lib/use-closed-contacts";
 import { ClosedContactsTable } from "./ClosedContactsTable";
@@ -32,21 +30,16 @@ export function ClosedContacts() {
     [activeTab],
   );
 
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage({ resetKey: activeTab });
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
-
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading, isError, error } = useClosedContracts(
     activeView.category,

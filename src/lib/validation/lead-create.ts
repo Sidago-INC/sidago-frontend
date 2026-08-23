@@ -4,8 +4,6 @@ import { email, maxLength, required } from "./index";
 export type LeadCreateFormValues = {
   companyId: string;
   fullName: string;
-  firstName: string;
-  lastName: string;
   phone: string;
   phoneExtension: string;
   email: string;
@@ -23,14 +21,6 @@ export const leadCreateValidationSchema: Record<
   fullName: [
     required("Full name is required."),
     maxLength(120, "Full name must be 120 characters or fewer."),
-  ],
-  firstName: [
-    required("First name is required."),
-    maxLength(80, "First name must be 80 characters or fewer."),
-  ],
-  lastName: [
-    required("Last name is required."),
-    maxLength(80, "Last name must be 80 characters or fewer."),
   ],
   phone: [
     required("Phone is required."),

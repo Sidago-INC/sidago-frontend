@@ -1,28 +1,21 @@
 
 
 import React, { useEffect, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import { UnassignedHotTable } from "./UnassignedHotTable";
 import { useUnassignedHot } from "../_lib/use-unassigned-hot";
 
 export function UnassignedHotSvg() {
-  const { page, perPage, setPage, setPerPage } = useServerPagination();
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage();
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
-
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading, isError, error } = useUnassignedHot(
     "svg",
@@ -31,7 +24,10 @@ export function UnassignedHotSvg() {
     url.grid,
   );
 
-  if (isLoading) {
+  // Only blank the page on the genuine cold start. Every later fetch keeps
+  // the previous rows on screen (see `keepPreviousData`), so returning early
+  // here would unmount the table — and the search box — on every keystroke.
+  if (isLoading && !result) {
     return (
       <div className="flex min-h-50 items-center justify-center text-sm text-gray-500">
         Loading unassigned hot leads…

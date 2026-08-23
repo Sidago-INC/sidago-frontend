@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { PaginationMeta } from "@/lib/pagination";
 import { resolveLeaderboardBadgeStatuses } from "@/lib/resolveLeaderboardBadge";
@@ -352,6 +352,10 @@ export function useAgentHotAndClosed(
         `/dashboard/hot-and-closed?agentSlug=${agentSlug}&page=${page}&limit=${limit}`,
       ) as Promise<HotAndClosedResponse>,
     enabled: Boolean(agentSlug),
+    // Grid data: hold the previous page on screen while the next one loads.
+    // Without this the hook drops to isLoading/undefined between keystrokes and
+    // the page unmounts itself, taking the search box with it.
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }

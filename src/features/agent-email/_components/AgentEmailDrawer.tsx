@@ -13,6 +13,7 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import { printHtml } from "@/lib/print-html";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -284,26 +285,18 @@ export function AgentEmailDrawer({
       )
       .join("");
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (!printWindow) {
-      return;
-    }
-
-    printWindow.document.title = `${escapeHtml(row.companyName)} | Email Activity`;
-    printWindow.document.body.style.cssText =
-      "font-family:Arial,sans-serif;padding:24px;color:#0f172a;";
-    printWindow.document.body.innerHTML = `
-      <h1>${escapeHtml(row.companyName)}</h1>
-      <p style="margin-bottom:20px;color:#475569;">
-        ${escapeHtml(row.fullName)} | ${escapeHtml(row.email)}
-      </p>
-      <table style="width:100%;border-collapse:collapse;">
-        ${rows}
-      </table>
-    `;
-
-    printWindow.focus();
-    printWindow.print();
+    printHtml({
+      title: `${escapeHtml(row.companyName)} | Email Activity`,
+      body: `
+        <h1>${escapeHtml(row.companyName)}</h1>
+        <p style="margin-bottom:20px;color:#475569;">
+          ${escapeHtml(row.fullName)} | ${escapeHtml(row.email)}
+        </p>
+        <table style="width:100%;border-collapse:collapse;">
+          ${rows}
+        </table>
+      `,
+    });
   };
 
   return (
@@ -402,52 +395,38 @@ export function AgentEmailDrawer({
           </DetailCard>
 
           <DetailCard label="Personal Details">
+            {/* Identity fields are read-only here. They belong to the lead
+                record and are corrected from All Leads or Fix Leads, not from
+                the email queue. The outcome controls below stay editable —
+                recording what happened to an email is the point of this
+                panel. */}
             <EditableField label="Full Name">
-              <TextInput
-                value={row.fullName}
-                onChange={(event) => onChange("fullName", event.target.value)}
-                className="text-xs font-semibold"
-              />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {row.fullName || "—"}
+              </span>
             </EditableField>
             <EditableField label="Phone">
-              <TextInput
-                value={row.phone}
-                onChange={(event) => onChange("phone", event.target.value)}
-                className="text-xs font-semibold"
-              />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {row.phone || "—"}
+              </span>
             </EditableField>
             <EditableField label="Email">
-              <TextInput
-                type="email"
-                value={row.email}
-                onChange={(event) => onChange("email", event.target.value)}
-                className="text-xs font-semibold"
-              />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {row.email || "—"}
+              </span>
             </EditableField>
           </DetailCard>
 
           <DetailCard label="Lead Details">
             <EditableField label="Contact Type">
-              <Select
-                value={row.contactType}
-                onChange={(value) => onChange("contactType", String(value))}
-                options={contactTypeOptions.map((value) => ({
-                  label: value,
-                  value,
-                }))}
-                className="text-xs font-semibold"
-              />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {row.contactType || "—"}
+              </span>
             </EditableField>
             <EditableField label="Lead Type Benton">
-              <Select
-                value={row.bentonLeadType}
-                onChange={(value) => onChange("bentonLeadType", String(value))}
-                options={leadTypeOptions.map((value) => ({
-                  label: value,
-                  value,
-                }))}
-                className="text-xs font-semibold"
-              />
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {row.bentonLeadType || "—"}
+              </span>
             </EditableField>
             <EditableField label="Email To Be Sent">
               <div className="flex min-h-9 items-center justify-end">

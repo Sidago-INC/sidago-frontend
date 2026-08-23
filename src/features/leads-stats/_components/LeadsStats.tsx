@@ -111,7 +111,7 @@ export function LeadsStats() {
         value: effectiveStats?.leadsSentToDnc ?? 0,
         icon: <CircleOff size={18} />,
         titleClassName: "text-slate-600 dark:text-slate-300",
-        flagType: null,
+        flagType: "dnc" as LeadStatsFlagType,
       },
     ],
     [effectiveStats],

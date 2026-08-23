@@ -13,16 +13,11 @@ import {
 import type { Column } from "@/components/ui/Table";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
 import {
-  findCompanyPickerRow,
-  parseCompanySymbolFromLabel,
-  resolveCompanyFromDirectory,
-  resolveCompanyTimezone,
-  useCompanyBySymbol,
-  useCompanyOptions,
-  useDrawerCompanyNameSelectSource,
   type CompanyRow,
 } from "@/features/companies/_lib/hooks";
 import { useUsers } from "@/features/backoffice-shared/use-users";
+import { openPrintFrame } from "@/lib/print-html";
+import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
@@ -36,10 +31,7 @@ import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import {
-  findCompanyForLead,
-  getHotLeadTimezone,
   getLeadId,
-  getRowCompanySymbol,
   type LeadRow,
 } from "../_lib/data";
 
@@ -180,13 +172,6 @@ export function CurrentlyHotDrawer({
   const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
   const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
     useState<string>();
-  const [pinnedCompanyOption, setPinnedCompanyOption] = useState<{
-    label: string;
-    value: string;
-  } | null>(null);
-  const [pinnedCompanyRow, setPinnedCompanyRow] = useState<CompanyRow | null>(
-    null,
-  );
   const [formState, setFormState] = useState<{
     key: string;
     value: EditableDrawerState;
@@ -200,93 +185,24 @@ export function CurrentlyHotDrawer({
     [row],
   );
   const form = formState?.key === rowKey ? formState.value : initialForm;
+
+  // Replaced a searchable company picker plus two pieces of pinned state, four
+  // effects and three queries that could settle in any order. Re-linking a lead
+  // to a different company was removed from the detail panels on the customer's
+  // instruction; this only resolves what to display.
+  const { displayCompanySymbol, displayTimezone } = useDrawerCompanyIdentity({
+    drawerOpen,
+    rowCompanySymbol: row?.companySymbol,
+    rowCompanyName: row?.companyName,
+    rowTimezone: row?.timezone,
+  });
   const updateLead = useUpdateLead();
-  const companyChanged = form?.companyName !== initialForm?.companyName;
   const isDirty = useMemo(() => {
     if (!form || !initialForm) return false;
     return !jsonEqualIgnoringKeys(form, initialForm, ["notWorked"]);
   }, [form, initialForm]);
 
-  const extraCompanyOptions = useMemo(() => {
-    const currentName = form?.companyName?.trim();
-    if (!currentName) return [];
 
-    if (
-      pinnedCompanyOption &&
-      String(pinnedCompanyOption.value) === currentName
-    ) {
-      return [pinnedCompanyOption];
-    }
-
-    return [
-      {
-        value: currentName,
-        label: row?.companySymbol
-          ? `${row.companySymbol} - ${currentName}`
-          : currentName,
-      },
-    ];
-  }, [form?.companyName, pinnedCompanyOption, row?.companySymbol]);
-
-  const companySelectSource = useDrawerCompanyNameSelectSource(
-    extraCompanyOptions,
-    drawerOpen,
-  );
-  const { data: companyResult } = useCompanyOptions(1);
-  const allCompanies = companyResult?.data ?? [];
-  const companyOptions = useMemo(() => {
-    const currentName = form?.companyName?.trim();
-    if (!currentName || !pinnedCompanyOption) {
-      return companySelectSource.options;
-    }
-
-    if (String(pinnedCompanyOption.value) !== currentName) {
-      return companySelectSource.options;
-    }
-
-    const exists = companySelectSource.options.some(
-      (option) => String(option.value) === currentName,
-    );
-
-    if (exists) {
-      return companySelectSource.options;
-    }
-
-    return [pinnedCompanyOption, ...companySelectSource.options];
-  }, [companySelectSource.options, form?.companyName, pinnedCompanyOption]);
-  const loadedCompanyRows = useMemo(
-    () => [
-      ...companySelectSource.browseItems,
-      ...companySelectSource.remoteItems,
-    ],
-    [companySelectSource.browseItems, companySelectSource.remoteItems],
-  );
-  const companyRows = useMemo(() => {
-    let rows = companyChanged ? [...loadedCompanyRows] : loadedCompanyRows;
-
-    if (!companyChanged) {
-      const leadCompany = row ? buildLeadCompanyRow(row) : null;
-      if (
-        leadCompany &&
-        !findCompanyPickerRow(leadCompany.name, leadCompany.symbol, rows)
-      ) {
-        rows = [leadCompany, ...rows];
-      }
-    }
-
-    if (
-      pinnedCompanyRow &&
-      !findCompanyPickerRow(
-        pinnedCompanyRow.name,
-        pinnedCompanyRow.symbol,
-        rows,
-      )
-    ) {
-      rows = [pinnedCompanyRow, ...rows];
-    }
-
-    return rows;
-  }, [companyChanged, loadedCompanyRows, pinnedCompanyRow, row]);
   const svgAgentsQuery = useUsers("svg");
   const bentonAgentsQuery = useUsers("benton");
   const svgAgentOptions = useMemo(
@@ -313,105 +229,6 @@ export function CurrentlyHotDrawer({
     () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
-  const selectedCompany = useMemo(() => {
-    if (pinnedCompanyRow) {
-      return pinnedCompanyRow;
-    }
-
-    return findCompanyPickerRow(
-      form?.companyName,
-      getRowCompanySymbol({
-        companySymbol: row?.companySymbol,
-        companyName: form?.companyName || row?.companyName,
-      }),
-      companyRows,
-    );
-  }, [companyRows, form?.companyName, pinnedCompanyRow, row?.companyName, row?.companySymbol]);
-  const activeCompanySymbol = useMemo(
-    () =>
-      getRowCompanySymbol({
-        companySymbol:
-          pinnedCompanyRow?.symbol ||
-          selectedCompany?.symbol ||
-          row?.companySymbol,
-        companyName: form?.companyName || row?.companyName || "",
-      }),
-    [
-      form?.companyName,
-      pinnedCompanyRow?.symbol,
-      row?.companyName,
-      row?.companySymbol,
-      selectedCompany?.symbol,
-    ],
-  );
-  const { data: companyBySymbol } = useCompanyBySymbol(
-    activeCompanySymbol,
-    drawerOpen && Boolean(activeCompanySymbol.trim()),
-  );
-  const selectedCompanySymbol = useMemo(() => {
-    if (companyChanged) {
-      return (
-        selectedCompany?.symbol ||
-        getRowCompanySymbol({
-          companyName: form?.companyName,
-          companySymbol: "",
-        })
-      );
-    }
-
-    return getRowCompanySymbol({
-      companySymbol: row?.companySymbol,
-      companyName: form?.companyName || row?.companyName,
-    });
-  }, [
-    companyChanged,
-    form?.companyName,
-    row?.companyName,
-    row?.companySymbol,
-    selectedCompany?.symbol,
-  ]);
-  const displayCompanySymbol = useMemo(() => {
-    if (companyChanged) {
-      return selectedCompanySymbol;
-    }
-
-    return getRowCompanySymbol({
-      companySymbol: row?.companySymbol,
-      companyName: form?.companyName || row?.companyName,
-    });
-  }, [
-    companyChanged,
-    form?.companyName,
-    row?.companyName,
-    row?.companySymbol,
-    selectedCompanySymbol,
-  ]);
-  const displayTimezone = useMemo(() => {
-    const leadContext = {
-      companyName: form?.companyName || row?.companyName || "",
-      companySymbol: activeCompanySymbol,
-      timezone: row?.timezone || "",
-    };
-    const lookupCompanies = [...companyRows, ...allCompanies];
-    const activeCompany = pinnedCompanyRow ?? selectedCompany;
-
-    return (
-      companyBySymbol?.timezone?.trim() ||
-      resolveCompanyTimezone(activeCompany, lookupCompanies) ||
-      findCompanyForLead(leadContext, lookupCompanies)?.timezone?.trim() ||
-      getHotLeadTimezone(leadContext, lookupCompanies)
-    );
-  }, [
-    activeCompanySymbol,
-    allCompanies,
-    companyBySymbol?.timezone,
-    companyRows,
-    form?.companyName,
-    pinnedCompanyRow,
-    row?.companyName,
-    row?.timezone,
-    selectedCompany,
-  ]);
 
   const detailItems = useMemo(() => {
     if (!row) return [];
@@ -451,63 +268,7 @@ export function CurrentlyHotDrawer({
   useEffect(() => {
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
-    setPinnedCompanyOption(null);
-    setPinnedCompanyRow(null);
-    companySelectSource.onSearchChange("");
-  }, [rowKey, companySelectSource.onSearchChange]);
-
-  useEffect(() => {
-    if (!pinnedCompanyOption || allCompanies.length === 0) return;
-
-    const resolved = resolveCompanyFromDirectory(
-      pinnedCompanyOption,
-      pinnedCompanyRow ?? undefined,
-      allCompanies,
-    );
-
-    if (!resolved?.timezone?.trim()) return;
-
-    setPinnedCompanyRow((current) => {
-      if (
-        current?.id &&
-        resolved.id &&
-        current.id !== resolved.id &&
-        current.timezone?.trim()
-      ) {
-        return current;
-      }
-
-      if (current?.timezone?.trim() === resolved.timezone?.trim()) {
-        return current;
-      }
-
-      return resolved;
-    });
-  }, [allCompanies, pinnedCompanyOption, pinnedCompanyRow]);
-
-  useEffect(() => {
-    if (!companyBySymbol?.timezone?.trim()) return;
-
-    setPinnedCompanyRow((current) => {
-      if (
-        current?.symbol &&
-        companyBySymbol.symbol &&
-        current.symbol.trim().toUpperCase() !==
-          companyBySymbol.symbol.trim().toUpperCase()
-      ) {
-        return current;
-      }
-
-      if (current?.timezone?.trim() === companyBySymbol.timezone?.trim()) {
-        return current;
-      }
-
-      return {
-        ...(current ?? companyBySymbol),
-        ...companyBySymbol,
-      };
-    });
-  }, [companyBySymbol]);
+  }, [rowKey]);
 
   if (!row || selectedIndex === null || !form) return null;
 
@@ -545,37 +306,6 @@ export function CurrentlyHotDrawer({
     if (!ok) {
       updateForm("notWorked", false);
     }
-  };
-
-  const handleCompanyChange = (value: string | number) => {
-    const stringValue = String(value);
-    const selectedOption = companyOptions.find(
-      (option) => String(option.value) === stringValue,
-    );
-    const selectedSymbol =
-      parseCompanySymbolFromLabel(selectedOption?.label ?? "") ??
-      parseCompanySymbolFromLabel(stringValue) ??
-      undefined;
-    const selectedRow = findCompanyPickerRow(
-      stringValue,
-      selectedSymbol,
-      loadedCompanyRows,
-    );
-    const resolvedRow =
-      resolveCompanyFromDirectory(
-        selectedOption,
-        selectedRow,
-        allCompanies,
-      ) ?? selectedRow;
-
-    if (selectedOption) {
-      setPinnedCompanyOption(selectedOption);
-    }
-    if (resolvedRow) {
-      setPinnedCompanyRow(resolvedRow);
-    }
-
-    updateForm("companyName", stringValue);
   };
 
   const handleReset = () => {
@@ -688,7 +418,7 @@ export function CurrentlyHotDrawer({
   const handlePrint = () => {
     if (typeof window === "undefined") return;
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = openPrintFrame();
     if (!printWindow) return;
 
     const rowsMarkup = detailItems
@@ -782,12 +512,15 @@ export function CurrentlyHotDrawer({
             </button>
             <button
               onClick={handleCopyUrl}
-              title="Copy URL"
+              title={copied ? "Copied!" : "Copy URL"}
+              aria-label={copied ? "Link copied" : "Copy link to this lead"}
               className="group flex h-7 w-7 items-center justify-center rounded border cursor-pointer border-slate-200 text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <Link
-                className={`${iconClass} group-hover:scale-110 transition`}
-              />
+              {copied ? (
+                <Check className={`${iconClass} text-emerald-500`} />
+              ) : (
+                <Link className={`${iconClass} group-hover:scale-110 transition`} />
+              )}
             </button>
           </div>
         </div>
@@ -826,33 +559,9 @@ export function CurrentlyHotDrawer({
               <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">
                 Company
               </p>
-              <Select
-                key={rowKey}
-                value={form.companyName}
-                onChange={handleCompanyChange}
-                options={companyOptions}
-                placeholder={
-                  companySelectSource.isLoading &&
-                  companySelectSource.options.length === 0
-                    ? "Loading companies..."
-                    : "Select company"
-                }
-                disabled={
-                  companySelectSource.isLoading &&
-                  companySelectSource.options.length === 0
-                }
-                searchable
-                searchPlaceholder="Search company"
-                searchValue={companySelectSource.searchInput}
-                onSearchChange={companySelectSource.onSearchChange}
-                filterOptionsLocally={false}
-                onLoadMore={companySelectSource.onLoadMore}
-                hasMore={companySelectSource.hasMore}
-                isLoadingMore={companySelectSource.isLoadingMore}
-                isSearching={companySelectSource.isSearching}
-                optionsClassName="z-[500] !w-[min(26rem,calc(100vw-2rem))] max-h-72 shadow-xl dark:border-slate-700 dark:bg-slate-950"
-                className="w-full py-1.5 text-xs"
-              />
+              <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+                {form.companyName || "—"}
+              </p>
             </div>
             <TimezoneBadge timezone={displayTimezone} className="shrink-0" />
           </div>

@@ -8,7 +8,6 @@ import {
   Transition,
 } from "@headlessui/react";
 import {
-  Bell,
   Check,
   ChevronDown,
   MessageCircle,
@@ -148,7 +147,6 @@ export default function Comments() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [filter, setFilter] = useState(FILTERS[0]);
-  const [notificationMode, setNotificationMode] = useState("mentions");
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
   const currentUser = "Alice";
@@ -261,53 +259,6 @@ export default function Comments() {
             </Popover>
 
             <div className="flex items-center gap-2">
-              {/* Notification Popover */}
-              <Popover className="relative">
-                <PopoverButton className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">
-                  <Bell size={16} />
-                  <ChevronDown size={12} />
-                </PopoverButton>
-
-                <Transition
-                  as={Fragment}
-                  enter="transition duration-100"
-                  enterFrom="opacity-0 translate-y-1"
-                  enterTo="opacity-100 translate-y-0"
-                  leave="transition duration-75"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <PopoverPanel
-                    anchor="top"
-                    portal
-                    className="z-260 w-64 rounded-lg border shadow-lg
-                    bg-white dark:bg-slate-800
-                    border-slate-200 dark:border-slate-700"
-                  >
-                    <div className="p-2">
-                      <button
-                        onClick={() => setNotificationMode("mentions")}
-                        className="w-full text-left px-3 py-2 rounded-md text-sm
-                        text-slate-700 dark:text-slate-200
-                        hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>Notify me only for @mentions</span>
-                        {notificationMode === "mentions" && <Check size={14} />}
-                      </button>
-
-                      <button
-                        onClick={() => setNotificationMode("all")}
-                        className="w-full text-left px-3 py-2 rounded-md text-sm
-                        text-slate-700 dark:text-slate-200
-                        hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-between cursor-pointer"
-                      >
-                        <span>Notify me about all comments</span>
-                        {notificationMode === "all" && <Check size={14} />}
-                      </button>
-                    </div>
-                  </PopoverPanel>
-                </Transition>
-              </Popover>
 
               {/* Close */}
               <button

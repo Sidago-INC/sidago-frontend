@@ -1,6 +1,8 @@
 
 
 import { CampaignBadge, CompanySymbolBadge, TypeBadge } from "@/components/ui";
+import { CALL_RESULT_OPTIONS } from "@/types/call-result.types";
+import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 import {
   Table,
   type Column,
@@ -20,9 +22,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { RecentInterestDrawer } from "./RecentInterestDrawer";
 import {
   RecentInterestRow,
-  recentInterestCallResultOptions,
-  recentInterestCampaignOptions,
-  recentInterestLeadTypeOptions,
 } from "../_lib/data";
 
 type RecentInterestTableProps = {
@@ -65,7 +64,7 @@ export function RecentInterestTable({
   const columns = useMemo<Column<RecentInterestRow>[]>(
     () => [
       {
-        title: "Follow-up Date (Cleaned)",
+        title: "Follow-up Date",
         key: "followUpDateCleaned",
         type: "date",
       },
@@ -87,11 +86,7 @@ export function RecentInterestTable({
         // Not a backend grid field for this report — display only.
         title: "Campaign Type",
         key: "campaignType",
-        type: "select",
-        options: recentInterestCampaignOptions.map((value) => ({
-          label: value,
-          value,
-        })),
+        // Display only on this report — no backend grid field, so no options.
         filterable: false,
         sortable: false,
         groupable: false,
@@ -128,19 +123,13 @@ export function RecentInterestTable({
         title: "Call Result",
         key: "callResult",
         type: "select",
-        options: recentInterestCallResultOptions.map((value) => ({
-          label: value,
-          value,
-        })),
+        options: CALL_RESULT_OPTIONS,
       },
       {
         title: "Lead Type",
         key: "leadType",
         type: "select",
-        options: recentInterestLeadTypeOptions.map((value) => ({
-          label: value,
-          value,
-        })),
+        options: LEAD_TYPE_OPTIONS,
         render: (row) => <TypeBadge value={row.leadType} kind="lead" />,
       },
       { title: "Notes", key: "notes" },

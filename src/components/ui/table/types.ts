@@ -67,6 +67,9 @@ export type FilterOperator =
   | "does_not_contain"
   | "is"
   | "is_not"
+  // Multi-value: `value` holds the choices joined by MULTI_VALUE_SEPARATOR.
+  | "is_any_of"
+  | "is_none_of"
   | "is_on"
   | "is_before"
   | "is_after"
@@ -98,6 +101,8 @@ export type GroupNode<T> = {
   children: GroupNode<T>[] | null;
   /** True count from serverGrid.groupCounts; falls back to rows.length when absent. */
   count?: number;
+  /** Raw group value ("" for blank), for building a "show only this" filter. */
+  value?: string;
 };
 
 export type SelectableColumn = { value: string; label: string };

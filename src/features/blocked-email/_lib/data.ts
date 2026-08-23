@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
   buildPaginationParams,
@@ -77,6 +77,10 @@ export function useBlockedEmails(
       const parsed = parsePaginatedResponse<BlockedEmailRow>(json);
       return { ...parsed, meta: { ...parsed.meta, groups: json.meta.groups } };
     },
+    // Grid data: hold the previous page on screen while the next one loads.
+    // Without this the hook drops to isLoading/undefined between keystrokes and
+    // the page unmounts itself, taking the search box with it.
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }

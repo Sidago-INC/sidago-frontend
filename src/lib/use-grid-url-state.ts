@@ -5,12 +5,13 @@ import type {
   FilterItem,
   SortRule,
 } from "@/components/ui/table/types";
+import { writeGridState } from "@/lib/grid-state-memory";
 
 /**
  * Keeps a grid's search/filters/sort/groupBy in the URL instead of useState, so
  * a filtered view survives refresh/back-forward and can be shared as a link.
  */
-export function useGridUrlState() {
+export function useGridUrlState(persistKey?: string | null) {
   const [params, setParams] = useSearchParams();
 
   const searchParam = params.get("search") ?? "";
@@ -49,6 +50,12 @@ export function useGridUrlState() {
 
   // write a param, or drop it when empty. replace:true so typing doesn't
   // create one history entry per keystroke.
+  //
+  // Persistence happens HERE, on the resulting params, and nowhere else.
+  // Doing it from an effect that watches the current state instead meant a
+  // freshly-mounted page — whose URL is still empty — wrote an empty snapshot
+  // and erased what had been saved, before the restore had a chance to land.
+  // Writing only from a real change makes that impossible.
   const set = useCallback(
     (patch: Record<string, string | null>) => {
       setParams(
@@ -58,12 +65,22 @@ export function useGridUrlState() {
             if (value) next.set(key, value);
             else next.delete(key);
           }
+
+          if (persistKey) {
+            writeGridState(persistKey, {
+              search: next.get("search") ?? undefined,
+              filters: next.get("filters") ?? undefined,
+              sort: next.get("sort") ?? undefined,
+              groupBy: next.get("groupBy") ?? undefined,
+            });
+          }
+
           return next;
         },
         { replace: true },
       );
     },
-    [setParams],
+    [persistKey, setParams],
   );
 
   return {
@@ -96,5 +113,22 @@ export function useGridUrlState() {
           : null,
       }),
     setGroupBy: (field: string | null) => set({ groupBy: field }),
+
+    /**
+     * Writes a whole remembered snapshot back in one navigation. Restoring
+     * field by field would fire four navigations and four refetches.
+     */
+    setAll: (snapshot: {
+      search?: string;
+      filters?: string;
+      sort?: string;
+      groupBy?: string;
+    }) =>
+      set({
+        search: snapshot.search ?? null,
+        filters: snapshot.filters ?? null,
+        sort: snapshot.sort ?? null,
+        groupBy: snapshot.groupBy ?? null,
+      }),
   };
 }

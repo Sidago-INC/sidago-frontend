@@ -16,9 +16,7 @@ import {
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
-import { useGridUrlState } from "@/lib/use-grid-url-state";
-import { useServerPagination } from "@/lib/use-server-pagination";
+import { useGridPage } from "@/lib/use-grid-page";
 import {
   getDeadEmailBrandLabel,
   getDeadEmailDisplayLeadId,
@@ -33,23 +31,17 @@ const DEFAULT_ROWS_PER_PAGE = 500;
 export function DeadMissingEmail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { page, perPage, setPage, setPerPage } = useServerPagination(
-    DEFAULT_ROWS_PER_PAGE,
-  );
+  const {
+    page,
+    perPage,
+    setPage,
+    setPerPage,
+    url,
+    searchInput,
+    setSearchInput,
+  } = useGridPage({ initialPerPage: DEFAULT_ROWS_PER_PAGE });
 
-  const url = useGridUrlState();
-  const [searchInput, setSearchInput] = useState(url.search);
-  const debouncedSearch = useDebouncedValue(searchInput, 300);
 
-  useEffect(() => {
-    url.setSearch(debouncedSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url.grid]);
 
   const { data: result, isLoading, isError, error, refetch } =
     useDeadMissingEmails(page, perPage, url.grid);

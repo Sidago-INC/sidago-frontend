@@ -370,7 +370,13 @@ export function LeadManualUpdateForm() {
                   className={readonlyInputClassName}
                 />
               )}
-              {isAdmin ? (
+              {/* Arriving from Agents > Brand > Agent > Lead Manual Update means the
+                  agent is already decided, so it is shown, not chosen. Leaving
+                  it as an open dropdown listing every agent on the brand is
+                  what made the page look like a duplicate of itself under each
+                  agent. The plain /lead-manual-update route still lets an admin
+                  pick. */}
+              {isAdmin && !navContext ? (
                 <Select
                   label="Agent"
                   value={agentFieldValue}

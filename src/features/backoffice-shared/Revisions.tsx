@@ -4,15 +4,8 @@ import {
   useCompanyRevisionHistory,
   useLeadRevisionHistory,
 } from "@/features/backoffice-shared/use-revision-history";
+import { Hourglass, X } from "lucide-react";
 import {
-  Popover,
-  PopoverButton,
-  PopoverPanel,
-  Transition,
-} from "@headlessui/react";
-import { Bell, Check, ChevronDown, Hourglass, X } from "lucide-react";
-import {
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -28,7 +21,6 @@ type RevisionsProps = {
 
 export default function Revisions({ leadId, companyId }: RevisionsProps) {
   const [open, setOpen] = useState(false);
-  const [notificationMode, setNotificationMode] = useState("mentions");
   const targetId = leadId ?? companyId;
   const isCompanyRevision = Boolean(companyId && !leadId);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -127,48 +119,6 @@ export default function Revisions({ leadId, companyId }: RevisionsProps) {
             <div className="text-xs">Revision History</div>
 
             <div className="flex items-center gap-2">
-              <Popover className="relative">
-                <PopoverButton className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">
-                  <Bell size={16} />
-                  <ChevronDown size={12} />
-                </PopoverButton>
-
-                <Transition
-                  as={Fragment}
-                  enter="transition duration-100"
-                  enterFrom="opacity-0 translate-y-1"
-                  enterTo="opacity-100 translate-y-0"
-                  leave="transition duration-75"
-                  leaveFrom="opacity-100"
-                  leaveTo="opacity-0"
-                >
-                  <PopoverPanel
-                    anchor="top"
-                    portal
-                    className="z-260 w-64 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <div className="p-2">
-                      <button
-                        type="button"
-                        onClick={() => setNotificationMode("mentions")}
-                        className="flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
-                      >
-                        <span>Notify me only for @mentions</span>
-                        {notificationMode === "mentions" && <Check size={14} />}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setNotificationMode("all")}
-                        className="flex w-full cursor-pointer items-center justify-between rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700"
-                      >
-                        <span>Notify me about all comments</span>
-                        {notificationMode === "all" && <Check size={14} />}
-                      </button>
-                    </div>
-                  </PopoverPanel>
-                </Transition>
-              </Popover>
 
               <button
                 type="button"

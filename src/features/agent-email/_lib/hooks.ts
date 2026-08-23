@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { agentCallsApi } from "@/features/agent-calls/_lib/agentCallsApi";
 import type { LogResultBody } from "@/features/agent-calls/_lib/apiTypes";
 import { api } from "@/lib/api";
@@ -49,6 +49,10 @@ export function useEmailQueue(
         meta: { ...parsed.meta, groups: json.meta?.groups },
       };
     },
+    // Grid data: hold the previous page on screen while the next one loads.
+    // Without this the hook drops to isLoading/undefined between keystrokes and
+    // the page unmounts itself, taking the search box with it.
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 }

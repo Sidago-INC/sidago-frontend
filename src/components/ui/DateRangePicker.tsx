@@ -75,7 +75,12 @@ export function DateRangePicker({
         {({ close }) => (
           <>
         {hasValue ? (
-          <div className="mb-3 flex justify-end">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {value?.from && value?.to && +value.from !== +value.to
+                ? "Range selected"
+                : "Pick an end date, or apply for a single day"}
+            </span>
             <button
               type="button"
               onClick={() => { onChange(undefined); close(); }}
@@ -91,7 +96,13 @@ export function DateRangePicker({
           selected={value}
           onSelect={(range) => {
             onChange(range);
-            if (range?.to) close();
+            // Do NOT close here. On react-day-picker v9 the first click already
+            // returns { from: day, to: day }, so `if (range?.to) close()` shut
+            // the picker after one click every time — the user picked 27 July,
+            // the panel closed, the consumer widened the open range to today,
+            // and they had to reopen and navigate back to July for the end
+            // date. The Apply button below closes it instead, which also keeps
+            // a deliberate single-day range possible.
           }}
           numberOfMonths={2}
           showOutsideDays

@@ -1,13 +1,9 @@
 import {
   CompanySymbolBadge,
-  Select,
   TextInput,
   TimezoneBadge,
   TimezoneSelect,
 } from "@/components/ui";
-import type { useDrawerCompanyNameSelectSource } from "@/features/companies/_lib/hooks";
-
-type CompanySelectSource = ReturnType<typeof useDrawerCompanyNameSelectSource>;
 
 // Company symbol / name / timezone are columns on `companies`, not on the lead.
 // Editing them here rewrites the company record, so every lead at that company
@@ -26,26 +22,25 @@ type CompanyEdit = {
 };
 
 type DrawerCompanyFieldProps = {
-  rowKey: string;
   badgeIndex: number;
   companyName: string;
   displayCompanySymbol: string;
   displayTimezone: string;
-  companyOptions: Array<{ label: string; value: string | number }>;
-  companySelectSource: CompanySelectSource;
-  onCompanyChange: (value: string | number) => void;
   companyEdit?: CompanyEdit;
 };
 
+// The searchable company picker that used to sit here is gone. It carried its
+// own pinned state, updated by four effects and three queries that could
+// settle in any order, which is why it lagged a lead behind the Next button,
+// mishandled arrow keys, and left the previous lead's details on screen after
+// a company change. Re-linking a lead to a different company is not something
+// this panel needs to do; correcting the company's own symbol / name /
+// timezone still is, and that is what `companyEdit` below provides.
 export function DrawerCompanyField({
-  rowKey,
   badgeIndex,
   companyName,
   displayCompanySymbol,
   displayTimezone,
-  companyOptions,
-  companySelectSource,
-  onCompanyChange,
   companyEdit,
 }: DrawerCompanyFieldProps) {
   return (
@@ -61,33 +56,9 @@ export function DrawerCompanyField({
           <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-400">
             Company
           </p>
-          <Select
-            key={rowKey}
-            value={companyName}
-            onChange={onCompanyChange}
-            options={companyOptions}
-            placeholder={
-              companySelectSource.isLoading &&
-              companySelectSource.options.length === 0
-                ? "Loading companies..."
-                : "Select company"
-            }
-            disabled={
-              companySelectSource.isLoading &&
-              companySelectSource.options.length === 0
-            }
-            searchable
-            searchPlaceholder="Search company"
-            searchValue={companySelectSource.searchInput}
-            onSearchChange={companySelectSource.onSearchChange}
-            filterOptionsLocally={false}
-            onLoadMore={companySelectSource.onLoadMore}
-            hasMore={companySelectSource.hasMore}
-            isLoadingMore={companySelectSource.isLoadingMore}
-            isSearching={companySelectSource.isSearching}
-            optionsClassName="z-[500] !w-[min(26rem,calc(100vw-2rem))] max-h-72 shadow-xl dark:border-slate-700 dark:bg-slate-950"
-            className="w-full py-1.5 text-xs"
-          />
+          <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+            {companyName || "—"}
+          </p>
         </div>
         {companyEdit ? null : (
           <TimezoneBadge timezone={displayTimezone} className="shrink-0" />

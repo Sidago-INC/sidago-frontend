@@ -3,6 +3,7 @@ import {
   CardContent,
   CheckboxInput,
   Select,
+  Textarea,
   TextInput,
   TimezoneBadge,
   Wave,
@@ -12,10 +13,18 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { useUpdateLead } from "@/features/backoffice-shared/use-update-lead";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useCantLocateLead, useLeadFull, type FullLead } from "../_lib/data";
+import { NewLeadDrawer } from "@/features/leads/_components/NewLeadDrawer";
+import { createLead } from "@/features/leads/_lib/hooks";
+import type { LeadCreateFormValues } from "@/lib/validation/lead-create";
+import {
+  useCantLocateLead,
+  useLeadFull,
+  useRelatedLeads,
+  type FullLead,
+} from "../_lib/data";
 
 const inputClassName = "h-10 rounded text-sm";
 const readOnlyInputClassName = `${inputClassName} bg-slate-100 dark:bg-slate-800`;
@@ -52,6 +61,42 @@ export function FixLeadEditForm() {
   const queryClient = useQueryClient();
   const { leadId } = useParams<{ leadId: string }>();
   const { data, isLoading, isError, error } = useLeadFull(leadId);
+  // The company's other people. Operations fix one contact and need to see
+  // who else is on file there — the old CRM listed them here as chips.
+  const { data: relatedLeads = [] } = useRelatedLeads(leadId);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [creatingLead, setCreatingLead] = useState(false);
+
+  // Adding a colleague at this company. Reuses the Add-Lead form and the same
+  // endpoint — the only difference is that the company is fixed and the user
+  // never leaves the lead they were fixing.
+  const handleCreateLead = async (values: LeadCreateFormValues) => {
+    setCreatingLead(true);
+    try {
+      const response = await createLead({
+        companyId: values.companyId,
+        fullName: values.fullName,
+        phone: values.phone,
+        phoneExtension: values.phoneExtension || undefined,
+        email: values.email,
+        role: values.role,
+      });
+      showSuccessToast(`Lead "${response.fullName}" added.`);
+      // The new person belongs in Other Contacts straight away.
+      queryClient.invalidateQueries({ queryKey: ["lead-related", leadId] });
+      setNewLeadOpen(false);
+    } catch (requestError) {
+      showErrorToast(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not add the lead.",
+      );
+      // Rethrow so the drawer stays open and keeps what was typed.
+      throw requestError;
+    } finally {
+      setCreatingLead(false);
+    }
+  };
   const updateLead = useUpdateLead();
   const cantLocateLead = useCantLocateLead();
 
@@ -255,14 +300,49 @@ export function FixLeadEditForm() {
                     : "Mark Can't Locate"}
                 </button>
               </div>
-              <TextInput
-                label="Other Contacts"
+              {relatedLeads.length > 0 && (
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Other Contacts ({relatedLeads.length})
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {relatedLeads.map((contact) => {
+                      const symbol =
+                        contact.companySymbol?.trim() ||
+                        lead.companySymbol?.trim() ||
+                        "";
+                      const name = contact.fullName?.trim() || "Unnamed";
+
+                      return (
+                        <button
+                          key={contact.id}
+                          type="button"
+                          onClick={() => navigate(`/fix-leads/${contact.id}`)}
+                          title={
+                            contact.role?.trim()
+                              ? `${name} — ${contact.role}`
+                              : name
+                          }
+                          className="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:bg-slate-700 dark:hover:text-indigo-300"
+                        >
+                          <span className="truncate">
+                            {symbol ? `${symbol} - ${name}` : name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <Textarea
+                label="Add Other Contacts"
                 value={form.otherContacts}
                 onChange={(event) =>
                   updateField("otherContacts", event.target.value)
                 }
                 placeholder="Extra phone numbers, addresses, etc."
-                className={inputClassName}
+                rows={4}
+                className="text-sm"
                 wrapperClassName="md:col-span-2"
               />
               <div className="flex flex-col gap-1">
@@ -313,7 +393,21 @@ export function FixLeadEditForm() {
               </div>
             </section>
 
-            <div className="flex flex-row justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <div className="flex flex-row items-center justify-end gap-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setNewLeadOpen(true)}
+                disabled={actionPending || !lead.companyId}
+                title={
+                  lead.companyId
+                    ? "Add another contact at this company"
+                    : "This lead has no company"
+                }
+                className="mr-auto inline-flex h-10 cursor-pointer items-center justify-center gap-1 rounded border border-indigo-200 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+              >
+                <Plus size={15} />
+                New Lead
+              </button>
               <button
                 type="button"
                 onClick={handleReset}
@@ -333,6 +427,21 @@ export function FixLeadEditForm() {
           </form>
         </CardContent>
       </Card>
+
+      {lead.companyId && (
+        <NewLeadDrawer
+          isOpen={newLeadOpen}
+          onClose={() => setNewLeadOpen(false)}
+          onCreate={handleCreateLead}
+          isSaving={creatingLead}
+          fixedCompany={{
+            id: lead.companyId,
+            label: lead.companySymbol
+              ? `${lead.companySymbol} - ${lead.companyName ?? ""}`.trim()
+              : (lead.companyName ?? ""),
+          }}
+        />
+      )}
     </div>
   );
 }

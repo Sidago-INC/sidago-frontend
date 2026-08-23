@@ -11,6 +11,8 @@ import type {
 } from "./types";
 
 export const DATE_RANGE_VALUE_SEPARATOR = "___to___";
+/** Matches MULTI_VALUE_SEPARATOR in the backend's filter-tree.ts. */
+export const MULTI_VALUE_SEPARATOR = "___or___";
 export const GROUP_DEPTH_CAN_CREATE_CHILD_GROUPS = 1;
 
 export function getCellValue<T>(
@@ -35,7 +37,32 @@ export function getColumnType<T>(column?: Column<T> | null): Column<T>["type"] {
 export function getDefaultOperatorForColumnType(
   columnType: Column<unknown>["type"],
 ): FilterOperator {
-  return columnType === "date" ? "is_on" : "contains";
+  if (columnType === "date") return "is_on";
+  // A closed set is picked from, so equality is the sensible default —
+  // "contains" on an enum invites matching a fragment of a value nobody sees.
+  if (columnType === "select") return "is";
+  return "contains";
+}
+
+/**
+ * Keeps a condition's value meaningful when the operator changes.
+ *
+ * Switching between a single-value and a multi-value operator used to blank
+ * the value, so picking "is any of" after "is EST" lost EST.
+ */
+export function convertFilterValue(
+  value: string,
+  from: FilterOperator,
+  to: FilterOperator,
+): string {
+  if (!operatorNeedsValue(to)) return "";
+
+  const wasMulti = isMultiValueOperator(from);
+  const isMulti = isMultiValueOperator(to);
+
+  if (wasMulti === isMulti) return value;
+  if (isMulti) return serializeMultiValue(value.trim() ? [value.trim()] : []);
+  return parseMultiValue(value)[0] ?? "";
 }
 
 export function getFilterOperatorOptions(
@@ -51,6 +78,21 @@ export function getFilterOperatorOptions(
       { label: "is not empty", value: "is_not_empty" },
     ];
   }
+
+  // A closed set is chosen from, never typed, so "contains" is meaningless on
+  // it — matching a substring of "send_contract" is not something anyone
+  // wants. Offer set membership instead.
+  if (columnType === "select") {
+    return [
+      { label: "is", value: "is" },
+      { label: "is not", value: "is_not" },
+      { label: "is any of", value: "is_any_of" },
+      { label: "is none of", value: "is_none_of" },
+      { label: "is empty", value: "is_empty" },
+      { label: "is not empty", value: "is_not_empty" },
+    ];
+  }
+
   return [
     { label: "contains", value: "contains" },
     { label: "does not contain", value: "does_not_contain" },
@@ -59,6 +101,22 @@ export function getFilterOperatorOptions(
     { label: "is empty", value: "is_empty" },
     { label: "is not empty", value: "is_not_empty" },
   ];
+}
+
+/** True for operators whose value is a list rather than a single string. */
+export function isMultiValueOperator(operator: FilterOperator): boolean {
+  return operator === "is_any_of" || operator === "is_none_of";
+}
+
+export function parseMultiValue(value: string): string[] {
+  return value
+    .split(MULTI_VALUE_SEPARATOR)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function serializeMultiValue(values: string[]): string {
+  return [...new Set(values.filter(Boolean))].join(MULTI_VALUE_SEPARATOR);
 }
 
 export function operatorNeedsValue(operator: FilterOperator): boolean {
@@ -142,10 +200,12 @@ export function createSortRule(field = ""): SortRule {
 }
 
 export function isFilterConditionActive(condition: FilterCondition): boolean {
-  return Boolean(
-    condition.field &&
-    (!operatorNeedsValue(condition.operator) || condition.value.trim()),
-  );
+  if (!condition.field) return false;
+  if (!operatorNeedsValue(condition.operator)) return true;
+  if (isMultiValueOperator(condition.operator)) {
+    return parseMultiValue(condition.value).length > 0;
+  }
+  return Boolean(condition.value.trim());
 }
 
 export function countActiveFilterItems(items: FilterItem[]): number {

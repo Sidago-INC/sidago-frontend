@@ -28,7 +28,8 @@ export type LeadStatsFlagType =
   | "fixed"
   | "cant_locate"
   | "void"
-  | "new_lead";
+  | "new_lead"
+  | "dnc";
 
 export type LeadStatsDetailItem = {
   fullName: string;
