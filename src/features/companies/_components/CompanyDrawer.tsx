@@ -9,6 +9,8 @@ import {
   TimezoneSelect,
 } from "@/components/ui";
 import { COMPANY } from "@/types/company.types";
+import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
+import { useLeadsByCompany } from "@/features/leads/_lib/hooks";
 import { openPrintFrame } from "@/lib/print-html";
 import type { TIMEZONE } from "@/types/timezone.types";
 import { useEffect, useState } from "react";
@@ -79,6 +81,13 @@ export function CompanyDrawer({
   useEffect(() => {
     setIsEditMode(mode === "create");
   }, [companyId, isOpen, mode]);
+
+  // Who is on file at this company: the leads themselves, and the extra
+  // contacts from the additional_contacts table.
+  const { data: companyLeadsData, isLoading: leadsLoading } = useLeadsByCompany(
+    mode === "edit" && isOpen ? companyId : null,
+  );
+  const companyLeads = companyLeadsData ?? [];
 
   const handleCopyLink = async () => {
     if (typeof window === "undefined" || mode !== "edit") return;
@@ -269,6 +278,69 @@ export function CompanyDrawer({
             className={inputClassName}
           />
         </div>
+
+        {mode === "edit" && companyId ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <section className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                Associated leads
+                {companyLeads.length > 0 ? ` (${companyLeads.length})` : ""}
+              </h3>
+
+              {leadsLoading ? (
+                <p className="text-xs text-slate-400">Loading leads…</p>
+              ) : companyLeads.length === 0 ? (
+                <p className="text-xs text-slate-400">
+                  No leads are linked to this company.
+                </p>
+              ) : (
+                <ul className="max-h-56 space-y-1.5 overflow-y-auto">
+                  {companyLeads.map((lead) => (
+                    <li
+                      key={lead.id}
+                      className="rounded border border-slate-200 px-2.5 py-1.5 dark:border-slate-700"
+                    >
+                      <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">
+                        {lead.fullName?.trim() || "Unnamed lead"}
+                        {lead.notWorkAnymore ? (
+                          <span className="ml-1 text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                            no longer there
+                          </span>
+                        ) : null}
+                      </p>
+                      {lead.role?.trim() ? (
+                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                          {lead.role}
+                        </p>
+                      ) : null}
+                      {lead.phone?.trim() ? (
+                        <a
+                          href={`tel:${lead.phone.replace(/\s+/g, "")}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="block truncate text-[11px] tabular-nums text-slate-600 hover:underline dark:text-slate-300"
+                        >
+                          {lead.phone}
+                        </a>
+                      ) : null}
+                      {lead.email?.trim() ? (
+                        <p className="truncate text-[11px] text-sky-600 dark:text-sky-400">
+                          {lead.email}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                Additional contacts
+              </h3>
+              <AdditionalContactsList companyId={companyId} />
+            </section>
+          </div>
+        ) : null}
       </div>
     </Drawer>
   );

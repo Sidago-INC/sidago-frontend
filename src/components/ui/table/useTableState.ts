@@ -92,6 +92,13 @@ export interface UseTableStateReturn<T> {
   appendFilterItemToGroup: (groupId: string, item: FilterItem) => void;
 }
 
+/**
+ * How many levels a server grid may group by. Matches MAX_GROUP_LEVELS in the
+ * backend's build-conditions.ts — each level multiplies the aggregate result,
+ * and a third is not renderable in a useful way.
+ */
+export const MAX_SERVER_GROUP_LEVELS = 2;
+
 export function useTableState<T>({
   data,
   columns,
@@ -119,10 +126,14 @@ export function useTableState<T>({
   const filterItems = serverGrid ? serverGrid.filters : localFilterItems;
   const rootFilterGate = serverGrid ? serverGrid.rootGate : localRootFilterGate;
   const sortRules = serverGrid ? serverGrid.sort : localSortRules;
+  // `groupBy` travels as a comma-separated list, so "timezone,svgLeadType"
+  // nests lead type inside timezone. One field behaves exactly as before.
   const groupRules: GroupRule[] = serverGrid
-    ? serverGrid.groupBy
-      ? [{ field: serverGrid.groupBy, direction: "asc" }]
-      : []
+    ? (serverGrid.groupBy ?? "")
+        .split(",")
+        .map((field) => field.trim())
+        .filter(Boolean)
+        .map((field) => ({ field, direction: "asc" as const }))
     : localGroupRules;
 
   const setFilterItems: Dispatch<SetStateAction<FilterItem[]>> = (value) => {
@@ -157,11 +168,15 @@ export function useTableState<T>({
   const setGroupRules: Dispatch<SetStateAction<GroupRule[]>> = (value) => {
     if (serverGrid) {
       const next = typeof value === "function" ? value(groupRules) : value;
-      // The backend accepts a single groupBy field. GroupPanel's column list
-      // appends the clicked field rather than replacing (it's built for
-      // multi-level client grouping), so the most-recently-added rule is the
-      // one the user just picked — take the last item, not the first.
-      serverGrid.onGroupByChange(next[next.length - 1]?.field ?? null);
+
+      // Up to MAX_SERVER_GROUP_LEVELS, in the order they were added, so the
+      // first column picked is the outer level. Duplicates are dropped —
+      // grouping by the same column twice would give one child per parent.
+      const fields = [
+        ...new Set(next.map((rule) => rule.field).filter(Boolean)),
+      ].slice(0, MAX_SERVER_GROUP_LEVELS);
+
+      serverGrid.onGroupByChange(fields.length ? fields.join(",") : null);
       return;
     }
     setLocalGroupRules(value);
@@ -397,52 +412,95 @@ export function useTableState<T>({
     const nodes = buildGroupNodes(processedData, activeGroupRules, columnMap);
     const serverGroups = serverGrid?.groupCounts;
 
+    // Client-side grid: the rows on screen ARE the whole set, so grouping them
+    // directly is already correct at every level.
     if (!serverGroups?.length) return nodes;
 
-    // Which groups EXIST comes from the server; which rows are on screen comes
-    // from this page. Both matter, and they have to be presented in the same
-    // order or the result is nonsense — the API returns groups sorted by size
-    // (EST 18,383 first) while the rows come back sorted by group VALUE, so
-    // page 1 of All Leads is 34 blanks + 66 CST. Rendering the big groups first
-    // showed EST and PST expanded and empty.
+    // Server grid. Which groups exist, and how big they are, can only come
+    // from the API — a timezone holding 18,383 leads is not countable from the
+    // 100 rows on this page. The rows that ARE here get slotted into their
+    // leaf; a group whose rows live on another page renders collapsed with its
+    // real total and opens on click.
     //
-    // So: order the groups the way the rows are ordered, and let a group whose
-    // rows live on another page render collapsed with its true count.
-    const rule = activeGroupRules[0];
-    const loadedByLabel = new Map(nodes.map((node) => [node.label, node]));
+    // The API returns one entry per leaf, e.g. { values: ["EST","Hot"] }, so
+    // the tree is rebuilt from those paths.
+    const labelOf = (value: string) => (value === "" ? "Unknown" : value);
 
-    const ordered = [...serverGroups].sort((left, right) =>
+    // Index the loaded rows by their full path, so each leaf can find them.
+    const rowsByPath = new Map<string, T[]>();
+    const indexRows = (list: GroupNode<T>[], prefix: string[]) => {
+      for (const node of list) {
+        const path = [...prefix, node.label];
+        if (node.children?.length) indexRows(node.children, path);
+        else rowsByPath.set(JSON.stringify(path), node.rows);
+      }
+    };
+    indexRows(nodes, []);
+
+    type Draft = {
+      label: string;
+      value: string;
+      count: number;
+      children: Map<string, Draft>;
+    };
+
+    const roots = new Map<string, Draft>();
+    for (const group of serverGroups) {
+      // `values` is the full path; `value` alone is the old single-level shape.
+      const path = group.values ?? [group.value ?? ""];
+      let level = roots;
+      let parent: Draft | undefined;
+
+      for (const raw of path) {
+        const key = raw ?? "";
+        let node = level.get(key);
+        if (!node) {
+          node = { label: labelOf(key), value: key, count: 0, children: new Map() };
+          level.set(key, node);
+        }
+        // A parent's total is the sum of its leaves.
+        node.count += group.count;
+        parent = node;
+        level = node.children;
+      }
+      void parent;
+    }
+
+    const byPath = (left: Draft, right: Draft) =>
       left.value.localeCompare(right.value, undefined, {
         numeric: true,
         sensitivity: "base",
-      }),
-    );
+      });
 
-    const seen = new Set<string>();
-    const fromServer = ordered.map((group) => {
-      // buildGroupNodes labels NULL/blank as "Unknown"; the API sends "".
-      const label = group.value === "" ? "Unknown" : group.value;
-      seen.add(label);
-      const loaded = loadedByLabel.get(label);
+    const toNodes = (
+      level: Map<string, Draft>,
+      depth: number,
+      prefix: string[],
+    ): GroupNode<T>[] =>
+      [...level.values()].sort(byPath).map((draft) => {
+        const path = [...prefix, draft.label];
+        const children = draft.children.size
+          ? toNodes(draft.children, depth + 1, path)
+          : null;
 
-      return {
-        ...(loaded ?? {
-          id: `${rule.field}:${label}`,
-          label,
-          level: 0,
-          rows: [] as T[],
-          children: null,
-        }),
-        count: group.count,
-        /** The raw value, so "show only this group" can build a filter. */
-        value: group.value,
-      } as GroupNode<T>;
-    });
+        return {
+          id: `${activeGroupRules
+            .slice(0, depth + 1)
+            .map((rule) => rule.field)
+            .join(">")}:${path.join(">")}`,
+          label: draft.label,
+          level: depth,
+          rows: children ? [] : (rowsByPath.get(JSON.stringify(path)) ?? []),
+          children,
+          count: draft.count,
+          /** Raw value, so "open this group" can build a filter from it. */
+          value: draft.value,
+          /** The whole path, for a filter per level. */
+          path: [...prefix.map((p) => (p === "Unknown" ? "" : p)), draft.value],
+        } as GroupNode<T>;
+      });
 
-    // Anything on the page the server did not enumerate still has to appear.
-    const extras = nodes.filter((node) => !seen.has(node.label));
-
-    return [...fromServer, ...extras];
+    return toNodes(roots, 0, []);
   }, [columnMap, groupRules, processedData, serverGrid]);
 
   const paginationContextKey = useMemo(

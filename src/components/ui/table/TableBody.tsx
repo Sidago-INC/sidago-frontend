@@ -32,6 +32,10 @@ interface GroupedRowsProps<T> {
  * nothing.
  */
 function isEmptyHere<T>(group: GroupNode<T>): boolean {
+  // A parent holds no rows of its own — its rows live in its children — so it
+  // must always expand. Only a LEAF with a real count but nothing on this page
+  // is "elsewhere".
+  if (group.children?.length) return false;
   return group.rows.length === 0 && (group.count ?? 0) > 0;
 }
 

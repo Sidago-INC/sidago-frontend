@@ -20,6 +20,7 @@ export type EmailQueueItem = {
   isMissingDeadEmail: boolean;
   lastEmailSentAt: string | null;
   notWorkAnymore: boolean;
+  companyId: string | null;
 };
 
 export type EmailQueueResponse = {

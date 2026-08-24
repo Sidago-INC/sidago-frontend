@@ -1,6 +1,6 @@
 
 
-import { CompanySymbolBadge, Table, TimezoneBadge } from "@/components/ui";
+import { CompanySymbolBadge, LongTextCell, Table, TimezoneBadge } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
@@ -179,7 +179,19 @@ export function Companies() {
         type: "select",
         options: COUNTRY_OPTIONS,
       },
-      { title: "Description", key: "description" },
+      {
+        title: "Description",
+        key: "description",
+        // Averages 574 characters and reaches 2,313. Left as a plain cell it
+        // stretched the column across the screen and pushed every column after
+        // it out of reach.
+        render: (row) => (
+          <LongTextCell
+            value={row.description}
+            label={`${row.name || row.symbol || "Company"} — description`}
+          />
+        ),
+      },
       { title: "Estimated Market Cap", key: "estimatedMarketcap" },
       { title: "City", key: "city" },
       { title: "State", key: "state" },

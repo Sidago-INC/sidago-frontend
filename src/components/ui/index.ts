@@ -40,3 +40,4 @@ export { PhoneInputField } from "./PhoneInputField";
 export { Textarea } from "./Textarea";
 export { TextInput } from "./TextInput";
 export { TimezoneSelect } from "./TimezoneSelect";
+export { LongTextCell } from "./LongTextCell";

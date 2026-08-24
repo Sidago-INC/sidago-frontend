@@ -12,6 +12,7 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
 import {
   contactTypeOptions,
@@ -463,14 +464,8 @@ export function AgentSmsDrawer({
           </DetailCard>
 
           <DetailCard label="Additional Contacts">
-            <Detail
-              label="Contacts"
-              value={
-                <HistoryText
-                  value={row.additionalContacts || "No additional contacts."}
-                />
-              }
-            />
+            {/* Was bound to row.additionalContacts, hard-coded to "". */}
+            <AdditionalContactsList companyId={row.companyId} />
           </DetailCard>
 
           <DetailCard label="Call Outcome">

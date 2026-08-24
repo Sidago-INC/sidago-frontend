@@ -20,6 +20,7 @@ export type AgentSmsRow = {
   leadId: string;
   companyName: string;
   companySymbol: string;
+  companyId: string | null;
   fullName: string;
   timezone: string;
   contactType: string;
@@ -71,6 +72,7 @@ export function mapSmsQueueItem(
     leadId: item.leadId,
     companyName: item.companyName ?? "",
     companySymbol,
+    companyId: item.companyId ?? null,
     fullName: item.fullName ?? "",
     timezone: item.timezone ?? "",
     contactType: item.contactType ?? "",

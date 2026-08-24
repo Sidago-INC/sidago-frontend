@@ -10,6 +10,11 @@ import type { GroupRule, SelectableColumn, SortDirection } from "./types";
 interface GroupPanelProps {
   groupRules: GroupRule[];
   setGroupRules: Dispatch<SetStateAction<GroupRule[]>>;
+  /**
+   * Levels this grid can group by. Server grids cap at 2 — the API groups on
+   * at most two columns, and a third is not renderable in a useful way.
+   */
+  maxLevels?: number;
   showCounts: boolean;
   setShowCounts: Dispatch<SetStateAction<boolean>>;
   selectableColumns: SelectableColumn[];
@@ -24,6 +29,7 @@ const DIRECTION_OPTIONS = [
 export function GroupPanel({
   groupRules,
   setGroupRules,
+  maxLevels = Number.POSITIVE_INFINITY,
   showCounts,
   setShowCounts,
   selectableColumns,
@@ -49,8 +55,11 @@ export function GroupPanel({
             groupRules.map((groupRule, index) => (
               <div
                 key={`${groupRule.field}-${index}`}
-                className="grid w-full min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center"
+                className="grid w-full min-w-0 gap-4 md:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center"
               >
+                <span className="w-16 shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {index === 0 ? "Group by" : "then by"}
+                </span>
                 <div className="min-w-0 flex-1">
                   <Select
                     value={groupRule.field}
@@ -200,9 +209,20 @@ export function GroupPanel({
             <button
               key={column.value}
               type="button"
+              disabled={
+                groupRules.length >= maxLevels &&
+                !groupRules.some((item) => item.field === column.value)
+              }
+              title={
+                groupRules.length >= maxLevels &&
+                !groupRules.some((item) => item.field === column.value)
+                  ? `Remove a level first — grouping goes ${maxLevels} deep`
+                  : undefined
+              }
               onClick={() =>
                 setGroupRules((current) =>
-                  current.some((item) => item.field === column.value)
+                  current.some((item) => item.field === column.value) ||
+                  current.length >= maxLevels
                     ? current
                     : [...current, { field: column.value, direction: "asc" }],
                 )
@@ -210,6 +230,7 @@ export function GroupPanel({
               className={clsx(
                 "flex w-full min-w-0 items-center rounded px-3 py-2 text-left text-sm transition",
                 "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900",
+                "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
                 groupRules.some((item) => item.field === column.value) &&
                   "bg-slate-100 font-medium dark:bg-slate-900",
               )}

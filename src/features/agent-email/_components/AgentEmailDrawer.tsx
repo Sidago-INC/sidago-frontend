@@ -13,6 +13,7 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
 import {
   getCallBackDateError,
@@ -500,14 +501,10 @@ export function AgentEmailDrawer({
           </DetailCard>
 
           <DetailCard label="Additional Contacts">
-            <Detail
-              label="Contacts"
-              value={
-                <HistoryText
-                  value={row.additionalEmails || "No additional contacts."}
-                />
-              }
-            />
+            {/* The company's additional_contacts rows. This card used to bind
+                to row.additionalEmails, which is hard-coded to "" — so it read
+                "No additional contacts." on every lead in the system. */}
+            <AdditionalContactsList companyId={row.companyId} />
           </DetailCard>
 
           <DetailCard label="Call Outcome">

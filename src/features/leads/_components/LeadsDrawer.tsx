@@ -10,6 +10,7 @@ import {
   Wave,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { openPrintFrame } from "@/lib/print-html";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import Revisions from "@/features/backoffice-shared/Revisions";
@@ -853,6 +854,14 @@ export function LeadsDrawer({
               onChange={handleNotWorkedChange}
             />
           </div>
+        </DetailCard>
+
+        <DetailCard label="Additional Contacts">
+          {/* Separate from "Other Contacts" (free text on the lead) and from
+              the related-lead chips (other LEADS at this company). These are
+              rows in additional_contacts — extra people on file for the
+              company, written by the Add Additional Contacts form. */}
+          <AdditionalContactsList companyId={companyIdForEdit} />
         </DetailCard>
 
         <DetailCard label="Other Contacts">

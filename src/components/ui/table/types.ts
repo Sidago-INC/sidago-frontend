@@ -23,8 +23,12 @@ export type ServerGridConfig = {
   onFiltersChange: (items: FilterItem[], gate: FilterGate) => void;
   onSortChange: (rules: SortRule[]) => void;
   onGroupByChange: (field: string | null) => void;
-  /** True per-group counts from meta.groups, keyed by the group's raw value ("" = blank/NULL). */
-  groupCounts?: { value: string; count: number }[];
+  /**
+   * True per-group counts from meta.groups. One entry per LEAF:  is
+   * the full path (e.g. ["EST", "Hot"]),  its first level. Parent
+   * totals are summed from the leaves.
+   */
+  groupCounts?: { value: string; values?: string[]; count: number }[];
 };
 
 export type Column<T> = {
@@ -103,6 +107,8 @@ export type GroupNode<T> = {
   count?: number;
   /** Raw group value ("" for blank), for building a "show only this" filter. */
   value?: string;
+  /** Raw value at every level down to this node, for one filter per level. */
+  path?: string[];
 };
 
 export type SelectableColumn = { value: string; label: string };

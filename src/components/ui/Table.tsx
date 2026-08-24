@@ -14,7 +14,10 @@ import { GroupPanel } from "./table/GroupPanel";
 import { SortPanel } from "./table/SortPanel";
 import { TableBody } from "./table/TableBody";
 import { TablePagination } from "./table/TablePagination";
-import { useTableState } from "./table/useTableState";
+import {
+  MAX_SERVER_GROUP_LEVELS,
+  useTableState,
+} from "./table/useTableState";
 
 export type {
   Column,
@@ -126,12 +129,22 @@ export function Table<T>({
   // filters to that group and you page inside it. That is why the other groups
   // disappear — they have no rows once the filter is on. This finds that
   // filter so the grid can offer a way back out.
-  const groupField = groupRules[0]?.field;
+  const groupFields = groupRules.map((rule) => rule.field).filter(Boolean);
   const openedGroup =
-    groupField && filterItems.length === 1 && filterItems[0].type === "condition"
-      ? filterItems[0].condition.field === groupField
-        ? filterItems[0].condition.value || "(blank)"
-        : null
+    groupFields.length &&
+    filterItems.length === groupFields.length &&
+    filterItems.every(
+      (item, index) =>
+        item.type === "condition" &&
+        item.condition.field === groupFields[index],
+    )
+      ? filterItems
+          .map((item) =>
+            item.type === "condition"
+              ? item.condition.value || "(blank)"
+              : "",
+          )
+          .join(" › ")
       : null;
 
   const handleTableScrollKeys = (
@@ -245,6 +258,7 @@ export function Table<T>({
             showCounts={showCounts}
             setShowCounts={setShowCounts}
             selectableColumns={groupableColumns}
+            maxLevels={serverGrid ? MAX_SERVER_GROUP_LEVELS : undefined}
             buttonClassName={TOOLBAR_BUTTON_CLASS}
           />
 
@@ -419,29 +433,28 @@ export function Table<T>({
             emptyText={emptyText}
             safeCurrentPage={safeCurrentPage}
             onShowOnlyGroup={
-              // Only meaningful for a server grid, where "show only this group"
-              // means adding a filter the API can apply across every page.
-              serverGrid && groupRules[0]?.field
+              // Only meaningful for a server grid, where "open this group"
+              // means a filter the API applies across every page.
+              serverGrid && groupRules.length
                 ? (group) => {
-                    const field = groupRules[0].field;
-                    const value = group.value ?? "";
-                    // Keep the grouping. Scoping to a group used to clear it,
-                    // which made clicking EST look like grouping had switched
-                    // itself off. With the filter applied AND groupBy still on,
-                    // the server returns one group — EST with its real total —
-                    // and the pages you now page through are all EST.
-                    setFilterItems([
-                      {
-                        id: `only-${field}`,
-                        type: "condition",
-                        condition: {
-                          id: `only-${field}-c`,
-                          field,
-                          operator: value ? "is" : "is_empty",
-                          value,
-                        },
-                      },
-                    ]);
+                    // One condition per level, so opening EST > Hot filters on
+                    // both. `path` carries the raw value at each level.
+                    const path = group.path ?? [group.value ?? ""];
+                    setFilterItems(
+                      path.map((value, level) => {
+                        const field = groupRules[level]?.field ?? "";
+                        return {
+                          id: `only-${field}`,
+                          type: "condition" as const,
+                          condition: {
+                            id: `only-${field}-c`,
+                            field,
+                            operator: value ? ("is" as const) : ("is_empty" as const),
+                            value,
+                          },
+                        };
+                      }),
+                    );
                   }
                 : undefined
             }

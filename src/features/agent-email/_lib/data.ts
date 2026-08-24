@@ -44,6 +44,7 @@ export type AgentEmailRow = {
   leadId: string;
   companyName: string;
   companySymbol: string;
+  companyId: string | null;
   fullName: string;
   phone: string;
   email: string;
@@ -84,6 +85,7 @@ export function mapEmailQueueItem(
     leadId: item.leadId,
     companyName: item.companyName ?? "",
     companySymbol,
+    companyId: item.companyId ?? null,
     fullName: item.fullName ?? "",
     phone: item.phone ?? "",
     email: item.email ?? "",

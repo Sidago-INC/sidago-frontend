@@ -17,6 +17,7 @@ export type SmsQueueItem = {
   isSmsLogged: boolean;
   lastSmsSentAt: string | null;
   notWorkAnymore: boolean;
+  companyId: string | null;
 };
 
 export type SmsQueueResponse = {

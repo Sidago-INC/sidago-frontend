@@ -11,6 +11,7 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
+import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { openPrintFrame } from "@/lib/print-html";
 import type { ClosedContactRow } from "../_lib/data";
 import {
@@ -586,16 +587,10 @@ export function ClosedContactDrawer({
         </DetailCard>
 
         <DetailCard label="Additional Contacts">
-          <EditableField label="Contacts" align="stack">
-            <Textarea
-              value={form.additionalContacts}
-              onChange={(event) =>
-                updateForm("additionalContacts", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
-              placeholder="Add contacts"
-            />
-          </EditableField>
+          {/* The company's additional_contacts rows. This was an editable
+              textarea bound to form.additionalContacts, which is hard-coded to
+              "" and never sent anywhere — typing in it saved nothing. */}
+          <AdditionalContactsList companyId={row.companyId} />
         </DetailCard>
 
         <DetailCard label="Call Outcome">

@@ -33,10 +33,15 @@ export type AdditionalContactRow = {
   id: string;
   firstName: string | null;
   lastName: string | null;
-  fullName: string | null;
+  /**
+   * The API returns `name` (the column on additional_contacts), not
+   * `fullName`. This type used to claim `fullName`, which is simply absent on
+   * the wire — nothing had ever rendered the response, so nothing caught it.
+   */
+  name: string | null;
   email: string | null;
   role: string | null;
-  companyId: string;
+  createdAt: string;
 };
 
 type AdditionalContactsListResponse = {

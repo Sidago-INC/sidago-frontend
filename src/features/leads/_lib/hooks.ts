@@ -217,4 +217,37 @@ export async function createLead(body: CreateLeadBody) {
   return (await api.post("/leads/add-new", body)) as CreateLeadResponse;
 }
 
+export type CompanyLeadRow = {
+  id: string;
+  fullName: string | null;
+  role: string | null;
+  phone: string | null;
+  email: string | null;
+  contactType: string | null;
+  notWorkAnymore: boolean;
+};
+
+/**
+ * Every lead at a company, for the company drawer's roster card.
+ *
+ * Deliberately does not hydrate per-brand states — the card lists who is on
+ * file, and hydrating each lead's states is the N+1 that made the related
+ * contacts endpoint take seven seconds.
+ */
+export function useLeadsByCompany(companyId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["leads", "by-company", companyId],
+    enabled: Boolean(companyId),
+    queryFn: async () => {
+      const json = (await api.get(`/leads/by-company/${companyId}`)) as {
+        ok: true;
+        count: number;
+        data: CompanyLeadRow[];
+      };
+      return json.data;
+    },
+    staleTime: 60_000,
+  });
+}
+
 export { pickerToDirectoryRow };
