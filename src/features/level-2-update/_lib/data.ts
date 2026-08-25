@@ -15,6 +15,9 @@ export type Level2UpdateRow = {
   level_2_result_update: string;
   updated_notes: string;
   call_back_date: string;
+  // Read-only. Today's date while the row is a draft, then replaced with the
+  // server's created_at once the row is logged. It is never sent to the API —
+  // the column used to render a date picker that wrote to nothing.
   created_date: string;
   // Read-only — prefilled from /api/leads/<id>/brand-states when a lead is
   // picked, never edited directly in the row.
@@ -52,8 +55,17 @@ export const level2UpdateCampaignOptions = BRAND_OPTIONS.map((option) => ({
   label: option.value === "BENTON" ? "Benton" : option.label,
 }));
 
+// The user's own date, not UTC. `toISOString()` would stamp a row added after
+// ~7pm Eastern with tomorrow's date.
+function todayLocal(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export function createEmptyLevel2UpdateRow(nextId: number): Level2UpdateRow {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   return {
     id: `l2u-new-${nextId}`,
     lead: "",

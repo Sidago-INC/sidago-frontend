@@ -141,7 +141,18 @@ type Level2PostBody = {
   callBackDate: string;
 };
 
-type Level2PostResponse = { ok: true; id: string };
+type Level2PostResponse = {
+  ok: true;
+  id: string;
+  /** Authoritative timestamp — the grid shows this, not a client-side guess. */
+  createdAt: string;
+  /** Per-brand lead types as they stood immediately after the update landed. */
+  leadTypes: {
+    svg: string | null;
+    benton: string | null;
+    "95rm": string | null;
+  };
+};
 
 // Logs a single Level 2 row to the DB. On success it invalidates the history
 // query so the History page reflects the new row without a manual refresh.
@@ -159,14 +170,10 @@ export function useLogLevel2Result() {
   });
 }
 
-// Reverts a logged Level 2 request by its DB id.
-export function useRevertLevel2Result() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) =>
-      await api.delete(`/level-2-requests/${id}/revert`, {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["level-2-history"] });
-    },
-  });
-}
+// Reverting lives in features/level-2-shared/revert.ts — both this page and
+// Level 2 History need it.
+export {
+  buildRevertMessage,
+  useRevertLevel2Result,
+  type Level2RevertResponse,
+} from "@/features/level-2-shared/revert";

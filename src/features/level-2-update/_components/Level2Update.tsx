@@ -31,9 +31,12 @@ import {
 import {
   useLeadSelectSource,
   useLogLevel2Result,
-  useRevertLevel2Result,
   type BrandStatesResponse,
 } from "../_lib/hooks";
+import {
+  buildRevertMessage,
+  useRevertLevel2Result,
+} from "@/features/level-2-shared/revert";
 
 const cellInputClass =
   "h-8 min-w-[8rem] w-full rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 hover:bg-slate-50 focus:border-slate-200 focus:bg-white focus:text-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900 dark:focus:text-slate-100";
@@ -239,19 +242,31 @@ export function Level2Update() {
     const row = rows.find((r) => r.id === rowId);
     if (!row) return;
 
+    // A row that was logged but has lost its server id must not be dropped
+    // from the grid — that is how deletes used to look like they worked while
+    // the request, the call log and the lead's new type all stayed behind.
+    if (row.logged_at && !row.api_id) {
+      showErrorToast({
+        message:
+          "This row was logged in an earlier session, so it can't be reverted from here. Use Level 2 History instead.",
+      });
+      return;
+    }
+
     if (row.api_id) {
       setDeletingRowId(rowId);
       try {
-        await revertResult.mutateAsync(row.api_id);
+        const result = await revertResult.mutateAsync(row.api_id);
         setRows((current) => current.filter((r) => r.id !== rowId));
         setEditingRowId((current) => (current === rowId ? null : current));
-        showSuccessToast("Level 2 result reverted.");
+        showSuccessToast(buildRevertMessage(result));
       } catch (err) {
         showErrorToast(err);
       } finally {
         setDeletingRowId(null);
       }
     } else {
+      // Never logged — a draft that only ever existed in the browser.
       setRows((current) => current.filter((r) => r.id !== rowId));
       setEditingRowId((current) => (current === rowId ? null : current));
     }
@@ -330,32 +345,19 @@ export function Level2Update() {
         updatedNotes: row.updated_notes,
         callBackDate: row.call_back_date,
       });
-      // Re-fetch brand states so Lead Type cells reflect the result that was
-      // just logged (e.g. "not interested" → Ignore) without a page reload.
-      let leadTypePatch: Partial<Level2UpdateRow> = {};
-      try {
-        const json = (await api.get(
-          `/leads/${row.lead}/brand-states`,
-        )) as BrandStatesResponse;
-        leadTypePatch = {
-          lead_type_sidago: (json.brandStates.svg.leadType ?? "") as
-            | LEAD_TYPE
-            | "",
-          lead_type_benton: (json.brandStates.benton.leadType ?? "") as
-            | LEAD_TYPE
-            | "",
-          lead_type_95rm: (json.brandStates["95rm"].leadType ?? "") as
-            | LEAD_TYPE
-            | "",
-        };
-      } catch {
-        // Logging succeeded; leave lead types as-is if the refresh fails.
-      }
       showSuccessToast("Level 2 result logged.");
+      // The response carries the lead types the update produced and the row's
+      // real created_at. Both are frozen onto the row: this is a record of what
+      // happened, so it must not drift when the lead moves again later.
       patchRow(rowId, {
         logged_at: new Date().toISOString(),
         api_id: result.id,
-        ...leadTypePatch,
+        created_date: result.createdAt
+          ? result.createdAt.slice(0, 10)
+          : row.created_date,
+        lead_type_sidago: (result.leadTypes?.svg ?? "") as LEAD_TYPE | "",
+        lead_type_benton: (result.leadTypes?.benton ?? "") as LEAD_TYPE | "",
+        lead_type_95rm: (result.leadTypes?.["95rm"] ?? "") as LEAD_TYPE | "",
       });
     } catch (err) {
       showErrorToast(err);
@@ -518,22 +520,14 @@ export function Level2Update() {
         ),
     },
     {
+      // Read-only. This used to render a date picker, but created_date is not
+      // part of the POST body — and could not be, since the API rejects
+      // unknown fields — so editing it changed nothing. It shows today while
+      // the row is a draft and the row's real created_at once it is logged.
       title: "Created date",
       key: "created_date",
       type: "date",
-      render: (row) =>
-        isEditingRow(row.id) ? (
-          <div onClick={(event) => event.stopPropagation()}>
-            <DatePickerField
-              value={row.created_date}
-              onChange={(value) => updateRow(row.id, "created_date", value)}
-              className={cellDatePickerClass}
-              placeholder="Pick a date"
-            />
-          </div>
-        ) : (
-          <ReadText value={row.created_date} />
-        ),
+      render: (row) => <ReadText value={row.created_date} />,
     },
     {
       title: "Lead Type Sidago",

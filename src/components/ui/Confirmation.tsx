@@ -7,6 +7,9 @@ type ConfirmModalProps = {
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  /** Verb on the confirm button. Not every destructive action is a delete. */
+  confirmLabel?: string;
+  loadingLabel?: string;
 };
 
 export function Confirmation({
@@ -16,6 +19,8 @@ export function Confirmation({
   onConfirm,
   onCancel,
   loading = false,
+  confirmLabel = "Delete",
+  loadingLabel = "Deleting...",
 }: ConfirmModalProps) {
   if (!open) return null;
 
@@ -42,7 +47,7 @@ export function Confirmation({
             disabled={loading}
             className="px-2 py-1 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
-            {loading ? "Deleting..." : "Delete"}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>
