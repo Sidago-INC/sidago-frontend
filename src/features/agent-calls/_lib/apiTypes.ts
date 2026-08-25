@@ -12,7 +12,9 @@ export type QueueLead = {
   lastCalledDate: string | null;
   followUpDate: string | null;
   companyId: string;
-  companyName: string;
+  // Nullable: the Calls Log LEFT JOINs companies, so a lead with no company
+  // arrives with both of these null.
+  companyName: string | null;
   companySymbol: string | null;
   notWorkAnymore: boolean;
   matchedBlock: number;
@@ -127,12 +129,16 @@ export type LeadDetailResponse = {
     /** Cross-brand last action timestamp when provided by lead detail. */
     lastActionDate?: string | null;
   };
+  // Null when the lead has no company. The backend already types this as
+  // `CompanyCoreRow | null`; declaring it non-null here meant every `?.` in
+  // the callers was voluntary rather than enforced.
   company: {
     id: string;
-    companyName: string;
+    companyName: string | null;
     companySymbol: string | null;
-    timezone: string;
-  };
+    timezone: string | null;
+    country: string | null;
+  } | null;
   brandState: BrandState;
   peerBrandStates: BrandState[];
   history: HistoryEntry[] | HistoryByBrand;

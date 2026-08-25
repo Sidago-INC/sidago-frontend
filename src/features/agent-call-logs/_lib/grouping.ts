@@ -1,5 +1,5 @@
 import type { QueueLead } from "@/features/agent-calls/_lib/apiTypes";
-import { getCompanySymbol } from "@/features/backoffice-shared/constants";
+import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 
 // The sidebar tree is built from the server's bucket summary, not from the
 // loaded rows. Grouping in the browser was only ever possible because the page
@@ -8,18 +8,20 @@ import { getCompanySymbol } from "@/features/backoffice-shared/constants";
 // described before any of them exist.
 
 export function getCallLogLeadLabel(lead: QueueLead): string {
-  const rawSymbol =
-    lead.companySymbol?.trim() || getCompanySymbol(lead.companyName);
-  const symbolParts = rawSymbol.split(":").map((part) => part.trim()).filter(Boolean);
-  const companySymbol =
-    symbolParts.length > 1 ? symbolParts[symbolParts.length - 1]! : rawSymbol;
-  const fullName = lead.fullName?.trim();
-
-  if (companySymbol && fullName) {
-    return `${companySymbol}-${fullName}`;
-  }
-
-  return fullName || companySymbol || lead.leadIdExternal || lead.leadId;
+  // Deliberately the SHARED label, not a local variant.
+  //
+  // This used to split the symbol on ":" and keep only the last part, so
+  // "TSX : ARL" rendered as "ARL-Winfield Ding" in the list while the detail
+  // panel beside it — and All Leads, and every report — showed "TSX : ARL".
+  // 8,256 of 16,004 companies carry an exchange prefix, so the two disagreed
+  // for over half the data. Splitting also mangled the handful of symbols with
+  // a colon inside the name itself.
+  return getLeadGridLabel({
+    companySymbol: lead.companySymbol,
+    companyName: lead.companyName,
+    fullName: lead.fullName,
+    leadIdExternal: lead.leadIdExternal,
+  });
 }
 
 /** Label for a timezone bucket. "" is the real bucket for "no timezone". */

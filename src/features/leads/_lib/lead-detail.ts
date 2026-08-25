@@ -209,10 +209,13 @@ export function mapLeadDetailResponseToPayload(
       contactType: lead.contactType,
       otherContacts: lead.otherContacts ?? null,
       notWorkAnymore: lead.notWorkAnymore,
-      companyId: company.id,
-      companyName: company.companyName,
-      companySymbol: company.companySymbol,
-      companyTimezone: company.timezone,
+      // A lead can have no company at all (19 of them do), in which case the
+      // detail endpoint returns company: null.
+      companyId: company?.id ?? null,
+      companyName: company?.companyName ?? null,
+      companySymbol: company?.companySymbol ?? null,
+      companyTimezone: company?.timezone ?? null,
+      companyCountry: company?.country ?? null,
       lastActionDate: response.lastActionDate ?? lead.lastActionDate ?? null,
     },
     brandStates,

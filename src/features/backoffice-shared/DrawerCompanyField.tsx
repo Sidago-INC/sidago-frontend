@@ -4,6 +4,7 @@ import {
   TimezoneBadge,
   TimezoneSelect,
 } from "@/components/ui";
+import { CountryPicker } from "@/features/companies/_components/CountryPicker";
 
 // Company symbol / name / timezone are columns on `companies`, not on the lead.
 // Editing them here rewrites the company record, so every lead at that company
@@ -14,11 +15,13 @@ type CompanyEdit = {
   symbol: string;
   name: string;
   timezone: string;
+  country: string;
   /** Leads at this company, for the "this affects N leads" hint. */
   leadCount?: number;
   onSymbolChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onTimezoneChange: (value: string) => void;
+  onCountryChange: (value: string) => void;
 };
 
 type DrawerCompanyFieldProps = {
@@ -92,6 +95,17 @@ export function DrawerCompanyField({
               value={companyEdit.timezone}
               onChange={(value) => companyEdit.onTimezoneChange(value)}
               className="py-1.5 text-xs"
+            />
+          </CompanyEditRow>
+
+          <CompanyEditRow label="Country">
+            {/* Lives on `companies`, like symbol / name / timezone. The stored
+                values are inconsistent ("USA" vs "United States", "CANADA" vs
+                "Canada"), so this is a picker rather than free text — editing a
+                company now normalises it. */}
+            <CountryPicker
+              value={companyEdit.country}
+              onChange={(value: string) => companyEdit.onCountryChange(value)}
             />
           </CompanyEditRow>
 

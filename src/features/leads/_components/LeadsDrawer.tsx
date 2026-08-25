@@ -61,6 +61,7 @@ type CompanyPatchFields = {
   companySymbol?: string;
   companyName?: string;
   timezone?: string;
+  country?: string;
 };
 
 type LeadsDrawerProps = {
@@ -169,7 +170,7 @@ export function LeadsDrawer({
   const [editModeKey, setEditModeKey] = useState<string | null>(null);
   const [companyEdits, setCompanyEdits] = useState<{
     key: string;
-    value: { symbol: string; name: string; timezone: string };
+    value: { symbol: string; name: string; timezone: string; country: string };
   } | null>(null);
   const [formState, setFormState] = useState<{
     key: string;
@@ -320,8 +321,15 @@ export function LeadsDrawer({
       symbol: displayCompanySymbol ?? "",
       name: selectedCompanyName || form?.companyName || "",
       timezone: displayTimezone ?? "",
+      country: detailPayload?.lead.companyCountry ?? "",
     }),
-    [displayCompanySymbol, displayTimezone, form?.companyName, selectedCompanyName],
+    [
+      detailPayload?.lead.companyCountry,
+      displayCompanySymbol,
+      displayTimezone,
+      form?.companyName,
+      selectedCompanyName,
+    ],
   );
 
   // `selectedCompanyId` resolves from the company fetched by symbol, which is
@@ -338,7 +346,7 @@ export function LeadsDrawer({
     companyEdits?.key === companyIdForEdit ? companyEdits.value : companyBaseline;
 
   const updateCompanyForm = (
-    key: "symbol" | "name" | "timezone",
+    key: "symbol" | "name" | "timezone" | "country",
     value: string,
   ) => {
     if (!companyIdForEdit) return;
@@ -618,6 +626,9 @@ export function LeadsDrawer({
     if (companyForm.timezone.trim() !== companyBaseline.timezone.trim()) {
       companyDiff.timezone = companyForm.timezone.trim();
     }
+    if (companyForm.country.trim() !== companyBaseline.country.trim()) {
+      companyDiff.country = companyForm.country.trim();
+    }
     const hasCompanyChanges = Object.keys(companyDiff).length > 0;
 
     if (hasCompanyChanges && !companyIdForEdit) {
@@ -781,10 +792,12 @@ export function LeadsDrawer({
               symbol: companyForm.symbol,
               name: companyForm.name,
               timezone: companyForm.timezone,
+              country: companyForm.country,
               leadCount: relatedContacts.length + 1,
               onSymbolChange: (value) => updateCompanyForm("symbol", value),
               onNameChange: (value) => updateCompanyForm("name", value),
               onTimezoneChange: (value) => updateCompanyForm("timezone", value),
+              onCountryChange: (value) => updateCompanyForm("country", value),
             }}
           />
         </DetailCard>

@@ -26,8 +26,19 @@ export const assigneeOptions = [
 
 export const timezoneOptions = TIMEZONE_OPTIONS;
 
-export function getCompanySymbol(companyName: string): string {
-  const words = companyName
+/**
+ * Initials for a company with no ticker symbol.
+ *
+ * Accepts nullish because a lead can have no company at all — 19 of them do,
+ * and the Calls Log LEFT JOINs companies, so `companyName` really does arrive
+ * as null. The parameter used to be a bare `string`, which was a lie the type
+ * system could not catch: two Calls Log call sites passed the value straight
+ * through and `null.split` took the whole page down with it.
+ */
+export function getCompanySymbol(
+  companyName: string | null | undefined,
+): string {
+  const words = (companyName ?? "")
     .split(/\s+/)
     .map((word) => word.trim())
     .filter(Boolean);
@@ -80,16 +91,26 @@ export function getLeadGridLabel(row: {
   companySymbol?: string | null;
   companyName?: string | null;
   fullName?: string | null;
+  /** Airtable record id, used only when there is nothing else to show. */
+  leadIdExternal?: string | null;
 }): string {
   const companySymbol =
-    row.companySymbol?.trim() || getCompanySymbol(row.companyName ?? "");
+    row.companySymbol?.trim() || getCompanySymbol(row.companyName);
   const fullName = row.fullName?.trim() ?? "";
 
   if (companySymbol && fullName) {
     return `${companySymbol}-${fullName}`;
   }
 
-  return companySymbol || fullName || "Lead";
+  // 19 leads have no company at all, and one of those has no name either.
+  // The record id is at least searchable; past that say so plainly rather
+  // than printing a bare "Lead" that could be any of them.
+  return (
+    companySymbol ||
+    fullName ||
+    row.leadIdExternal?.trim() ||
+    "Unnamed lead"
+  );
 }
 
 export function getRowCompanySymbol(row: {

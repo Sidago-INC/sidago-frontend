@@ -82,6 +82,7 @@ export type FullLead = {
   companyName: string | null;
   companySymbol: string | null;
   companyTimezone: string | null;
+  companyCountry: string | null;
   lastActionDate?: string | null;
 };
 

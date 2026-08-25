@@ -307,14 +307,24 @@ export function AgentCallLogs() {
   const brandCode = summary?.brandCode ?? "svg";
   const brandKey = toBrandKey(brandCode);
 
-  // Exactly one bucket is open at a time, and it is the only thing fetched.
-  // `null` means "nothing chosen yet" — resolved below to the first bucket the
-  // summary reports, so the page lands on real rows instead of an empty panel.
+  // Two independent things, which used to be one.
+  //
+  //  * `expandedLeadTypes` — which sections (Hot, General) are open. Several
+  //    can be at once; this is pure presentation.
+  //  * `openLeadType` / `openTimezone` — the single bucket whose rows are
+  //    fetched and listed. Only one, because a bucket is a network request.
+  //
+  // Collapsing a timezone used to close its parent section too: both levels
+  // read `activeBucket`, so clearing it made "General is open" and "EST is
+  // open" false in the same breath. Separating them is the fix.
   const [openLeadType, setOpenLeadType] = useState<string | null>(null);
   const [openTimezone, setOpenTimezone] = useState<string | null>(null);
+  const [expandedLeadTypes, setExpandedLeadTypes] = useState<Set<string> | null>(
+    null,
+  );
   // Distinguishes "nothing chosen yet" (fall through to the first bucket) from
-  // "the user collapsed it" (show nothing). Without this the auto-opened first
-  // group could not be closed — clearing the selection just re-derived it.
+  // "the user closed it" (show no rows). Without this the auto-opened first
+  // bucket could not be closed — clearing the selection just re-derived it.
   const [collapsed, setCollapsed] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -353,6 +363,15 @@ export function AgentCallLogs() {
     return { leadType: firstGroup.leadType, timezone: firstTimezone.timezone };
   }, [collapsed, groups, openLeadType, openTimezone]);
 
+  // Which sections are drawn open. Whatever the agent has toggled, plus the
+  // section holding the loaded bucket — otherwise rows would be fetched and
+  // then hidden behind a closed header.
+  const openSections = useMemo(() => {
+    const next = new Set(expandedLeadTypes ?? []);
+    if (activeBucket) next.add(activeBucket.leadType);
+    return next;
+  }, [activeBucket, expandedLeadTypes]);
+
   const bucketQuery = useCallsLogBucket({
     agentSlug,
     leadType: activeBucket?.leadType ?? "",
@@ -380,10 +399,13 @@ export function AgentCallLogs() {
     (summaryFetching && !summaryLoading) ||
     (bucketFetching && !bucketLoading && !isFetchingNextPage);
 
-  // Infinite scroll: General buckets run to five figures for a single agent, so
-  // rows arrive 500 at a time as the list is scrolled. Hot is returned whole —
-  // there are 27 Hot rows across the entire system.
-  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  // Rows arrive 500 at a time — a General bucket runs to five figures for a
+  // single agent, while Hot is returned whole (27 Hot rows exist system-wide).
+  //
+  // Loading is explicit. This used to auto-fetch from an IntersectionObserver
+  // as the list scrolled, which meant scrolling quietly appended thousands of
+  // rows and moved the scroll position under the reader. Clicking "Load more"
+  // keeps the agent in control of how much is on screen.
   const leadListRef = useRef<HTMLDivElement | null>(null);
 
   const tryLoadMore = useCallback(() => {
@@ -391,22 +413,6 @@ export function AgentCallLogs() {
       void fetchNextPage();
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
-
-  useEffect(() => {
-    const root = leadListRef.current;
-    const sentinel = loadMoreSentinelRef.current;
-    if (!root || !sentinel || !hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) tryLoadMore();
-      },
-      { root, rootMargin: "128px", threshold: 0 },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, rows.length, tryLoadMore]);
 
   // Switching agents resets the whole view — the previous agent's bucket
   // selection means nothing here.
@@ -769,25 +775,47 @@ export function AgentCallLogs() {
     leadListRef.current?.scrollTo({ top: 0 });
   };
 
+  // Opening or closing a section is presentation only — it never touches the
+  // loaded bucket, so closing General and reopening it leaves the same rows in
+  // place rather than refetching.
   const toggleLeadType = (leadType: string) => {
-    if (activeBucket?.leadType === leadType) {
+    const closing = openSections.has(leadType);
+
+    setExpandedLeadTypes(() => {
+      const next = new Set(openSections);
+      if (closing) next.delete(leadType);
+      else next.add(leadType);
+      return next;
+    });
+
+    // Closing a section that holds the loaded bucket closes its rows too —
+    // otherwise `openSections` would immediately re-add it and the header
+    // could never be shut.
+    if (closing && activeBucket?.leadType === leadType) {
       setCollapsed(true);
-      return;
+      setSelectedLeadId(null);
+      setLastLead(null);
     }
-    const target = groups.find((group) => group.leadType === leadType);
-    const firstTimezone = target?.timezones[0];
-    if (!firstTimezone) return;
-    openBucket(leadType, firstTimezone.timezone);
   };
 
   const toggleTimezone = (leadType: string, timezone: string) => {
-    if (
-      activeBucket?.leadType === leadType &&
-      activeBucket?.timezone === timezone
-    ) {
+    const isOpenBucket =
+      activeBucket?.leadType === leadType && activeBucket?.timezone === timezone;
+
+    if (isOpenBucket) {
+      // Close the rows only. Pin the section open first: until the agent
+      // touches a section, `openSections` is DERIVED from the active bucket, so
+      // clearing the bucket would collapse the section right along with it —
+      // exactly the bug this is fixing.
+      setExpandedLeadTypes(() => new Set(openSections).add(leadType));
       setCollapsed(true);
+      setSelectedLeadId(null);
+      setLastLead(null);
       return;
     }
+
+    // Opening a timezone implies its section is open.
+    setExpandedLeadTypes(() => new Set(openSections).add(leadType));
     openBucket(leadType, timezone);
   };
 
@@ -879,8 +907,11 @@ export function AgentCallLogs() {
                         {groups.length ? (
                           <div className="flex min-h-0 flex-1 flex-col space-y-2">
                             {groups.map((group) => {
-                              const isLeadTypeExpanded =
-                                activeBucket?.leadType === group.leadType;
+                              // Section open state, independent of which
+                              // bucket happens to be loaded.
+                              const isLeadTypeExpanded = openSections.has(
+                                group.leadType,
+                              );
 
                               return (
                                 <div
@@ -920,9 +951,14 @@ export function AgentCallLogs() {
                                           group.leadType,
                                           timezoneGroup.timezone,
                                         );
+                                        // Both halves must match. Comparing
+                                        // only the timezone meant Hot ▸ EST
+                                        // also lit up General ▸ EST.
                                         const isTimezoneExpanded =
+                                          activeBucket?.leadType ===
+                                            group.leadType &&
                                           activeBucket?.timezone ===
-                                          timezoneGroup.timezone;
+                                            timezoneGroup.timezone;
 
                                         return (
                                           <div
@@ -1000,31 +1036,22 @@ export function AgentCallLogs() {
                                                   );
                                                 })}
 
-                                                {/* Trips the observer that
-                                                    pulls the next 500 rows. */}
-                                                <div
-                                                  ref={loadMoreSentinelRef}
-                                                  className="h-px shrink-0"
-                                                />
-
-                                                {isFetchingNextPage ? (
-                                                  <p className="shrink-0 py-2 text-center text-xs text-slate-400">
-                                                    Loading more...
-                                                  </p>
-                                                ) : null}
-
+                                                {/* The only way more rows
+                                                    arrive — nothing loads on
+                                                    scroll any more. */}
                                                 {!bucketLoading &&
                                                 hasNextPage ? (
                                                   <Button
                                                     onClick={tryLoadMore}
-                                                    className="shrink-0 cursor-pointer rounded border border-slate-200 px-2 py-1 text-center text-xs text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                                                    disabled={isFetchingNextPage}
+                                                    className="mt-1 shrink-0 cursor-pointer rounded border border-indigo-200 bg-indigo-50/60 px-2 py-1.5 text-center text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-wait disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
                                                   >
-                                                    Load more (
-                                                    {(
-                                                      timezoneGroup.count -
-                                                      rows.length
-                                                    ).toLocaleString()}{" "}
-                                                    left)
+                                                    {isFetchingNextPage
+                                                      ? "Loading…"
+                                                      : `Load 500 more (${(
+                                                          timezoneGroup.count -
+                                                          rows.length
+                                                        ).toLocaleString()} left)`}
                                                   </Button>
                                                 ) : null}
                                               </div>
