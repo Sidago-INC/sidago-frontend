@@ -17,7 +17,10 @@ import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users } from "lucide-react";
-import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  getLeadGridLabel,
+  timezoneOptions,
+} from "@/features/backoffice-shared/constants";
 import {
   type FixQueueRow,
   getFixQueueTimezone,
@@ -75,10 +78,9 @@ export function FixLeadsTable({
         title: "Company",
         key: "companySymbol",
         getValue: (row) => displaySymbol(row),
-        type: "select",
-        options: Array.from(new Set(data.map(displaySymbol)))
-          .filter(Boolean)
-          .map((value) => ({ label: value, value })),
+        // Open-ended: there is no fixed list of company symbols to pick from,
+        // so this filters as free text ("contains", "does not contain", …).
+        type: "text",
         render: (row) => (
           <CompanySymbolBadge
             symbol={displaySymbol(row)}
@@ -91,9 +93,12 @@ export function FixLeadsTable({
         key: "timezone",
         getValue: (row) => getFixQueueTimezoneLabel(row),
         type: "select",
-        options: Array.from(
-          new Set(data.map(getFixQueueTimezoneLabel).filter(Boolean)),
-        ).map((value) => ({ label: value, value })),
+        // The five timezones the system knows about, NOT the ones present in
+        // the rows on screen. Deriving them from `data` meant the list shrank
+        // as filters narrowed it: after "Timezone is PST", the value dropdown
+        // for a second condition offered only PST, because PST was all that
+        // survived the first. A closed set has to come from the domain.
+        options: timezoneOptions,
         render: (row) => {
           const timezone = getFixQueueTimezone(row);
           return timezone ? (

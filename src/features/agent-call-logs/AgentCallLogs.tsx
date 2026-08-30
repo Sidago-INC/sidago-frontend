@@ -1283,7 +1283,6 @@ export function AgentCallLogs() {
             }}
             callBackDateError={companyContactCallBackDateError}
             outcomeDisabled={actionPending}
-            historyEditable
             showAllCompanyContacts={false}
             isDrawer
             allCompanyContacts={[]}
@@ -1307,7 +1306,6 @@ function CallLogDetailContent({
   onCallBackDateChange,
   callBackDateError,
   outcomeDisabled = false,
-  historyEditable = false,
   showAllCompanyContacts,
   isDrawer,
   allCompanyContacts,
@@ -1327,7 +1325,6 @@ function CallLogDetailContent({
   onCallBackDateChange: (date: string) => void;
   callBackDateError?: string;
   outcomeDisabled?: boolean;
-  historyEditable?: boolean;
   showAllCompanyContacts: boolean;
   isDrawer: boolean;
   allCompanyContacts: CompanyContact[];
@@ -1460,26 +1457,20 @@ function CallLogDetailContent({
 
       <DetailCard label="History">
         <EditableField label="History Calls" align="stack">
+          {/* Read-only, deliberately. This panel renders history assembled
+              from call_logs rows; free text typed here has no row to belong
+              to, so it saved "successfully" and then never appeared. Calls are
+              recorded on the Calls page, which writes a real call_logs row. */}
           <Textarea
             value={form.historyCalls}
-            readOnly={!historyEditable}
-            onChange={
-              historyEditable
-                ? (event) => onUpdateForm("historyCalls", event.target.value)
-                : undefined
-            }
+            readOnly
             className="text-xs font-semibold leading-5"
           />
         </EditableField>
         <EditableField label="History Notes" align="stack">
           <Textarea
             value={form.historyNotes}
-            readOnly={!historyEditable}
-            onChange={
-              historyEditable
-                ? (event) => onUpdateForm("historyNotes", event.target.value)
-                : undefined
-            }
+            readOnly
             className="text-xs font-semibold leading-5"
           />
         </EditableField>

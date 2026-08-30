@@ -55,6 +55,36 @@ export function gridStateKey(pathname: string): string {
   return PREFIX + pathname;
 }
 
+/**
+ * Forget every remembered grid view.
+ *
+ * sessionStorage is scoped to the TAB, not to the session — it outlives a
+ * logout, so signing out and signing back in as someone else in the same tab
+ * handed the second person the first person's filters. Reported after the
+ * migration: a "Timezone is INTL" filter set by one user was still applied for
+ * the next.
+ *
+ * Called from `logout()`, which is the single exit point for both the menu
+ * action and an expired-token redirect, so there is no way out of the app that
+ * skips it.
+ */
+export function clearAllGridState(): void {
+  const store = storage();
+  if (!store) return;
+
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (key && key.startsWith(PREFIX)) keys.push(key);
+    }
+    // Collected first: removing during iteration reindexes the store.
+    for (const key of keys) store.removeItem(key);
+  } catch {
+    // Storage disabled — nothing was remembered in the first place.
+  }
+}
+
 export function readGridState(pathname: string): GridStateSnapshot | null {
   const store = storage();
   if (!store) return null;

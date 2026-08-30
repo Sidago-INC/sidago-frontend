@@ -117,7 +117,25 @@ export const Sidebar = ({
         </Button>
       </div>
 
-      <nav className="mb-10 mt-4 flex-1 overflow-y-auto overflow-x-visible px-3">
+      {/*
+        `overflow-y-auto overflow-x-visible` does not do what it reads like.
+        CSS promotes `visible` to `auto` whenever the other axis scrolls, so
+        this container was scrollable on BOTH axes — and the collapsed rail's
+        flyout sub-menu (positioned `left-full`, i.e. outside the rail) pushed
+        the scroll width instead of overflowing. That is the "scroll sideways
+        to reach Reports' sub-pages" bug.
+
+        Collapsed, the rail is icons only and short enough not to need
+        scrolling, so overflow is released on both axes and the flyout escapes.
+        Expanded, the labelled list can be long, so vertical scrolling stays —
+        and no flyout is used there, sub-items render inline.
+      */}
+      <nav
+        className={clsx(
+          "mb-10 mt-4 flex-1 px-3",
+          isCollapsed ? "overflow-visible" : "overflow-y-auto overflow-x-hidden",
+        )}
+      >
         {navigations.map((item) => (
           <SidebarItem
             key={item.href ?? item.label}

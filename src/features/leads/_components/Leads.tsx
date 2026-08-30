@@ -61,7 +61,7 @@ export function Leads() {
         title: "Lead ID",
         key: "lead",
         getValue: (row) => getLeadGridLabel(row),
-        type: "select",
+        type: "text",
         options: rows.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
@@ -72,7 +72,7 @@ export function Leads() {
         title: "Company Symbol",
         key: "companySymbol",
         getValue: (row) => getRowCompanySymbol(row),
-        type: "select",
+        type: "text",
         options: getCompanySymbolOptions(rows).map((value) => ({
           label: value,
           value,

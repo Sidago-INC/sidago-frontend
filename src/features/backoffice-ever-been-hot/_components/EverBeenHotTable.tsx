@@ -63,7 +63,7 @@ export function EverBeenHotTable({
         title: "Lead ID",
         key: "lead",
         getValue: (row) => getLeadGridLabel(row),
-        type: "select",
+        type: "text",
         options: data.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
@@ -74,7 +74,7 @@ export function EverBeenHotTable({
         title: "Company Symbol",
         key: "companySymbol",
         getValue: (row) => getRowCompanySymbol(row),
-        type: "select",
+        type: "text",
         options: getCompanySymbolOptions(data).map((value) => ({
           label: value,
           value,

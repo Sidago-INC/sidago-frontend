@@ -530,7 +530,7 @@ export function Level2Update() {
       render: (row) => <ReadText value={row.created_date} />,
     },
     {
-      title: "Lead Type Sidago",
+      title: "Lead Type SVG",
       key: "lead_type_sidago",
       render: (row) => <TypeBadge value={row.lead_type_sidago} kind="lead" />,
     },

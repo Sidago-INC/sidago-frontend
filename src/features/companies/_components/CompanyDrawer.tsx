@@ -13,7 +13,7 @@ import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalC
 import { useLeadsByCompany } from "@/features/leads/_lib/hooks";
 import { openPrintFrame } from "@/lib/print-html";
 import type { TIMEZONE } from "@/types/timezone.types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CountryPicker } from "./CountryPicker";
 import Revisions from "@/features/backoffice-shared/Revisions";
 
@@ -65,6 +65,24 @@ export function CompanyDrawer({
 }: CompanyDrawerProps) {
   const [copied, setCopied] = useState(false);
   const [isEditMode, setIsEditMode] = useState(mode === "create");
+
+  // Save / Reset / Cancel only earn their space once there is something to
+  // save. Previously they appeared the moment the panel opened in edit mode,
+  // so a read-only look at a company presented three action buttons with
+  // nothing to act on.
+  //
+  // After a successful save the parent refetches and `initialCompany` catches
+  // up with `company`, so this flips back to false and the footer clears
+  // itself — no extra bookkeeping needed.
+  const isDirty = useMemo(
+    () =>
+      (Object.keys(company) as Array<keyof COMPANY>).some(
+        (key) => (company[key] ?? "") !== (initialCompany[key] ?? ""),
+      ),
+    [company, initialCompany],
+  );
+  // Creating always needs a Save — there is no baseline to differ from.
+  const showFooter = isEditMode && (mode === "create" || isDirty);
   const title = mode === "create" ? "Create Company" : "Edit Company";
   const subtitle =
     mode === "create"
@@ -169,7 +187,7 @@ export function CompanyDrawer({
       }
       footer={
         <div className="flex flex-col">
-          {isEditMode ? (
+          {showFooter ? (
             <EditableDrawerFooter
               onCancel={() => {
                 setIsEditMode(mode === "create");
