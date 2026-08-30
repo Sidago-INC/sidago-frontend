@@ -106,6 +106,11 @@ export function FixLeadEditForm() {
     [data],
   );
 
+  // Whether the lead was ALREADY marked before this edit — the cross-brand
+  // void warning is about what saving will newly do, so it only shows when the
+  // operator is the one turning it on.
+  const baselineNotWorkAnymore = initialForm?.notWorkAnymore ?? false;
+
   useEffect(() => {
     if (initialForm) setForm(initialForm);
   }, [initialForm]);
@@ -357,14 +362,22 @@ export function FixLeadEditForm() {
                   )}
                 </div>
               </div>
-              <CheckboxInput
-                label="Not Work Anymore"
-                checked={form.notWorkAnymore}
-                onChange={(event) =>
-                  updateField("notWorkAnymore", event.target.checked)
-                }
-                wrapperClassName="h-10 justify-center rounded border border-slate-200 px-4 dark:border-slate-700 md:self-end"
-              />
+              <div className="md:self-end">
+                <CheckboxInput
+                  label="Not Work Anymore"
+                  checked={form.notWorkAnymore}
+                  onChange={(event) =>
+                    updateField("notWorkAnymore", event.target.checked)
+                  }
+                  wrapperClassName="h-10 justify-center rounded border border-slate-200 px-4 dark:border-slate-700"
+                />
+                {form.notWorkAnymore && !baselineNotWorkAnymore ? (
+                  <p className="mt-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    On save, this lead is marked VOID across all brands — SVG,
+                    Benton and 95RM.
+                  </p>
+                ) : null}
+              </div>
             </section>
 
             <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">

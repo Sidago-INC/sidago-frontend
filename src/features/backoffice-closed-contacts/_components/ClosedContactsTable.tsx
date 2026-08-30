@@ -58,7 +58,7 @@ export function ClosedContactsTable({
         title: "Lead ID",
         key: "lead",
         getValue: (row) => getLeadGridLabel(row),
-        type: "select",
+        type: "text",
         options: data.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
@@ -70,7 +70,7 @@ export function ClosedContactsTable({
         title: "Company Symbol",
         key: "companySymbol",
         getValue: (row) => getCompanySymbol(row.companyName),
-        type: "select",
+        type: "text",
         options: getCompanySymbolOptions(data).map((value) => ({
           label: value,
           value,

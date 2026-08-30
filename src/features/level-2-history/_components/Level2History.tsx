@@ -79,7 +79,7 @@ export function Level2History() {
       { title: "Call Back Date", key: "call_back_date", type: "date" },
       { title: "Created Date", key: "created_date", type: "date" },
       {
-        title: "Lead Type Sidago",
+        title: "Lead Type SVG",
         key: "lead_type_sidago",
         render: (row) => <LeadTypeCell value={row.lead_type_sidago} />,
       },

@@ -4,7 +4,7 @@ import { type NavigationItem } from "@/lib/navigation";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 
 export type Props = {
@@ -91,6 +91,41 @@ export const SidebarItem = ({
     value: null,
   });
   const [flyoutOpen, setFlyoutOpen] = useState(false);
+
+  // Closing the flyout the instant the pointer leaves is unusable: the icon and
+  // the menu are separate boxes, so any route between them — however the offset
+  // is drawn — passes through space that belongs to neither, and the menu
+  // vanishes mid-reach.
+  //
+  // A short grace period fixes it properly rather than relying on the two boxes
+  // touching exactly. Leaving schedules the close; re-entering either the icon
+  // or the menu cancels it. 400ms is long enough to cross the gap without
+  // hurrying and short enough that a menu never feels stuck open.
+  const closeTimer = useRef<number | null>(null);
+
+  const cancelClose = () => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const openFlyout = () => {
+    cancelClose();
+    setFlyoutOpen(true);
+  };
+
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => {
+      setFlyoutOpen(false);
+      closeTimer.current = null;
+    }, 400);
+  };
+
+  // A pending close must not fire after the item unmounts, or after the sidebar
+  // is expanded and the flyout is no longer the thing on screen.
+  useEffect(() => cancelClose, []);
   const isOpen =
     manualOpenState.routeSignature === routeSignature
       ? (manualOpenState.value ?? isBranchActive)
@@ -172,12 +207,15 @@ export const SidebarItem = ({
           // was a button that did nothing and could never reveal its pages.
           <div
             className="relative"
-            onMouseEnter={() => setFlyoutOpen(true)}
-            onMouseLeave={() => setFlyoutOpen(false)}
+            onMouseEnter={openFlyout}
+            onMouseLeave={scheduleClose}
           >
             <button
               type="button"
-              onClick={() => setFlyoutOpen((open) => !open)}
+              onClick={() => {
+                cancelClose();
+                setFlyoutOpen((open) => !open);
+              }}
               aria-expanded={flyoutOpen}
               aria-haspopup="menu"
               title={item.label}
@@ -187,9 +225,20 @@ export const SidebarItem = ({
             </button>
 
             {flyoutOpen && (
+              // The 8px offset is PADDING on this positioner, not a margin on
+              // the panel. As a margin it was dead space: the pointer left the
+              // rail before it reached the menu, `onMouseLeave` fired on the
+              // wrapper, and the flyout closed the instant you moved toward
+              // it. As padding the gap belongs to a hovered element, so the
+              // path from icon to menu is unbroken.
               <div
                 role="menu"
-                className="absolute left-full top-0 z-50 ml-2 min-w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+                onMouseEnter={openFlyout}
+                onMouseLeave={scheduleClose}
+                className="absolute left-full top-0 z-50 pl-2"
+              >
+              <div
+                className="min-w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
               >
                 <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   {item.label}
@@ -206,6 +255,7 @@ export const SidebarItem = ({
                     itemKey={`${resolvedKey}-${child.label}-${index}`}
                   />
                 ))}
+              </div>
               </div>
             )}
           </div>

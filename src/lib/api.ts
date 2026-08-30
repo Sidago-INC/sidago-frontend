@@ -1,5 +1,6 @@
 import { tokenService } from "./token";
 import { setAuthNotice } from "./auth-routing";
+import { clearAllGridState } from "./grid-state-memory";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -97,12 +98,52 @@ async function refreshToken() {
 
 export function logout(message?: string) {
   tokenService.clear();
+  // Grid filters/sort/grouping live in sessionStorage, which is scoped to the
+  // TAB and therefore outlives a logout. Without this, signing in as someone
+  // else in the same tab inherits the previous user's filters.
+  clearAllGridState();
 
   if (message) {
     setAuthNotice(message);
   }
 
-  window.location.href = "/";
+  // `replace`, not `href`: assigning href PUSHES a history entry, so the CRM
+  // page the user just left stayed one Back press away. Replacing drops it.
+  //
+  // On its own that is not enough — the browser can still serve the old page
+  // from the back/forward cache, fully rendered, without re-running any script
+  // that would notice the tokens are gone. `installBfcacheAuthGuard` below
+  // closes that door.
+  window.location.replace("/");
+}
+
+/**
+ * Force a reload when a page is restored from the back/forward cache without a
+ * valid session.
+ *
+ * bfcache restores the DOM and JS heap verbatim: after logging out and pressing
+ * Back, the CRM re-appears exactly as it was — previous user's rows, filters
+ * and all — because no code runs to re-check auth. `pageshow` with
+ * `event.persisted` is the one signal that a restore happened, so it is the
+ * only place this can be caught.
+ *
+ * Reloading rather than redirecting keeps the decision in one place: the boot
+ * path already sends an unauthenticated visitor to the login screen.
+ */
+export function installBfcacheAuthGuard() {
+  if (typeof window === "undefined") return;
+
+  window.addEventListener("pageshow", (event) => {
+    if (!(event as PageTransitionEvent).persisted) return;
+    // `hasPersistedSession`, NOT the in-memory token: bfcache restores the JS
+    // heap, so an older page comes back with its access token, its React Query
+    // cache and its `user` object all intact. PrivateRoute sees a user and
+    // renders the CRM, then every request 401s — which is exactly what the
+    // tester hit: "it opened the account, but nothing loaded". localStorage is
+    // the only thing logout actually emptied.
+    if (tokenService.hasPersistedSession()) return;
+    window.location.reload();
+  });
 }
 
 export const api = {

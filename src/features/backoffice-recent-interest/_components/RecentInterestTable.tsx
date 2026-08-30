@@ -72,7 +72,7 @@ export function RecentInterestTable({
         title: "Lead ID",
         key: "lead",
         getValue: getRecentInterestLeadLabel,
-        type: "select",
+        type: "text",
         options: data
           .map(getRecentInterestLeadLabel)
           .filter(Boolean)
@@ -96,7 +96,7 @@ export function RecentInterestTable({
         title: "Company Symbol",
         key: "companySymbol",
         getValue: (row) => getRowCompanySymbol(row),
-        type: "select",
+        type: "text",
         options: getCompanySymbolOptions(data).map((value) => ({
           label: value,
           value,
