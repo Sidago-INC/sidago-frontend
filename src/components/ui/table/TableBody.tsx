@@ -5,6 +5,7 @@ import React from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { EmailLink } from "../EmailLink";
 import { LongTextCell } from "../LongTextCell";
+import { CellPopover } from "../CellPopover";
 import type { Column, GroupNode } from "./types";
 import { getCellValue, isEmailColumn } from "./utils";
 
@@ -126,11 +127,11 @@ function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<stri
   if (isEmailColumn(column)) {
     const text = String(value ?? "").trim();
     return text ? (
-      <EmailLink 
-        value={text} 
-        title={text}
-        aria-label={text}
-      />
+      <CellPopover content={text}>
+        <EmailLink 
+          value={text} 
+        />
+      </CellPopover>
     ) : (
       <span className="text-slate-400 dark:text-slate-500">—</span>
     );
@@ -143,16 +144,16 @@ function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<stri
       return <LongTextCell value={text} label={column.title} preview={90} />;
     }
     return (
-      <span
-        className="block max-w-full truncate text-left"
-        title={text}
-        aria-label={text}
-        style={{
-          maxWidth: getColumnStyle(column, columnWidths).maxWidth ?? "220px",
-        }}
-      >
-        {text}
-      </span>
+      <CellPopover content={text}>
+        <span
+          className="block max-w-full truncate text-left cursor-help"
+          style={{
+            maxWidth: getColumnStyle(column, columnWidths).maxWidth ?? "220px",
+          }}
+        >
+          {text}
+        </span>
+      </CellPopover>
     );
   }
 
@@ -281,10 +282,10 @@ function GroupedRows<T>({
                     key={String(col.key)}
                     className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-slate-200 whitespace-nowrap"
                     style={getColumnStyle(col, columnWidths)}
-                    title={cellTooltip}
-                    aria-label={cellTooltip}
                   >
-                    {renderCellValue(row, col, columnWidths)}
+                    <CellPopover content={cellTooltip ?? ""}>
+                      {renderCellValue(row, col, columnWidths)}
+                    </CellPopover>
                   </td>
                 );
               })}
@@ -367,10 +368,10 @@ export function TableBody<T>({
                   key={String(col.key)}
                   className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-white whitespace-nowrap"
                   style={getColumnStyle(col, columnWidths)}
-                  title={cellTooltip}
-                  aria-label={cellTooltip}
                 >
-                  {renderCellValue(row, col, columnWidths)}
+                  <CellPopover content={cellTooltip ?? ""}>
+                    {renderCellValue(row, col, columnWidths)}
+                  </CellPopover>
                 </td>
               );
             })}
