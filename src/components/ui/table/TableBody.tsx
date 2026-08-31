@@ -32,12 +32,16 @@ function getColumnStyle<T>(column: Column<T>, columnWidths: Record<string, numbe
   const key = String(column.key);
   const width = columnWidths[key] ?? Number(column.width ?? getDefaultColumnWidth(column));
   const minWidth = column.minWidth ?? 80;
-  const maxWidth = column.maxWidth ?? (column.longText ? 240 : 220);
+  const maxWidth = column.maxWidth;
+  const resolvedWidth = Math.max(
+    minWidth,
+    maxWidth === undefined ? width : Math.min(width, maxWidth),
+  );
 
   return {
-    width: `${Math.max(minWidth, Math.min(width, maxWidth))}px`,
+    width: `${resolvedWidth}px`,
     minWidth: `${minWidth}px`,
-    maxWidth: `${maxWidth}px`,
+    ...(maxWidth === undefined ? {} : { maxWidth: `${maxWidth}px` }),
     overflow: "hidden",
   };
 }
@@ -140,7 +144,7 @@ function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<stri
   if (typeof value === "string" || typeof value === "number") {
     const text = String(value ?? "").trim();
     if (!text) return <span className="text-slate-400 dark:text-slate-500">—</span>;
-    if (column.longText || text.length > 80 || /\n/.test(text)) {
+    if (column.longText || /\n/.test(text)) {
       return <LongTextCell value={text} label={column.title} preview={90} />;
     }
     return (
@@ -148,7 +152,7 @@ function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<stri
         <span
           className="block max-w-full truncate text-left cursor-help"
           style={{
-            maxWidth: getColumnStyle(column, columnWidths).maxWidth ?? "220px",
+            maxWidth: "100%",
           }}
         >
           {text}

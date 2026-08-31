@@ -12,14 +12,29 @@ export function CellPopover({ content, children, maxWidth = "320px" }: CellPopov
     return <>{children}</>;
   }
 
+  // Column renderers occasionally bring their own `max-w-*` utility. Keep
+  // that content constrained by the cell instead, so widening a table column
+  // always reveals more of its value.
+  const cellChild = React.isValidElement(children)
+    ? React.cloneElement(
+        children as React.ReactElement<{ style?: React.CSSProperties }>,
+        {
+          style: {
+            ...(children.props as { style?: React.CSSProperties }).style,
+            maxWidth: "100%",
+          },
+        },
+      )
+    : children;
+
   return (
-    <Popover className="relative">
+    <Popover className="relative max-w-full overflow-hidden">
       <PopoverButton
         as="div"
-        className="cursor-help"
+        className="block max-w-full overflow-hidden cursor-help"
         onClick={(e) => e.stopPropagation()}
       >
-        {children}
+        {cellChild}
       </PopoverButton>
       <PopoverPanel
         anchor="top"

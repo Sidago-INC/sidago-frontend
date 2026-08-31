@@ -14,6 +14,7 @@ import { GroupPanel } from "./table/GroupPanel";
 import { SortPanel } from "./table/SortPanel";
 import { TableBody } from "./table/TableBody";
 import { TablePagination } from "./table/TablePagination";
+import { getCellValue } from "./table/utils";
 import {
   MAX_SERVER_GROUP_LEVELS,
   useTableState,
@@ -67,6 +68,39 @@ function getDefaultColumnWidth<T>(column: import("./table/types").Column<T>): nu
     return 170;
   }
   return 140;
+}
+
+/**
+ * Measures the text that can be shown in a column. This supplies the natural
+ * upper bound for resizing instead of the old generic 220/240px cap.
+ */
+function getContentColumnWidth<T>(
+  column: import("./table/types").Column<T>,
+  data: T[],
+): number {
+  if (typeof document === "undefined") return getDefaultColumnWidth(column);
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) return getDefaultColumnWidth(column);
+
+  const measure = (value: unknown, font: string) => {
+    context.font = font;
+    return String(value ?? "")
+      .split(/\r?\n/)
+      .reduce((widest, line) => Math.max(widest, context.measureText(line).width), 0);
+  };
+
+  // Cell/header horizontal padding is 24px on each side.
+  let widest = measure(column.title, "600 12px sans-serif") + 48;
+  for (const row of data) {
+    const value = getCellValue(row, column);
+    if (typeof value === "string" || typeof value === "number") {
+      widest = Math.max(widest, measure(value, "14px sans-serif") + 48);
+    }
+  }
+
+  return Math.ceil(widest);
 }
 
 export function Table<T>({
@@ -124,6 +158,17 @@ export function Table<T>({
     return next;
   }, [columnWidths, columns]);
 
+  const contentColumnWidths = useMemo(
+    () =>
+      Object.fromEntries(
+        columns.map((column) => [
+          String(column.key),
+          Math.max(column.minWidth ?? 80, getContentColumnWidth(column, data)),
+        ]),
+      ),
+    [columns, data],
+  );
+
   useEffect(() => {
     setColumnWidths((current) => {
       const next: Record<string, number> = {};
@@ -142,7 +187,7 @@ export function Table<T>({
     if (!column) return;
 
     const minWidth = column.minWidth ?? 80;
-    const maxWidth = column.maxWidth ?? (column.longText ? 240 : 220);
+    const maxWidth = column.maxWidth ?? contentColumnWidths[key];
     const clampedWidth = Math.min(Math.max(nextWidth, minWidth), maxWidth);
 
     setColumnWidths((current) => ({
@@ -245,7 +290,7 @@ export function Table<T>({
       document.removeEventListener("pointerup", handleGlobalPointerUp);
       document.removeEventListener("pointercancel", handleGlobalPointerUp);
     };
-  }, [isDragging, columns]);
+  }, [isDragging, columns, contentColumnWidths]);
 
   const {
     scrollContainerRef,
@@ -611,7 +656,9 @@ export function Table<T>({
                     style={{
                       width: `${resolvedColumnWidths[key] ?? Number(col.width ?? getDefaultColumnWidth(col))}px`,
                       minWidth: `${col.minWidth ?? 80}px`,
-                      maxWidth: `${col.maxWidth ?? (col.longText ? 240 : 220)}px`,
+                      ...(col.maxWidth === undefined
+                        ? {}
+                        : { maxWidth: `${col.maxWidth}px` }),
                       position: "relative",
                     }}
                   >

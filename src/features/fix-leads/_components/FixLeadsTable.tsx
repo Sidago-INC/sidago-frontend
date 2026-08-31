@@ -194,7 +194,7 @@ export function FixLeadsTable({
           row.otherContacts ? (
             <span
               title={row.otherContacts}
-              className="block max-w-[220px] truncate text-sm text-slate-700 dark:text-slate-200"
+              className="block truncate text-sm text-slate-700 dark:text-slate-200"
             >
               {row.otherContacts}
             </span>
