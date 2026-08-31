@@ -8,7 +8,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FilterPanel } from "./table/FilterPanel";
 import { GroupPanel } from "./table/GroupPanel";
 import { SortPanel } from "./table/SortPanel";
@@ -35,6 +35,9 @@ const TOOLBAR_BUTTON_CLASS =
 const TOOLBAR_ICON_BUTTON_CLASS =
   "flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900";
 
+const RESIZE_HANDLE_WIDTH = 8;
+const RESIZE_HANDLE_LINE_WIDTH = 2;
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
 
@@ -45,6 +48,25 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return Boolean(
     target.closest("input, textarea, select, [contenteditable='true']"),
   );
+}
+
+function getDefaultColumnWidth<T>(column: import("./table/types").Column<T>): number {
+  const key = String(column.key).toLowerCase();
+  const title = column.title.toLowerCase();
+
+  if (column.longText || /(description|notes|details|summary|comments?|body|message)/.test(`${key} ${title}`)) {
+    return 220;
+  }
+  if (/(date|time|last.*date|called.*date|action.*date|to be called by|timezone|country|status|lead type|contact type)/.test(`${key} ${title}`)) {
+    return 130;
+  }
+  if (/(phone|email|website|twitter|zip|symbol|id)/.test(`${key} ${title}`)) {
+    return 130;
+  }
+  if (/(company name|full name|city|state|market cap|lead name)/.test(`${key} ${title}`)) {
+    return 170;
+  }
+  return 140;
 }
 
 export function Table<T>({
@@ -74,6 +96,156 @@ export function Table<T>({
     serverSearch,
     serverGrid,
   });
+
+  const columnWidthsKey = useMemo(
+    () => columns.map((column) => String(column.key)).join("|"),
+    [columns],
+  );
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [hoveredHeaderKey, setHoveredHeaderKey] = useState<string | null>(null);
+  const [resizeIndicatorX, setResizeIndicatorX] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragState = useRef<{ 
+    key: string; 
+    startX: number; 
+    startWidth: number; 
+    containerRect: DOMRect;
+    columnLeftOffset: number;
+  } | null>(null);
+
+  const resolvedColumnWidths = useMemo(() => {
+    const next: Record<string, number> = {};
+    for (const column of columns) {
+      const key = String(column.key);
+      const defaultWidth = Number(column.width ?? getDefaultColumnWidth(column));
+      const stored = columnWidths[key];
+      next[key] = typeof stored === "number" ? stored : defaultWidth;
+    }
+    return next;
+  }, [columnWidths, columns]);
+
+  useEffect(() => {
+    setColumnWidths((current) => {
+      const next: Record<string, number> = {};
+      for (const column of columns) {
+        const key = String(column.key);
+        const currentWidth = current[key];
+        const defaultWidth = Number(column.width ?? getDefaultColumnWidth(column));
+        next[key] = typeof currentWidth === "number" ? currentWidth : defaultWidth;
+      }
+      return next;
+    });
+  }, [columnWidthsKey, columns]);
+
+  const handleColumnResize = (key: string, nextWidth: number) => {
+    const column = columns.find((entry) => String(entry.key) === key);
+    if (!column) return;
+
+    const minWidth = column.minWidth ?? 80;
+    const maxWidth = column.maxWidth ?? (column.longText ? 240 : 220);
+    const clampedWidth = Math.min(Math.max(nextWidth, minWidth), maxWidth);
+
+    setColumnWidths((current) => ({
+      ...current,
+      [key]: clampedWidth,
+    }));
+  };
+
+  const handleResizeStart = (
+    event: React.PointerEvent<HTMLElement>,
+    column: import("./table/types").Column<T>,
+  ) => {
+    if (column.resizable === false) return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const containerRect = container.getBoundingClientRect();
+    
+    // Calculate the column's left offset by summing previous column widths
+    let columnLeftOffset = 0;
+    for (const col of columns) {
+      if (String(col.key) === String(column.key)) break;
+      const colKey = String(col.key);
+      columnLeftOffset += resolvedColumnWidths[colKey] ?? Number(col.width ?? getDefaultColumnWidth(col));
+    }
+    
+    dragState.current = {
+      key: String(column.key),
+      startX: event.clientX,
+      startWidth:
+        resolvedColumnWidths[String(column.key)] ??
+        Number(column.width ?? getDefaultColumnWidth(column)),
+      containerRect,
+      columnLeftOffset,
+    };
+    
+    // Set initial indicator position
+    const initialIndicatorX = columnLeftOffset + (dragState.current.startWidth);
+    setResizeIndicatorX(initialIndicatorX - container.scrollLeft);
+    setIsDragging(true);
+    
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleResizeMove = (event: React.PointerEvent<HTMLElement>) => {
+    // This is kept for reference but the actual movement is handled by global listeners
+    // to ensure smooth tracking even when pointer leaves the handle
+  };
+
+  const handleResizeEnd = () => {
+    dragState.current = null;
+    setResizeIndicatorX(null);
+    setIsDragging(false);
+  };
+
+  // Handle global pointer events during resize dragging
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleGlobalPointerMove = (event: PointerEvent) => {
+      const drag = dragState.current;
+      if (!drag) return;
+      
+      event.preventDefault();
+      const delta = (event as any).clientX - drag.startX;
+      const newWidth = drag.startWidth + delta;
+      
+      // Update the column width
+      const column = columns.find((entry) => String(entry.key) === drag.key);
+      if (column) {
+        handleColumnResize(drag.key, newWidth);
+      }
+      
+      // Update the resize indicator position
+      const container = scrollContainerRef.current;
+      if (container) {
+        const indicatorX = drag.columnLeftOffset + newWidth;
+        setResizeIndicatorX(indicatorX - container.scrollLeft);
+      }
+    };
+
+    const handleGlobalPointerUp = () => {
+      dragState.current = null;
+      setResizeIndicatorX(null);
+      setIsDragging(false);
+      document.removeEventListener("pointermove", handleGlobalPointerMove);
+      document.removeEventListener("pointerup", handleGlobalPointerUp);
+      document.removeEventListener("pointercancel", handleGlobalPointerUp);
+    };
+
+    document.addEventListener("pointermove", handleGlobalPointerMove);
+    document.addEventListener("pointerup", handleGlobalPointerUp);
+    document.addEventListener("pointercancel", handleGlobalPointerUp);
+
+    return () => {
+      document.removeEventListener("pointermove", handleGlobalPointerMove);
+      document.removeEventListener("pointerup", handleGlobalPointerUp);
+      document.removeEventListener("pointercancel", handleGlobalPointerUp);
+    };
+  }, [isDragging, columns]);
 
   const {
     scrollContainerRef,
@@ -394,25 +566,87 @@ export function Table<T>({
         tabIndex={0}
         onKeyDown={handleTableScrollKeys}
         onPointerDown={focusScrollContainer}
-        className="min-h-0 flex-1 overflow-auto px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+        className="min-h-0 flex-1 overflow-auto px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 relative"
         aria-label="Scrollable table"
       >
+        {/* Resize indicator line - floats above table during dragging */}
+        {resizeIndicatorX !== null && (
+          <div
+            className="fixed pointer-events-none z-50"
+            style={{
+              left: `${(scrollContainerRef.current?.getBoundingClientRect().left ?? 0) + resizeIndicatorX + 16}px`,
+              top: `${scrollContainerRef.current?.getBoundingClientRect().top ?? 0}px`,
+              height: `${scrollContainerRef.current?.getBoundingClientRect().height ?? 0}px`,
+              width: 0,
+              borderLeft: "2px solid rgb(14, 165, 233)",
+              boxShadow: "0 0 8px rgba(14, 165, 233, 0.6)",
+              boxSizing: "border-box",
+            }}
+          />
+        )}
+        
         <table
           ref={tableElementRef}
-          className={`min-w-240 w-full transition-opacity ${
+          className={`w-full min-w-full table-fixed transition-opacity ${
             isRefreshing ? "opacity-60" : "opacity-100"
           }`}
+          style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}
         >
           <thead className="text-xs uppercase tracking-wide text-gray-500 transition-colors dark:text-white">
             <tr>
-              {columns.map((col) => (
-                <th
-                  key={col.title}
-                  className="sticky top-0 z-10 whitespace-nowrap border-b border-slate-200/80 bg-white px-6 py-4 text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
-                >
-                  {col.title}
-                </th>
-              ))}
+              {columns.map((col) => {
+                const key = String(col.key);
+                const isHovered = hoveredHeaderKey === key;
+
+                return (
+                  <th
+                    key={key}
+                    onMouseEnter={() => setHoveredHeaderKey(key)}
+                    onMouseLeave={() =>
+                      setHoveredHeaderKey((current) =>
+                        current === key ? null : current,
+                      )
+                    }
+                    className="sticky top-0 z-10 overflow-hidden border-b border-slate-200/80 bg-white text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
+                    style={{
+                      width: `${resolvedColumnWidths[key] ?? Number(col.width ?? getDefaultColumnWidth(col))}px`,
+                      minWidth: `${col.minWidth ?? 80}px`,
+                      maxWidth: `${col.maxWidth ?? (col.longText ? 240 : 220)}px`,
+                      position: "relative",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 px-6 py-4">
+                      <span className="block truncate">{col.title}</span>
+                    </div>
+
+                    {col.resizable !== false && (
+                      <div
+                        onPointerDown={(event) => handleResizeStart(event, col)}
+                        className="absolute inset-y-0 right-0 flex cursor-col-resize items-center justify-center transition-opacity duration-150"
+                        style={{
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: "8px",
+                          boxSizing: "border-box",
+                          opacity: isHovered && !isDragging ? 1 : 0,
+                          pointerEvents: isHovered ? "auto" : "none",
+                          zIndex: 2,
+                          borderLeft: "2px solid rgb(14, 165, 233)",
+                          paddingLeft: 0,
+                          marginLeft: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-start",
+                        }}
+                        aria-label={`Resize ${col.title} column`}
+                        role="separator"
+                        title={`Resize ${col.title} column`}
+                      />
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
@@ -458,6 +692,7 @@ export function Table<T>({
                   }
                 : undefined
             }
+            columnWidths={resolvedColumnWidths}
           />
         </table>
       </div>

@@ -38,6 +38,16 @@ export type Column<T> = {
   getValue?: (row: T) => React.ReactNode;
   type?: "text" | "select" | "date";
   options?: Array<{ label: string; value: string }>;
+  /** Default visual width, in pixels. */
+  width?: number | string;
+  /** Lower bound for manual resizing. */
+  minWidth?: number;
+  /** Upper bound for manual resizing. */
+  maxWidth?: number;
+  /** Set false to lock the column width. Default true. */
+  resizable?: boolean;
+  /** Set true to clamp this text column at a smaller reading width. */
+  longText?: boolean;
   /** Set false when the backend doesn't accept this field for that grid control. Default true. */
   filterable?: boolean;
   sortable?: boolean;

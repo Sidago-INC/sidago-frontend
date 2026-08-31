@@ -47,7 +47,8 @@ export function LongTextCell({
           event.stopPropagation();
           setOpen(true);
         }}
-        title="Click to read in full"
+        title={text}
+        aria-label={text}
         className="block max-w-80 cursor-pointer truncate text-left text-sky-700 underline decoration-dotted underline-offset-2 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
       >
         {shown}
