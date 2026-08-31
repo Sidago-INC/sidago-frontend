@@ -2,10 +2,10 @@
 
 import clsx from "clsx";
 import React from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { EmailLink } from "../EmailLink";
 import { LongTextCell } from "../LongTextCell";
-import { CellPopover } from "../CellPopover";
 import type { Column, GroupNode } from "./types";
 import { getCellValue, isEmailColumn } from "./utils";
 
@@ -50,56 +50,50 @@ function renderTooltipValue(value: string | null | undefined): string {
   return (value ?? "").trim();
 }
 
-function getCellTooltip<T>(row: T, column: Column<T>): string | undefined {
-  // Prioritize getValue if it exists - it's the canonical source of the cell value
+function getCellTooltip<T>(
+  row: T,
+  column: Column<T>,
+  rendered: React.ReactNode,
+): string | undefined {
   if (column.getValue) {
     const value = column.getValue(row);
     if (typeof value === "string" || typeof value === "number") {
-      const text = String(value ?? "").trim();
+      const text = renderTooltipValue(String(value));
       if (text) return text;
     }
   }
 
-  // Fall back to extracting from render function
-  if (column.render) {
-    const rendered = column.render(row);
-    if (React.isValidElement(rendered)) {
-      const props = rendered.props as {
-        children?: unknown;
-        value?: unknown;
-        title?: string;
-      };
-      // Check if title is already set
-      if (props.title) return props.title;
-      
-      const tooltipText = renderTooltipValue(
-        typeof props.children === "string"
-          ? props.children
-          : typeof props.value === "string"
-            ? props.value
-            : undefined,
-      );
-      return tooltipText || undefined;
-    }
-    // If render returns a string directly, use it as tooltip
-    if (typeof rendered === "string" || typeof rendered === "number") {
-      const text = String(rendered ?? "").trim();
-      if (text && text !== "—") return text;
-    }
-    return undefined;
+  if (React.isValidElement(rendered)) {
+    const props = rendered.props as {
+      children?: unknown;
+      value?: unknown;
+      title?: string;
+    };
+    if (props.title) return props.title;
+    const text = renderTooltipValue(
+      typeof props.children === "string"
+        ? props.children
+        : typeof props.value === "string"
+          ? props.value
+          : undefined,
+    );
+    if (text) return text;
   }
 
-  // Final fallback: try to extract from the raw value
+  if (typeof rendered === "string" || typeof rendered === "number") {
+    const text = renderTooltipValue(String(rendered));
+    if (text && text !== "—") return text;
+  }
+
   const value = getCellValue(row, column);
   if (typeof value === "string" || typeof value === "number") {
-    const text = String(value ?? "").trim();
-    return text || undefined;
+    return renderTooltipValue(String(value)) || undefined;
   }
 
   return undefined;
 }
 
-function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<string, number>): React.ReactNode {
+function renderCellValue<T>(row: T, column: Column<T>): React.ReactNode {
   if (column.render) {
     const rendered = column.render(row);
     if (React.isValidElement(rendered)) {
@@ -131,11 +125,7 @@ function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<stri
   if (isEmailColumn(column)) {
     const text = String(value ?? "").trim();
     return text ? (
-      <CellPopover content={text}>
-        <EmailLink 
-          value={text} 
-        />
-      </CellPopover>
+      <EmailLink value={text} />
     ) : (
       <span className="text-slate-400 dark:text-slate-500">—</span>
     );
@@ -148,16 +138,12 @@ function renderCellValue<T>(row: T, column: Column<T>, columnWidths: Record<stri
       return <LongTextCell value={text} label={column.title} preview={90} />;
     }
     return (
-      <CellPopover content={text}>
-        <span
-          className="block max-w-full truncate text-left cursor-help"
-          style={{
-            maxWidth: "100%",
-          }}
-        >
-          {text}
-        </span>
-      </CellPopover>
+      <span
+        className="block max-w-full truncate text-left"
+        aria-label={text}
+      >
+        {text}
+      </span>
     );
   }
 
@@ -280,16 +266,16 @@ function GroupedRows<T>({
               )}
             >
               {columns.map((col) => {
-                const cellTooltip = getCellTooltip(row, col);
+                const rendered = renderCellValue(row, col);
+                const cellTooltip = getCellTooltip(row, col, rendered);
                 return (
                   <td
                     key={String(col.key)}
+                    data-cell-tooltip={cellTooltip}
                     className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-slate-200 whitespace-nowrap"
                     style={getColumnStyle(col, columnWidths)}
                   >
-                    <CellPopover content={cellTooltip ?? ""}>
-                      {renderCellValue(row, col, columnWidths)}
-                    </CellPopover>
+                    {rendered}
                   </td>
                 );
               })}
@@ -313,6 +299,43 @@ interface TableBodyProps<T> {
   safeCurrentPage: number;
   onShowOnlyGroup?: (group: GroupNode<T>) => void;
   columnWidths: Record<string, number>;
+  virtualRows?: {
+    startIndex: number;
+    endIndex: number;
+    topSpacerHeight: number;
+    bottomSpacerHeight: number;
+  };
+}
+
+function VirtualSpacer({ colSpan, height }: { colSpan: number; height: number }) {
+  if (height <= 0) return null;
+
+  return (
+    <tr aria-hidden="true" role="presentation">
+      <td
+        colSpan={colSpan}
+        className="p-0 leading-none"
+        style={{ height: `${height}px`, border: 0 }}
+      />
+    </tr>
+  );
+}
+
+type TooltipState = { content: string; left: number; top: number } | null;
+
+function GridCellTooltip({ tooltip }: { tooltip: TooltipState }) {
+  if (!tooltip || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      role="tooltip"
+      className="pointer-events-none z-[60] max-w-80 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words"
+      style={{ left: tooltip.left, top: tooltip.top, position: "fixed" }}
+    >
+      {tooltip.content}
+    </div>,
+    document.body,
+  );
 }
 
 export function TableBody<T>({
@@ -328,9 +351,33 @@ export function TableBody<T>({
   safeCurrentPage,
   onShowOnlyGroup,
   columnWidths,
+  virtualRows,
 }: TableBodyProps<T>) {
+  const [tooltip, setTooltip] = React.useState<TooltipState>(null);
+  const visibleRows = virtualRows
+    ? paginatedData.slice(virtualRows.startIndex, virtualRows.endIndex)
+    : paginatedData;
+
   return (
-    <tbody className="divide-y divide-slate-200/80 dark:divide-slate-600">
+    <tbody
+      className="divide-y divide-slate-200/80 dark:divide-slate-600"
+      onMouseOver={(event) => {
+        const cell = (event.target as HTMLElement).closest<HTMLElement>(
+          "td[data-cell-tooltip]",
+        );
+        if (!cell || cell.contains(event.relatedTarget as Node | null)) return;
+
+        const content = cell.dataset.cellTooltip;
+        if (!content) return;
+        const rect = cell.getBoundingClientRect();
+        setTooltip({
+          content,
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 336)),
+          top: Math.min(rect.bottom + 8, window.innerHeight - 48),
+        });
+      }}
+      onMouseLeave={() => setTooltip(null)}
+    >
       {groupedData ? (
         <GroupedRows
           groups={groupedData}
@@ -354,34 +401,48 @@ export function TableBody<T>({
           </td>
         </tr>
       ) : (
-        paginatedData.map((row, i) => (
-          <tr
-            key={`${safeCurrentPage}-${i}`}
-            onClick={onRowClick ? () => onRowClick(row) : undefined}
-            className={clsx(
-              "transition-colors duration-150 dark:hover:bg-slate-800",
-              onRowClick
-                ? "cursor-pointer hover:bg-indigo-50/40"
-                : "hover:bg-indigo-50/40",
-            )}
-          >
-            {columns.map((col) => {
-              const cellTooltip = getCellTooltip(row, col);
-              return (
-                <td
-                  key={String(col.key)}
-                  className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-white whitespace-nowrap"
-                  style={getColumnStyle(col, columnWidths)}
-                >
-                  <CellPopover content={cellTooltip ?? ""}>
-                    {renderCellValue(row, col, columnWidths)}
-                  </CellPopover>
-                </td>
-              );
-            })}
-          </tr>
-        ))
+        <>
+          <VirtualSpacer
+            colSpan={columns.length}
+            height={virtualRows?.topSpacerHeight ?? 0}
+          />
+          {visibleRows.map((row, visibleIndex) => {
+            const rowIndex = (virtualRows?.startIndex ?? 0) + visibleIndex;
+            return (
+              <tr
+                key={`${safeCurrentPage}-${rowIndex}`}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={clsx(
+                  "h-[53px] transition-colors duration-150 dark:hover:bg-slate-800",
+                  onRowClick
+                    ? "cursor-pointer hover:bg-indigo-50/40"
+                    : "hover:bg-indigo-50/40",
+                )}
+              >
+                {columns.map((col) => {
+                  const rendered = renderCellValue(row, col);
+                  const cellTooltip = getCellTooltip(row, col, rendered);
+                  return (
+                    <td
+                      key={String(col.key)}
+                      data-cell-tooltip={cellTooltip}
+                      className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-white whitespace-nowrap"
+                      style={getColumnStyle(col, columnWidths)}
+                    >
+                      {rendered}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+          <VirtualSpacer
+            colSpan={columns.length}
+            height={virtualRows?.bottomSpacerHeight ?? 0}
+          />
+        </>
       )}
+      <GridCellTooltip tooltip={tooltip} />
     </tbody>
   );
 }

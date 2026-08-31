@@ -14,7 +14,6 @@ import { GroupPanel } from "./table/GroupPanel";
 import { SortPanel } from "./table/SortPanel";
 import { TableBody } from "./table/TableBody";
 import { TablePagination } from "./table/TablePagination";
-import { getCellValue } from "./table/utils";
 import {
   MAX_SERVER_GROUP_LEVELS,
   useTableState,
@@ -38,6 +37,9 @@ const TOOLBAR_ICON_BUTTON_CLASS =
 
 const RESIZE_HANDLE_WIDTH = 8;
 const RESIZE_HANDLE_LINE_WIDTH = 2;
+const VIRTUAL_ROW_HEIGHT = 53;
+const VIRTUAL_ROW_OVERSCAN = 12;
+const VIRTUALIZATION_THRESHOLD = 100;
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -68,39 +70,6 @@ function getDefaultColumnWidth<T>(column: import("./table/types").Column<T>): nu
     return 170;
   }
   return 140;
-}
-
-/**
- * Measures the text that can be shown in a column. This supplies the natural
- * upper bound for resizing instead of the old generic 220/240px cap.
- */
-function getContentColumnWidth<T>(
-  column: import("./table/types").Column<T>,
-  data: T[],
-): number {
-  if (typeof document === "undefined") return getDefaultColumnWidth(column);
-
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) return getDefaultColumnWidth(column);
-
-  const measure = (value: unknown, font: string) => {
-    context.font = font;
-    return String(value ?? "")
-      .split(/\r?\n/)
-      .reduce((widest, line) => Math.max(widest, context.measureText(line).width), 0);
-  };
-
-  // Cell/header horizontal padding is 24px on each side.
-  let widest = measure(column.title, "600 12px sans-serif") + 48;
-  for (const row of data) {
-    const value = getCellValue(row, column);
-    if (typeof value === "string" || typeof value === "number") {
-      widest = Math.max(widest, measure(value, "14px sans-serif") + 48);
-    }
-  }
-
-  return Math.ceil(widest);
 }
 
 export function Table<T>({
@@ -139,13 +108,17 @@ export function Table<T>({
   const [hoveredHeaderKey, setHoveredHeaderKey] = useState<string | null>(null);
   const [resizeIndicatorX, setResizeIndicatorX] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const dragState = useRef<{ 
-    key: string; 
-    startX: number; 
-    startWidth: number; 
-    containerRect: DOMRect;
+  const [virtualScrollTop, setVirtualScrollTop] = useState(0);
+  const [virtualViewportHeight, setVirtualViewportHeight] = useState(600);
+  const dragState = useRef<{
+    key: string;
+    startX: number;
+    startWidth: number;
     columnLeftOffset: number;
+    currentWidth: number;
   } | null>(null);
+  const resizeFrameRef = useRef<number | null>(null);
+  const pendingResizeXRef = useRef<number | null>(null);
 
   const resolvedColumnWidths = useMemo(() => {
     const next: Record<string, number> = {};
@@ -157,17 +130,6 @@ export function Table<T>({
     }
     return next;
   }, [columnWidths, columns]);
-
-  const contentColumnWidths = useMemo(
-    () =>
-      Object.fromEntries(
-        columns.map((column) => [
-          String(column.key),
-          Math.max(column.minWidth ?? 80, getContentColumnWidth(column, data)),
-        ]),
-      ),
-    [columns, data],
-  );
 
   useEffect(() => {
     setColumnWidths((current) => {
@@ -182,20 +144,6 @@ export function Table<T>({
     });
   }, [columnWidthsKey, columns]);
 
-  const handleColumnResize = (key: string, nextWidth: number) => {
-    const column = columns.find((entry) => String(entry.key) === key);
-    if (!column) return;
-
-    const minWidth = column.minWidth ?? 80;
-    const maxWidth = column.maxWidth ?? contentColumnWidths[key];
-    const clampedWidth = Math.min(Math.max(nextWidth, minWidth), maxWidth);
-
-    setColumnWidths((current) => ({
-      ...current,
-      [key]: clampedWidth,
-    }));
-  };
-
   const handleResizeStart = (
     event: React.PointerEvent<HTMLElement>,
     column: import("./table/types").Column<T>,
@@ -206,8 +154,6 @@ export function Table<T>({
     
     const container = scrollContainerRef.current;
     if (!container) return;
-    
-    const containerRect = container.getBoundingClientRect();
     
     // Calculate the column's left offset by summing previous column widths
     let columnLeftOffset = 0;
@@ -223,8 +169,10 @@ export function Table<T>({
       startWidth:
         resolvedColumnWidths[String(column.key)] ??
         Number(column.width ?? getDefaultColumnWidth(column)),
-      containerRect,
       columnLeftOffset,
+      currentWidth:
+        resolvedColumnWidths[String(column.key)] ??
+        Number(column.width ?? getDefaultColumnWidth(column)),
     };
     
     // Set initial indicator position
@@ -235,62 +183,98 @@ export function Table<T>({
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handleResizeMove = (event: React.PointerEvent<HTMLElement>) => {
-    // This is kept for reference but the actual movement is handled by global listeners
-    // to ensure smooth tracking even when pointer leaves the handle
-  };
-
-  const handleResizeEnd = () => {
-    dragState.current = null;
-    setResizeIndicatorX(null);
-    setIsDragging(false);
-  };
-
-  // Handle global pointer events during resize dragging
+  // Resize work is limited to one paint per frame. Pointer events can arrive
+  // far faster than the browser can lay out a wide grid, especially on a
+  // trackpad or high-refresh-rate display.
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleGlobalPointerMove = (event: PointerEvent) => {
+    const applyPendingResize = () => {
+      resizeFrameRef.current = null;
+      const clientX = pendingResizeXRef.current;
+      pendingResizeXRef.current = null;
       const drag = dragState.current;
-      if (!drag) return;
-      
-      event.preventDefault();
-      const delta = (event as any).clientX - drag.startX;
-      const newWidth = drag.startWidth + delta;
-      
-      // Update the column width
+      if (!drag || clientX === null) return;
+
       const column = columns.find((entry) => String(entry.key) === drag.key);
-      if (column) {
-        handleColumnResize(drag.key, newWidth);
-      }
-      
-      // Update the resize indicator position
+      if (!column) return;
+
+      const minWidth = column.minWidth ?? 80;
+      const requestedWidth = Math.max(
+        drag.startWidth + clientX - drag.startX,
+        minWidth,
+      );
+      // Columns are unlimited by default. A maximum applies only when the
+      // column definition explicitly sets one.
+      const nextWidth =
+        column.maxWidth === undefined
+          ? requestedWidth
+          : Math.min(requestedWidth, column.maxWidth);
+      drag.currentWidth = nextWidth;
+      setColumnWidths((current) =>
+        current[drag.key] === nextWidth
+          ? current
+          : { ...current, [drag.key]: nextWidth },
+      );
+
       const container = scrollContainerRef.current;
       if (container) {
-        const indicatorX = drag.columnLeftOffset + newWidth;
+        const indicatorX = drag.columnLeftOffset + nextWidth;
         setResizeIndicatorX(indicatorX - container.scrollLeft);
       }
     };
 
-    const handleGlobalPointerUp = () => {
-      dragState.current = null;
-      setResizeIndicatorX(null);
-      setIsDragging(false);
-      document.removeEventListener("pointermove", handleGlobalPointerMove);
-      document.removeEventListener("pointerup", handleGlobalPointerUp);
-      document.removeEventListener("pointercancel", handleGlobalPointerUp);
+    const queueResize = (clientX: number) => {
+      pendingResizeXRef.current = clientX;
+      if (resizeFrameRef.current === null) {
+        resizeFrameRef.current = window.requestAnimationFrame(applyPendingResize);
+      }
     };
 
+    const handleGlobalPointerMove = (event: PointerEvent) => {
+      event.preventDefault();
+      queueResize(event.clientX);
+    };
+
+    const updateIndicatorForScroll = () => {
+      const drag = dragState.current;
+      const container = scrollContainerRef.current;
+      if (!drag || !container) return;
+      setResizeIndicatorX(
+        drag.columnLeftOffset + drag.currentWidth - container.scrollLeft,
+      );
+    };
+
+    const handleGlobalPointerUp = () => {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        applyPendingResize();
+      }
+      dragState.current = null;
+      pendingResizeXRef.current = null;
+      setResizeIndicatorX(null);
+      setIsDragging(false);
+    };
+
+    const container = scrollContainerRef.current;
     document.addEventListener("pointermove", handleGlobalPointerMove);
     document.addEventListener("pointerup", handleGlobalPointerUp);
     document.addEventListener("pointercancel", handleGlobalPointerUp);
+    container?.addEventListener("scroll", updateIndicatorForScroll, {
+      passive: true,
+    });
 
     return () => {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
       document.removeEventListener("pointermove", handleGlobalPointerMove);
       document.removeEventListener("pointerup", handleGlobalPointerUp);
       document.removeEventListener("pointercancel", handleGlobalPointerUp);
+      container?.removeEventListener("scroll", updateIndicatorForScroll);
     };
-  }, [isDragging, columns, contentColumnWidths]);
+  }, [isDragging, columns]);
 
   const {
     scrollContainerRef,
@@ -336,6 +320,72 @@ export function Table<T>({
     setPageState,
     appendFilterItemToGroup,
   } = state;
+
+  // A 500-row page may otherwise mount thousands of cells and Headless UI
+  // popovers. Keep only the rows around the viewport in the DOM. Grouped rows
+  // remain unvirtualized because their expandable hierarchy has variable
+  // heights and must stay fully accessible.
+  const shouldVirtualizeRows =
+    !groupedData && paginatedData.length >= VIRTUALIZATION_THRESHOLD;
+  const virtualRows = useMemo(() => {
+    if (!shouldVirtualizeRows) return undefined;
+
+    const startIndex = Math.max(
+      0,
+      Math.floor(virtualScrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_ROW_OVERSCAN,
+    );
+    const endIndex = Math.min(
+      paginatedData.length,
+      Math.ceil(
+        (virtualScrollTop + virtualViewportHeight) / VIRTUAL_ROW_HEIGHT,
+      ) + VIRTUAL_ROW_OVERSCAN,
+    );
+
+    return {
+      startIndex,
+      endIndex,
+      topSpacerHeight: startIndex * VIRTUAL_ROW_HEIGHT,
+      bottomSpacerHeight:
+        (paginatedData.length - endIndex) * VIRTUAL_ROW_HEIGHT,
+    };
+  }, [
+    paginatedData.length,
+    shouldVirtualizeRows,
+    virtualScrollTop,
+    virtualViewportHeight,
+  ]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let frame: number | undefined;
+    const updateViewport = () => {
+      setVirtualViewportHeight(container.clientHeight || 600);
+    };
+    const handleScroll = () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        setVirtualScrollTop(container.scrollTop);
+      });
+    };
+
+    updateViewport();
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(container);
+
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      container.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+    };
+  }, [scrollContainerRef]);
+
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    setVirtualScrollTop(0);
+  }, [safeCurrentPage, paginatedData]);
 
   useEffect(() => {
     onRowsPerPageChange?.(rowsPerPage);
@@ -623,7 +673,7 @@ export function Table<T>({
               top: `${scrollContainerRef.current?.getBoundingClientRect().top ?? 0}px`,
               height: `${scrollContainerRef.current?.getBoundingClientRect().height ?? 0}px`,
               width: 0,
-              borderLeft: "2px solid rgb(14, 165, 233)",
+              borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
               boxShadow: "0 0 8px rgba(14, 165, 233, 0.6)",
               boxSizing: "border-box",
             }}
@@ -674,12 +724,12 @@ export function Table<T>({
                           right: 0,
                           top: 0,
                           bottom: 0,
-                          width: "8px",
+                          width: `${RESIZE_HANDLE_WIDTH}px`,
                           boxSizing: "border-box",
                           opacity: isHovered && !isDragging ? 1 : 0,
                           pointerEvents: isHovered ? "auto" : "none",
                           zIndex: 2,
-                          borderLeft: "2px solid rgb(14, 165, 233)",
+                          borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
                           paddingLeft: 0,
                           marginLeft: 0,
                           display: "flex",
@@ -740,6 +790,7 @@ export function Table<T>({
                 : undefined
             }
             columnWidths={resolvedColumnWidths}
+            virtualRows={virtualRows}
           />
         </table>
       </div>
