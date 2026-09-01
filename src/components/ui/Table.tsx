@@ -37,9 +37,14 @@ const TOOLBAR_ICON_BUTTON_CLASS =
 
 const RESIZE_HANDLE_WIDTH = 8;
 const RESIZE_HANDLE_LINE_WIDTH = 2;
+// Table rows resolve to 53px in the browser once cell content and badges are
+// laid out. This must match the actual row height so virtual spacers do not
+// leave a blank area near the end of a large page.
 const VIRTUAL_ROW_HEIGHT = 53;
 const VIRTUAL_ROW_OVERSCAN = 12;
-const VIRTUALIZATION_THRESHOLD = 100;
+// The grid exposes at most 500 rows per page. Rendering that page directly
+// prevents table spacer rows from desynchronizing during native scrolling.
+const VIRTUALIZATION_THRESHOLD = 501;
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -700,7 +705,7 @@ export function Table<T>({
           }`}
           style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}
         >
-          <thead className="text-xs uppercase tracking-wide text-gray-500 transition-colors dark:text-white">
+          <thead className="text-[11px] tracking-normal text-slate-500 transition-colors dark:text-slate-300">
             <tr>
               {columns.map((col) => {
                 const key = String(col.key);
@@ -715,7 +720,7 @@ export function Table<T>({
                         current === key ? null : current,
                       )
                     }
-                    className="sticky top-0 z-10 overflow-hidden border-b border-slate-200/80 bg-white text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
+                    className="sticky top-0 z-10 overflow-hidden border-b border-slate-200/80 bg-white text-left font-medium dark:border-slate-600 dark:bg-slate-900"
                     style={{
                       width: `${resolvedColumnWidths[key] ?? Number(col.width ?? getDefaultColumnWidth(col))}px`,
                       minWidth: `${col.minWidth ?? 80}px`,
@@ -725,7 +730,7 @@ export function Table<T>({
                       position: "relative",
                     }}
                   >
-                    <div className="flex items-center gap-2 px-6 py-4">
+                    <div className="flex items-center gap-2 px-3 py-2">
                       <span className="block truncate">{col.title}</span>
                     </div>
 

@@ -272,7 +272,7 @@ function GroupedRows<T>({
                   <td
                     key={String(col.key)}
                     data-cell-tooltip={cellTooltip}
-                    className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-slate-200 whitespace-nowrap"
+                    className="overflow-hidden px-3 py-2 text-[12px] font-normal leading-4 text-slate-800 transition-colors dark:text-slate-200 whitespace-nowrap"
                     style={getColumnStyle(col, columnWidths)}
                   >
                     {rendered}
@@ -426,7 +426,7 @@ export function TableBody<T>({
                     <td
                       key={String(col.key)}
                       data-cell-tooltip={cellTooltip}
-                      className="overflow-hidden px-6 py-4 text-sm text-gray-700 transition-colors dark:text-white whitespace-nowrap"
+                      className="overflow-hidden px-3 py-2 text-[12px] font-normal leading-4 text-slate-800 transition-colors dark:text-white whitespace-nowrap"
                       style={getColumnStyle(col, columnWidths)}
                     >
                       {rendered}
