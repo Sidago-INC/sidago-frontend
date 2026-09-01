@@ -1,4 +1,5 @@
 import { Agent } from "@/types";
+import { EASTERN_TIME_ZONE } from "@/lib/est";
 
 export const AGENT_COLORS = [
   {
@@ -62,11 +63,16 @@ export const RANK_STYLES: Record<
 export function getMonthName(offset = 0): string {
   const date = new Date();
   date.setMonth(date.getMonth() + offset);
-  return date.toLocaleString("default", { month: "long", year: "numeric" });
+  return date.toLocaleString("default", {
+    timeZone: EASTERN_TIME_ZONE,
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export function getShortDateLabel(): string {
   return new Date().toLocaleDateString("default", {
+    timeZone: EASTERN_TIME_ZONE,
     month: "short",
     day: "numeric",
   });
@@ -74,6 +80,7 @@ export function getShortDateLabel(): string {
 
 export function getFullDateLabel(): string {
   return new Date().toLocaleDateString("default", {
+    timeZone: EASTERN_TIME_ZONE,
     weekday: "long",
     year: "numeric",
     month: "long",

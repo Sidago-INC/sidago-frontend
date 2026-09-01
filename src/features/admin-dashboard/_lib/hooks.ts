@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { toDateParam, toMonthParam } from "@/lib/est";
 
 export type TodayAgentCard = {
   id: string;
@@ -100,14 +101,6 @@ function splitAgentName(fullName: string): { name: string; surname: string } {
   };
 }
 
-function formatDateParam(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function formatMonthParam(date: Date) {
-  return date.toISOString().slice(0, 7);
-}
-
 function mapDailyScoresToCards(
   scores: DailyScoresResponse["dailyScores"],
 ): TodayAgentCard[] {
@@ -150,7 +143,7 @@ function mapMonthlyScoresToCards(
 }
 
 export function useAdminTodayAgentCards(selectedDate: Date) {
-  const date = formatDateParam(selectedDate);
+  const date = toDateParam(selectedDate);
 
   return useQuery({
     queryKey: ["admin-dashboard", "daily-scores", date],
@@ -169,7 +162,7 @@ export function useAdminTodayAgentCards(selectedDate: Date) {
 }
 
 export function useAdminMonthlyAgentCards(selectedDate: Date) {
-  const month = formatMonthParam(selectedDate);
+  const month = toMonthParam(selectedDate);
 
   return useQuery({
     queryKey: ["admin-dashboard", "monthly-scores", month],

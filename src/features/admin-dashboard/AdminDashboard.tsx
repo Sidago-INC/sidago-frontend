@@ -2,12 +2,13 @@
 
 import { DatePicker } from "@/components/ui";
 import { useState } from "react";
+import { easternTodayDate } from "@/lib/est";
 import { AdminAgentScoreCards } from "./AdminAgentScoreCards";
 import { AdminTodayStatsCards } from "./AdminTodayStatsCards";
 
 export default function AdminDashboard() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
+    easternTodayDate(),
   );
 
   return (
