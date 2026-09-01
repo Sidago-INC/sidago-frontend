@@ -1,6 +1,14 @@
 
 
-import { Card, CardContent, PhoneInputField, Select, TextInput } from "@/components/ui";
+import {
+  Card,
+  CardContent,
+  EmailListField,
+  PhoneInputField,
+  Select,
+  TextInput,
+  Textarea,
+} from "@/components/ui";
 import { createLead } from "../_lib/hooks";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
@@ -19,6 +27,7 @@ const blankForm: LeadCreateFormValues = {
   phoneExtension: "",
   email: "",
   role: "",
+  otherContacts: "",
 };
 
 const inputClassName = "h-10 rounded text-sm";
@@ -52,6 +61,7 @@ export function AddLeadForm() {
       phoneExtension: form.phoneExtension.trim(),
       email: form.email.trim(),
       role: form.role.trim(),
+      otherContacts: form.otherContacts.trim(),
     }),
     [form],
   );
@@ -83,6 +93,7 @@ export function AddLeadForm() {
         phoneExtension: normalizedForm.phoneExtension,
         email: normalizedForm.email,
         role: normalizedForm.role,
+        otherContacts: normalizedForm.otherContacts || undefined,
       });
 
       setForm(blankForm);
@@ -164,13 +175,11 @@ export function AddLeadForm() {
                 error={errors.phoneExtension}
                 className={inputClassName}
               />
-              <TextInput
-                label="Email"
-                type="email"
+              <EmailListField
                 value={form.email}
-                onChange={(event) => updateField("email", event.target.value)}
+                onChange={(value) => updateField("email", value)}
                 error={errors.email}
-                className={inputClassName}
+                inputClassName={inputClassName}
               />
               <TextInput
                 label="Role"
@@ -179,6 +188,18 @@ export function AddLeadForm() {
                 error={errors.role}
                 className={inputClassName}
               />
+              <div className="md:col-span-2">
+                <Textarea
+                  label="Other Contacts (optional)"
+                  value={form.otherContacts}
+                  onChange={(event) =>
+                    updateField("otherContacts", event.target.value)
+                  }
+                  error={errors.otherContacts}
+                  rows={3}
+                  placeholder="Additional phone numbers, alternate contacts, notes…"
+                />
+              </div>
             </div>
           </div>
 

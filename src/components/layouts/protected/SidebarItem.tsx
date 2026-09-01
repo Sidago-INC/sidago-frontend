@@ -278,9 +278,24 @@ export const SidebarItem = ({
           </button>
         )
       ) : item.href ? (
-        <Link to={item.href} title={item.label} className={baseClasses}>
-          {content}
-        </Link>
+        item.openInNewTab ? (
+          // A real anchor, not <Link>: the point is a second browser tab, so
+          // the router must not intercept the click. `noopener` because the
+          // opened tab has no reason to reach back into this one.
+          <a
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`${item.label} (opens in a new tab)`}
+            className={baseClasses}
+          >
+            {content}
+          </a>
+        ) : (
+          <Link to={item.href} title={item.label} className={baseClasses}>
+            {content}
+          </Link>
+        )
       ) : (
         <div title={item.label} className={baseClasses}>
           {content}

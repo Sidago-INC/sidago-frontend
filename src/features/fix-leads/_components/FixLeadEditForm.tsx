@@ -2,6 +2,7 @@ import {
   Card,
   CardContent,
   CheckboxInput,
+  EmailListField,
   Select,
   Textarea,
   TextInput,
@@ -15,7 +16,7 @@ import { useUpdateLead } from "@/features/backoffice-shared/use-update-lead";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { NewLeadDrawer } from "@/features/leads/_components/NewLeadDrawer";
 import { createLead } from "@/features/leads/_lib/hooks";
 import type { LeadCreateFormValues } from "@/lib/validation/lead-create";
@@ -58,6 +59,15 @@ function toFormState(lead: FullLead): FormState {
 
 export function FixLeadEditForm() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Where "back to the queue" goes. The table hands over the filtered list URL
+  // it was showing, so saving a lead returns to that exact view — same
+  // contacts bucket, same timezone, same has-other-contacts toggle, same page.
+  // Falling back to the bare path keeps a deep-linked or refreshed edit page
+  // working, it just cannot restore filters it was never told about.
+  const backToQueue =
+    (location.state as { from?: string } | null)?.from ?? "/fix-leads";
   const queryClient = useQueryClient();
   const { leadId } = useParams<{ leadId: string }>();
   const { data, isLoading, isError, error } = useLeadFull(leadId);
@@ -80,6 +90,7 @@ export function FixLeadEditForm() {
         phoneExtension: values.phoneExtension || undefined,
         email: values.email,
         role: values.role,
+        otherContacts: values.otherContacts || undefined,
       });
       showSuccessToast(`Lead "${response.fullName}" added.`);
       // The new person belongs in Other Contacts straight away.
@@ -136,7 +147,7 @@ export function FixLeadEditForm() {
           </p>
           <button
             type="button"
-            onClick={() => navigate("/fix-leads")}
+            onClick={() => navigate(backToQueue)}
             className="mt-4 inline-flex h-9 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300"
           >
             Back to Fix Queue
@@ -168,7 +179,7 @@ export function FixLeadEditForm() {
           ? result.cantLocateBrands.join(", ")
           : "eligible brands";
       showSuccessToast(`Marked Can't Locate for ${brands}.`);
-      navigate("/fix-leads");
+      navigate(backToQueue);
     } catch (err) {
       showErrorToast(err);
     }
@@ -208,7 +219,7 @@ export function FixLeadEditForm() {
       showSuccessToast(
         `Lead "${form.fullName || data.lead.fullName || leadId}" updated.`,
       );
-      navigate("/fix-leads");
+      navigate(backToQueue);
     } catch (err) {
       showErrorToast(err);
     }
@@ -222,7 +233,7 @@ export function FixLeadEditForm() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 lg:px-6">
       <button
         type="button"
-        onClick={() => navigate("/fix-leads")}
+        onClick={() => navigate(backToQueue)}
         className="inline-flex w-fit cursor-pointer items-center gap-2 text-sm font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
       >
         <ArrowLeft size={16} />
@@ -269,12 +280,14 @@ export function FixLeadEditForm() {
                 onChange={(event) => updateField("role", event.target.value)}
                 className={inputClassName}
               />
-              <TextInput
-                label="Email"
-                type="email"
+              {/* A lead's email is a comma-joined LIST, so a single
+                  `type="email"` input is wrong twice over: the browser rejects
+                  a value containing commas, and there was no way to add a
+                  second address while fixing a lead. */}
+              <EmailListField
                 value={form.email}
-                onChange={(event) => updateField("email", event.target.value)}
-                className={inputClassName}
+                onChange={(value) => updateField("email", value)}
+                inputClassName={inputClassName}
               />
               <TextInput
                 label="Phone"
@@ -322,7 +335,13 @@ export function FixLeadEditForm() {
                         <button
                           key={contact.id}
                           type="button"
-                          onClick={() => navigate(`/fix-leads/${contact.id}`)}
+                          onClick={() =>
+                            // Hop to a colleague without losing the queue we
+                            // came from.
+                            navigate(`/fix-leads/${contact.id}`, {
+                              state: { from: backToQueue },
+                            })
+                          }
                           title={
                             contact.role?.trim()
                               ? `${name} — ${contact.role}`

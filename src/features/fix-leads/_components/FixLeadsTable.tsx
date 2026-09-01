@@ -177,7 +177,25 @@ export function FixLeadsTable({
         groupable: false,
         render: (row) => (
           <Button
-            onClick={() => navigate(`/fix-leads/${row.leadId}`)}
+            onClick={() =>
+              // Carry the filtered list URL along, so leaving the edit form
+              // returns to the queue the user was actually working — not a
+              // bare /fix-leads.
+              //
+              // Read from `window.location`, NOT from useLocation(): this
+              // callback is created inside a useMemo keyed on [data, navigate],
+              // and React Query structurally shares its result, so a filter
+              // change often leaves `data` referentially identical and the memo
+              // never recomputes. A captured location object would then still
+              // be the one from mount — no query string — and the filter would
+              // be silently dropped on the way back. window.location is always
+              // the live URL, so there is nothing to go stale.
+              navigate(`/fix-leads/${row.leadId}`, {
+                state: {
+                  from: `${window.location.pathname}${window.location.search}`,
+                },
+              })
+            }
             className="cursor-pointer inline-flex h-6 items-center justify-center rounded border border-blue-600 bg-blue-500 px-4 text-sm font-semibold text-white transition hover:bg-blue-600 dark:border-blue-400 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500"
           >
             Fix

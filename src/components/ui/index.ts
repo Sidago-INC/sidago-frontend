@@ -36,6 +36,7 @@ export { Select } from "./Select";
 export { SimpleStatusCard, StatusCard } from "./StatusCard";
 export { Wave } from "./Spinner";
 export { Table } from "./Table";
+export { EmailListField } from "./EmailListField";
 export { PhoneInputField } from "./PhoneInputField";
 export { Textarea } from "./Textarea";
 export { TextInput } from "./TextInput";

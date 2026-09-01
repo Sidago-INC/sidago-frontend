@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import { readPageParams, writePageParams } from "@/lib/grid-state-memory";
 import { Wave } from "@/components/ui";
 import { useGridPage } from "@/lib/use-grid-page";
 import {
@@ -34,9 +36,99 @@ export function FixLeads() {
     setSearchInput,
     debouncedSearch,
   } = useGridPage();
-  const [contactsFilter, setContactsFilter] = useState<ContactsFilter | "">("");
-  const [hasOtherContacts, setHasOtherContacts] = useState(false);
-  const [timezone, setTimezone] = useState("");
+  // These three live in the URL, not in component state.
+  //
+  // Saving a lead sends the user back to this page, which remounts the
+  // component — and plain `useState` defaults meant every filter they had set
+  // was gone. On a queue worked lead-by-lead that is a re-selection after every
+  // single save. In the URL the selection survives the round trip, a refresh,
+  // and a shared link.
+  //
+  // `useGridUrlState` only ever deletes its own keys (search/filters/sort/
+  // groupBy), so these coexist with it safely. `replace` keeps the Back button
+  // meaning "the page before Fix Leads" rather than one entry per toggle.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const contactsFilter = (searchParams.get("contacts") ?? "") as
+    | ContactsFilter
+    | "";
+  const hasOtherContacts = searchParams.get("hasOther") === "1";
+  const timezone = searchParams.get("tz") ?? "";
+
+  // Mirrored into session memory as well as the URL, because the URL alone
+  // only survives Back and refresh. Clicking "Fix Leads" in the sidebar
+  // navigates to a bare path and the query string is gone — which is why the
+  // built-in Filter/Sort/Group came back and these three did not.
+  const { pathname } = useLocation();
+
+  const setFilterParam = useCallback(
+    (key: string, value: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set(key, value);
+          else next.delete(key);
+
+          // Persisted HERE, from a real change, rather than in an effect
+          // watching the current state — the same reasoning as
+          // useGridUrlState: a freshly mounted page whose URL is still empty
+          // would otherwise save an empty snapshot and erase what it was
+          // about to restore.
+          writePageParams(pathname, {
+            contacts: next.get("contacts") ?? "",
+            tz: next.get("tz") ?? "",
+            hasOther: next.get("hasOther") ?? "",
+          });
+
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams, pathname],
+  );
+
+  // Arriving with a bare URL: put back what was last used on this page. Runs
+  // once, and only when the URL carries none of the three — a shared or
+  // bookmarked link must win over whatever this tab happens to remember.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+
+    const urlHasFilters = ["contacts", "tz", "hasOther"].some((key) =>
+      searchParams.get(key),
+    );
+    if (urlHasFilters) return;
+
+    const remembered = readPageParams(pathname);
+    if (Object.keys(remembered).length === 0) return;
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(remembered)) {
+          if (value) next.set(key, value);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+    // Mount-only on purpose: this restores, it does not track.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setContactsFilter = useCallback(
+    (value: ContactsFilter | "") => setFilterParam("contacts", value),
+    [setFilterParam],
+  );
+  const setHasOtherContacts = useCallback(
+    (value: boolean) => setFilterParam("hasOther", value ? "1" : ""),
+    [setFilterParam],
+  );
+  const setTimezone = useCallback(
+    (value: string) => setFilterParam("tz", value),
+    [setFilterParam],
+  );
 
   const [socketStats, setSocketStats] = useState<LeadStatsSummary | null>(null);
 
