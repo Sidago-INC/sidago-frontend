@@ -106,7 +106,11 @@ export function Table<T>({
   );
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [hoveredHeaderKey, setHoveredHeaderKey] = useState<string | null>(null);
-  const [resizeIndicatorX, setResizeIndicatorX] = useState<number | null>(null);
+  // This is a viewport coordinate, taken from the actual header cell rather
+  // than calculated from configured widths. CSS table layout can distribute
+  // widths differently from those configured values, so summing widths can
+  // place the guide inside a column.
+  const [resizeIndicatorLeft, setResizeIndicatorLeft] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [virtualScrollTop, setVirtualScrollTop] = useState(0);
   const [virtualViewportHeight, setVirtualViewportHeight] = useState(600);
@@ -116,6 +120,8 @@ export function Table<T>({
     startWidth: number;
     columnLeftOffset: number;
     currentWidth: number;
+    startIndicatorLeft: number;
+    headerElement: HTMLTableCellElement;
   } | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
   const pendingResizeXRef = useRef<number | null>(null);
@@ -155,6 +161,9 @@ export function Table<T>({
     const container = scrollContainerRef.current;
     if (!container) return;
     
+    const headerElement = event.currentTarget.parentElement;
+    if (!(headerElement instanceof HTMLTableCellElement)) return;
+
     // Calculate the column's left offset by summing previous column widths
     let columnLeftOffset = 0;
     for (const col of columns) {
@@ -163,6 +172,7 @@ export function Table<T>({
       columnLeftOffset += resolvedColumnWidths[colKey] ?? Number(col.width ?? getDefaultColumnWidth(col));
     }
     
+    const startIndicatorLeft = headerElement.getBoundingClientRect().right;
     dragState.current = {
       key: String(column.key),
       startX: event.clientX,
@@ -173,11 +183,14 @@ export function Table<T>({
       currentWidth:
         resolvedColumnWidths[String(column.key)] ??
         Number(column.width ?? getDefaultColumnWidth(column)),
+      startIndicatorLeft,
+      headerElement,
     };
-    
-    // Set initial indicator position
-    const initialIndicatorX = columnLeftOffset + (dragState.current.startWidth);
-    setResizeIndicatorX(initialIndicatorX - container.scrollLeft);
+
+    // Anchor the guide to the rendered right edge of this exact header. The
+    // browser may adjust fixed table column widths, making a summed offset
+    // inaccurate.
+    setResizeIndicatorLeft(startIndicatorLeft);
     setIsDragging(true);
     
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -219,8 +232,9 @@ export function Table<T>({
 
       const container = scrollContainerRef.current;
       if (container) {
-        const indicatorX = drag.columnLeftOffset + nextWidth;
-        setResizeIndicatorX(indicatorX - container.scrollLeft);
+        setResizeIndicatorLeft(
+          drag.startIndicatorLeft + nextWidth - drag.startWidth,
+        );
       }
     };
 
@@ -240,9 +254,7 @@ export function Table<T>({
       const drag = dragState.current;
       const container = scrollContainerRef.current;
       if (!drag || !container) return;
-      setResizeIndicatorX(
-        drag.columnLeftOffset + drag.currentWidth - container.scrollLeft,
-      );
+      setResizeIndicatorLeft(drag.headerElement.getBoundingClientRect().right);
     };
 
     const handleGlobalPointerUp = () => {
@@ -252,7 +264,7 @@ export function Table<T>({
       }
       dragState.current = null;
       pendingResizeXRef.current = null;
-      setResizeIndicatorX(null);
+      setResizeIndicatorLeft(null);
       setIsDragging(false);
     };
 
@@ -665,17 +677,18 @@ export function Table<T>({
         aria-label="Scrollable table"
       >
         {/* Resize indicator line - floats above table during dragging */}
-        {resizeIndicatorX !== null && (
+        {resizeIndicatorLeft !== null && (
           <div
             className="fixed pointer-events-none z-50"
             style={{
-              left: `${(scrollContainerRef.current?.getBoundingClientRect().left ?? 0) + resizeIndicatorX + 16}px`,
+              left: `${resizeIndicatorLeft}px`,
               top: `${scrollContainerRef.current?.getBoundingClientRect().top ?? 0}px`,
               height: `${scrollContainerRef.current?.getBoundingClientRect().height ?? 0}px`,
               width: 0,
               borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
               boxShadow: "0 0 8px rgba(14, 165, 233, 0.6)",
               boxSizing: "border-box",
+              transform: "translateX(-1px)",
             }}
           />
         )}
@@ -729,17 +742,19 @@ export function Table<T>({
                           opacity: isHovered && !isDragging ? 1 : 0,
                           pointerEvents: isHovered ? "auto" : "none",
                           zIndex: 2,
-                          borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
-                          paddingLeft: 0,
-                          marginLeft: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "flex-start",
                         }}
                         aria-label={`Resize ${col.title} column`}
                         role="separator"
                         title={`Resize ${col.title} column`}
-                      />
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-0 right-0"
+                          style={{
+                            borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
+                          }}
+                        />
+                      </div>
                     )}
                   </th>
                 );
