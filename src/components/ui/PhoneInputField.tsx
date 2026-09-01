@@ -73,7 +73,20 @@ export function PhoneInputField({
         country={country}
         enableSearch
         value={value}
-        onChange={(nextValue) => onChange(nextValue ?? "")}
+        // react-phone-input-2 calls back as (value, country, event,
+        // formattedValue). The FIRST argument is the raw national+country
+        // digits with NO leading "+" — "14082428820" — while the fourth is the
+        // string the user actually sees, "+1 (408) 242-8820".
+        //
+        // Taking the first argument was why the Add Lead page could never be
+        // saved: the field displayed a country code, the form held digits, and
+        // the shared phone rule rejects anything that does not start with "+".
+        // The New Lead drawer uses a plain text input, so typing the "+" there
+        // worked — which is why the same lead saved from one screen and not the
+        // other, and why it looked like an account permissions problem.
+        onChange={(rawValue, _country, _event, formattedValue) =>
+          onChange(formattedValue?.trim() || (rawValue ? `+${rawValue}` : ""))
+        }
         containerClass={clsx(
           "phone-input-field",
           error && "phone-input-field--error",
