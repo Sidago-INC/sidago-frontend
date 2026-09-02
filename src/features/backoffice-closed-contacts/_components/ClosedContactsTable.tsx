@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/Table";
 import React, { useMemo } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import {
-  assigneeOptions,
   ClosedContactRow,
   contactTypeOptions,
   getCompanySymbol,
@@ -51,6 +51,9 @@ export function ClosedContactsTable({
   React.useEffect(() => {
     setSelectedIndex(findDrawerRouteIndex(data, selectedLead));
   }, [data, selectedLead]);
+
+  const svgAgents = useAgentSelectOptions("svg");
+  const bentonAgents = useAgentSelectOptions("benton");
 
   const columns = useMemo<Column<ClosedContactRow>[]>(
     () => [
@@ -120,13 +123,13 @@ export function ClosedContactsTable({
         title: "SVG - To Be Called By",
         key: "svgToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: svgAgents.options,
       },
       {
         title: "Benton - To Be Called By",
         key: "bentonToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: bentonAgents.options,
       },
       {
         // Not a backend grid field for this report — display only.
@@ -138,7 +141,7 @@ export function ClosedContactsTable({
       },
       { title: "Last Action Date", key: "lastActionDate", type: "date" },
     ],
-    [data],
+    [data, svgAgents.options, bentonAgents.options],
   );
 
   return (

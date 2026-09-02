@@ -11,9 +11,9 @@ import {
 import { useCompanyOptions } from "@/features/companies/_lib/hooks";
 import React, { useEffect, useMemo, useState } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import { CurrentlyHotDrawer } from "./CurrentlyHotDrawer";
 import {
-  assigneeOptions,
   contactTypeOptions,
   getCompanySymbolOptions,
   getHotLeadTimezone,
@@ -55,6 +55,10 @@ export function CurrentlyHotTable({
 
   const { data: companyResult } = useCompanyOptions(1);
   const companies = companyResult?.data ?? [];
+
+  const svgAgents = useAgentSelectOptions("svg");
+  const bentonAgents = useAgentSelectOptions("benton");
+  const rm95Agents = useAgentSelectOptions("95rm");
 
   const columns = useMemo<Column<LeadRow>[]>(() => {
     const baseColumns: Column<LeadRow>[] = [
@@ -123,7 +127,7 @@ export function CurrentlyHotTable({
           title: "SVG-To be Called by",
           key: "svgToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: svgAgents.options,
         },
         {
           title: "SVG-Last Call Date",
@@ -141,7 +145,7 @@ export function CurrentlyHotTable({
           title: "Benton-To be Called by",
           key: "bentonToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: bentonAgents.options,
         },
         {
           title: "Date Become Hot",
@@ -172,7 +176,7 @@ export function CurrentlyHotTable({
           title: "95RM-To be Called by",
           key: "rm95ToBeCalledBy",
           type: "select",
-          options: assigneeOptions.map((value) => ({ label: value, value })),
+          options: rm95Agents.options,
         },
         {
           title: "95RM-Last Call Date",
@@ -207,7 +211,7 @@ export function CurrentlyHotTable({
         title: "SVG-To be Called by",
         key: "svgToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: svgAgents.options,
       },
       {
         title: "SVG-Last Call Date",
@@ -225,7 +229,7 @@ export function CurrentlyHotTable({
         title: "Benton-To be Called by",
         key: "bentonToBeCalledBy",
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: bentonAgents.options,
       },
       {
         title: "Benton-Last Call Date",
@@ -245,7 +249,14 @@ export function CurrentlyHotTable({
         groupable: false,
       },
     ];
-  }, [companies, data, variant]);
+  }, [
+    companies,
+    data,
+    variant,
+    svgAgents.options,
+    bentonAgents.options,
+    rm95Agents.options,
+  ]);
 
   return (
     <div className="min-h-full">

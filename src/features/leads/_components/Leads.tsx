@@ -12,12 +12,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
 import { LeadsDrawer } from "./LeadsDrawer";
 import {
-  assigneeOptions,
   leadTypeOptions,
   timezoneOptions,
   type LeadDirectoryRow,
 } from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 
 export function Leads() {
   const [searchParams] = useSearchParams();
@@ -54,6 +54,10 @@ export function Leads() {
   useEffect(() => {
     setSelectedIndex(findDrawerRouteIndex(rows, selectedLead));
   }, [rows, selectedLead]);
+
+  const svgAgents = useAgentSelectOptions("svg");
+  const bentonAgents = useAgentSelectOptions("benton");
+  const rm95Agents = useAgentSelectOptions("95rm");
 
   const columns = useMemo<Column<LeadDirectoryRow>[]>(
     () => [
@@ -120,7 +124,7 @@ export function Leads() {
         key: "svgToBeCalledBy",
         width: 190,
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: svgAgents.options,
       },
       {
         title: "SVG Last Called Date",
@@ -141,7 +145,7 @@ export function Leads() {
         key: "bentonToBeCalledBy",
         width: 205,
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: bentonAgents.options,
       },
       {
         title: "Benton Last Called Date",
@@ -162,7 +166,7 @@ export function Leads() {
         key: "rm95ToBeCalledBy",
         width: 195,
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: rm95Agents.options,
       },
       {
         title: "95RM Last Called Date",
@@ -177,7 +181,7 @@ export function Leads() {
         type: "date",
       },
     ],
-    [rows],
+    [rows, svgAgents.options, bentonAgents.options, rm95Agents.options],
   );
 
   return (
