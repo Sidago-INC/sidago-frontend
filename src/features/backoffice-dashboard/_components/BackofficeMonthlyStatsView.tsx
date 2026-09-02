@@ -8,6 +8,7 @@ import {
   useAdminMonthlyAgentCards,
   type MonthlyAgentCard,
 } from "@/features/admin-dashboard/_lib/hooks";
+import { easternTodayDate } from "@/lib/est";
 import { AgentScoreCards } from "./AgentScoreCards";
 import { MonthLeaderCard } from "./MonthLeaderCard";
 import { AgentHistoryDrawer } from "./AgentHistoryDrawer";
@@ -38,7 +39,7 @@ export function BackofficeMonthlyStatsView({
   setView: (view: "preview" | "monthly") => void;
 }) {
   const [selectedAgent, setSelectedAgent] = useState<MonthlyAgentCard | null>(null);
-  const { data, isLoading } = useAdminMonthlyAgentCards(new Date());
+  const { data, isLoading } = useAdminMonthlyAgentCards(easternTodayDate());
   const cards = data?.cards ?? [];
   const chartAgents: Agent[] = cards.map((card) => ({
     recordId: card.id,

@@ -2,6 +2,7 @@
 import { CompanySymbolBadge, StatusCard } from "@/components/ui";
 import { WinnerBadge } from "@/features/agent-dashboard/_components/WinnerBadge";
 import clsx from "clsx";
+import { easternTodayDate } from "@/lib/est";
 import { useAdminMonthlyAgentCards } from "./_lib/hooks";
 
 const CARD_TONES = [
@@ -16,7 +17,7 @@ export function AdminAgentScoreCards({
 }: {
   selectedDate?: Date;
 }) {
-  const dashboardDate = selectedDate ?? new Date();
+  const dashboardDate = selectedDate ?? easternTodayDate();
   const { data, isLoading } = useAdminMonthlyAgentCards(dashboardDate);
   const cards = data?.cards ?? [];
 

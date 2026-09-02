@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { DateRangePicker } from "@/components/ui";
+import { easternTodayDate, rangeToDateParams } from "@/lib/est";
 import { Panel } from "./Panel";
 import { useAgentCallReport } from "../_lib/hooks";
 
@@ -26,30 +27,16 @@ const RESULT_CODE_COLORS: Record<string, string> = {
 const DEFAULT_COLOR =
   "bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300";
 
-function localDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function rangeToParams(range: DateRange | undefined): { startDate: string; endDate: string } {
-  const today = new Date();
-  const from = range?.from ?? today;
-  const to = range?.to ?? from;
-  return { startDate: localDate(from), endDate: localDate(to) };
-}
-
 export function AgentCallReportPanel({
   agentSlug,
 }: {
   agentSlug: string | null;
 }) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(),
-    to: new Date(),
+    from: easternTodayDate(),
+    to: easternTodayDate(),
   });
-  const { startDate, endDate } = rangeToParams(dateRange);
+  const { startDate, endDate } = rangeToDateParams(dateRange);
   const { data, isLoading } = useAgentCallReport(agentSlug, startDate, endDate);
 
   const byResult = data?.byResult ?? {};

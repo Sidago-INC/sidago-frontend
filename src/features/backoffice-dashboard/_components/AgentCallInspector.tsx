@@ -21,6 +21,11 @@ import { TablePagination } from "@/components/ui/table/TablePagination";
 import { createPaginationMeta, getPageNumbers, getPaginationRange, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { downloadWorkbook } from "@/lib/excel";
 import { ensureAbsoluteUrl } from "@/lib/url";
+import {
+  easternTodayDate,
+  formatEasternDateTime,
+  rangeToDateParams,
+} from "@/lib/est";
 
 const DEFAULT_DETAILS_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
@@ -46,29 +51,6 @@ const RESULT_CODE_COLORS: Record<string, string> = {
 const DEFAULT_COLOR =
   "bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300";
 
-function localDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function rangeToParams(range: DateRange | undefined): { startDate: string; endDate: string } {
-  const today = new Date();
-  const from = range?.from ?? today;
-  const to = range?.to ?? from;
-  return { startDate: localDate(from), endDate: localDate(to) };
-}
-
-function formatDateTime(ts: string): string {
-  return new Date(ts).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatDuration(seconds: number | null): string {
   if (!seconds) return "—";
   const mins = Math.floor(seconds / 60);
@@ -89,7 +71,7 @@ const EXPORT_COLUMNS = [
 
 function rowToExportValues(row: CallDetailRow): Record<(typeof EXPORT_COLUMNS)[number], string> {
   return {
-    "Date / Time": formatDateTime(row.calledAt),
+    "Date / Time": formatEasternDateTime(row.calledAt),
     Lead: row.fullName ?? "",
     Company: row.companyName ?? "",
     Outcome: row.resultCode ?? "",
@@ -137,7 +119,7 @@ async function downloadXlsx(filename: string, rows: CallDetailRow[]) {
 }
 
 export function AgentCallInspector() {
-  const today = new Date();
+  const today = easternTodayDate();
   const { data: agentData } = useAdminTodayAgentCards(today);
   const agents = agentData?.cards ?? [];
 
@@ -150,7 +132,7 @@ export function AgentCallInspector() {
   const [perPage, setPerPage] = useState(DEFAULT_DETAILS_PAGE_SIZE);
   const [resultFilters, setResultFilters] = useState<string[]>([]);
 
-  const { startDate, endDate } = rangeToParams(dateRange);
+  const { startDate, endDate } = rangeToDateParams(dateRange);
   const isAgentSelected = selectedSlug !== "";
   const hasResultFilter = resultFilters.length > 0;
 
@@ -506,7 +488,7 @@ export function AgentCallInspector() {
                         className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
                       >
                         <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
-                          {formatDateTime(row.calledAt)}
+                          {formatEasternDateTime(row.calledAt)}
                         </td>
                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                           {row.fullName ?? "—"}
