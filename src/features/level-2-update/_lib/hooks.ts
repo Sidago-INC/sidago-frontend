@@ -170,6 +170,44 @@ export function useLogLevel2Result() {
   });
 }
 
+type Level2StatusResponse = {
+  ok: true;
+  status: string;
+  processed: boolean;
+  leadTypes: { svg: string | null; benton: string | null; "95rm": string | null };
+};
+
+/**
+ * Waits for a submitted Level 2 request to be interpreted, then returns the
+ * lead types it produced.
+ *
+ * The submit response cannot carry them: the endpoint records the request and a
+ * worker applies it moments later, so at submit time the three per-brand lead
+ * types are genuinely not decided yet. Without this the row would show blank
+ * columns until the page was reloaded.
+ *
+ * Polls every 1.5s for up to ~30s. Returns null on timeout rather than
+ * throwing - a slow cascade is not an error the agent should see, and the
+ * columns simply stay as they are until the next refresh.
+ */
+export async function waitForLevel2Result(
+  requestId: string,
+  { attempts = 20, intervalMs = 1500 } = {},
+): Promise<Level2StatusResponse["leadTypes"] | null> {
+  for (let i = 0; i < attempts; i++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const res = (await api.get(
+        `/level-2-requests/${requestId}/status`,
+      )) as Level2StatusResponse;
+      if (res.processed) return res.leadTypes;
+    } catch {
+      // Transient failure - keep polling; the worker is unaffected either way.
+    }
+  }
+  return null;
+}
+
 // Reverting lives in features/level-2-shared/revert.ts — both this page and
 // Level 2 History need it.
 export {

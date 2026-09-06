@@ -31,6 +31,7 @@ import {
 import {
   useLeadSelectSource,
   useLogLevel2Result,
+  waitForLevel2Result,
   type BrandStatesResponse,
 } from "../_lib/hooks";
 import {
@@ -97,7 +98,7 @@ const RESULT_CATEGORY: Record<
   string,
   "positive" | "callback" | "negative" | "admin"
 > = {
-  Intersted: "positive",
+  Interested: "positive",
   "Contract Closed": "positive",
 
   "Call back Lead": "callback",
@@ -346,18 +347,30 @@ export function Level2Update() {
         callBackDate: row.call_back_date,
       });
       showSuccessToast("Level 2 result logged.");
-      // The response carries the lead types the update produced and the row's
-      // real created_at. Both are frozen onto the row: this is a record of what
-      // happened, so it must not drift when the lead moves again later.
+      // The row's created_at is authoritative and frozen here. The three
+      // lead-type columns are NOT known yet: the endpoint records the request
+      // and a worker applies it moments later. They start blank and are filled
+      // in below once the worker reports the request processed.
       patchRow(rowId, {
         logged_at: new Date().toISOString(),
         api_id: result.id,
         created_date: result.createdAt
           ? result.createdAt.slice(0, 10)
           : row.created_date,
-        lead_type_sidago: (result.leadTypes?.svg ?? "") as LEAD_TYPE | "",
-        lead_type_benton: (result.leadTypes?.benton ?? "") as LEAD_TYPE | "",
-        lead_type_95rm: (result.leadTypes?.["95rm"] ?? "") as LEAD_TYPE | "",
+        lead_type_sidago: "",
+        lead_type_benton: "",
+        lead_type_95rm: "",
+      });
+
+      // Fire-and-forget: the agent can carry on with other rows while this
+      // settles. On timeout the placeholder is cleared rather than left
+      // stuck - the History page always shows the authoritative values.
+      void waitForLevel2Result(result.id).then((leadTypes) => {
+        patchRow(rowId, {
+          lead_type_sidago: (leadTypes?.svg ?? "") as LEAD_TYPE | "",
+          lead_type_benton: (leadTypes?.benton ?? "") as LEAD_TYPE | "",
+          lead_type_95rm: (leadTypes?.["95rm"] ?? "") as LEAD_TYPE | "",
+        });
       });
     } catch (err) {
       showErrorToast(err);
