@@ -31,10 +31,16 @@ export type Level2UpdateRow = {
 };
 
 // The 14 result options the agent can pick from when updating a Level 2 row.
-// Matches the spec from the Level 2 Update brief verbatim (typo "Intersted"
-// preserved on the user's request — change here if/when the spec is fixed).
+//
+// These values are sent as-is and validated against VALID_RESULT_UPDATES in
+// level-2-requests.service.ts — the two lists must stay in step, and the
+// backend rejects anything not in its copy.
+//
+// "Interested" was previously spelled "Intersted" here and in the backend,
+// carried over from the original Level 2 brief. Corrected 2026-09-04;
+// migration 056 updated the 3 stored rows that used the misspelling.
 export const level2ResultUpdateOptions = [
-  { label: "Intersted", value: "Intersted" },
+  { label: "Interested", value: "Interested" },
   { label: "Call back Lead", value: "Call back Lead" },
   { label: "needs more time", value: "needs more time" },
   { label: "no answer", value: "no answer" },
