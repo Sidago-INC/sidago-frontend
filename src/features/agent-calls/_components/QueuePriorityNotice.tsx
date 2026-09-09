@@ -78,12 +78,27 @@ export function QueuePriorityNotice({ leads }: { leads: QueueLead[] }) {
     leads.map((lead) => lead.timezone?.trim()).filter(Boolean),
   );
 
+  // Hot leads are served ahead of every General lead, whatever their timezone,
+  // so "Calling EST first" is only true once the Hot block is worked through.
+  // Saying just that was misleading the moment Hot leads started arriving.
+  const hotCount = leads.filter((lead) => lead.leadType === "Hot").length;
+
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-300">
       <Clock size={13} className="shrink-0 text-slate-400" />
-      <span>
-        Calling <strong className="font-semibold">{active.label}</strong> first.
-      </span>
+      {hotCount > 0 ? (
+        <span>
+          <strong className="font-semibold text-rose-600 dark:text-rose-400">
+            {hotCount} hot {hotCount === 1 ? "lead" : "leads"}
+          </strong>{" "}
+          first, then <strong className="font-semibold">{active.label}</strong>.
+        </span>
+      ) : (
+        <span>
+          Calling <strong className="font-semibold">{active.label}</strong>{" "}
+          first.
+        </span>
+      )}
       <span className="text-slate-400 dark:text-slate-500">
         Order changes at {formatBoundary(next.start)}
         {timezones.size > 1

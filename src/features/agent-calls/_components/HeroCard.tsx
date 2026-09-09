@@ -13,7 +13,15 @@ export function HeroCard({ currentLead }: { currentLead: QueueLead }) {
             {formatLeadDisplayTitle(currentLead)}
           </h1>
 
+          {/*
+            Lead type is shown first because it is now what decides the agent's
+            order of work: the queue puts every qualifying Hot lead ahead of
+            every General one. Before that change Hot leads never reached the
+            page at all, so there was nothing to distinguish and no badge here —
+            a Hot lead and a General lead looked identical.
+          */}
           <div className="flex flex-wrap items-center gap-2">
+            <TypeBadge value={currentLead.leadType} kind="lead" />
             <TypeBadge value={currentLead.contactType} kind="contact" />
             <TimezoneBadge timezone={currentLead.timezone} />
           </div>
