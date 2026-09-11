@@ -2,6 +2,7 @@ import {
   Card,
   CardContent,
   CheckboxInput,
+  EmailInput,
   Select,
   Textarea,
   TextInput,
@@ -264,12 +265,11 @@ export function FixLeadEditForm() {
                 onChange={(event) => updateField("role", event.target.value)}
                 className={inputClassName}
               />
-              <TextInput
+              <EmailInput
                 label="Email"
-                type="email"
                 value={form.email}
                 onChange={(event) => updateField("email", event.target.value)}
-                className={inputClassName}
+                className="min-h-10 rounded text-sm"
               />
               <TextInput
                 label="Phone"

@@ -6,6 +6,7 @@ import {
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
+  EmailInput,
   Select,
   Textarea,
   TextInput,
@@ -171,7 +172,7 @@ function EditableField({
       <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
+      <div className={align === "stack" ? "w-full" : "min-w-0 w-64 max-w-[65%]"}>
         {children}
       </div>
     </div>
@@ -383,8 +384,7 @@ export function AgentSmsDrawer({
               />
             </EditableField>
             <EditableField label="Email">
-              <TextInput
-                type="email"
+              <EmailInput
                 value={row.email}
                 onChange={(event) => onChange("email", event.target.value)}
                 className="text-xs font-semibold"

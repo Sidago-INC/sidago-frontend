@@ -4,6 +4,7 @@ import {
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
+  EmailInput,
   Select,
   Textarea,
   TextInput,
@@ -834,8 +835,7 @@ export function LeadsDrawer({
             />
           </EditableField>
           <EditableField label="Email">
-            <TextInput
-              type="email"
+            <EmailInput
               value={form.email}
               onChange={(event) => updateForm("email", event.target.value)}
               className="text-xs font-semibold"
@@ -1110,13 +1110,21 @@ function EditableField({
       className={
         align === "stack"
           ? "space-y-1 py-2"
-          : "flex items-center justify-between gap-4 py-1.5"
+          : label.toLowerCase() === "email"
+            ? "flex items-start justify-between gap-4 py-1.5"
+            : "flex items-center justify-between gap-4 py-1.5"
       }
     >
-      <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
+      <p
+        className={
+          label.toLowerCase() === "email"
+            ? "shrink-0 pt-2 text-[10px] uppercase tracking-widest text-slate-400"
+            : "shrink-0 text-[10px] uppercase tracking-widest text-slate-400"
+        }
+      >
         {label}
       </p>
-      <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
+      <div className={align === "stack" ? "w-full" : "min-w-0 w-64 max-w-[65%]"}>
         {children}
       </div>
     </div>
