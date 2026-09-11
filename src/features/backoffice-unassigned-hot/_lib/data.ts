@@ -3,7 +3,6 @@ export {
   leadOptions,
   contactTypeOptions,
   leadTypeOptions,
-  assigneeOptions,
   timezoneOptions,
   getCompanySymbol,
   getCompanySymbolOptions,

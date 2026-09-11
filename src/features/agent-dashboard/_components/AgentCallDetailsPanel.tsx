@@ -4,31 +4,15 @@ import { DateRangePicker } from "@/components/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { ensureAbsoluteUrl } from "@/lib/url";
+import {
+  easternTodayDate,
+  formatEasternTime,
+  rangeToDateParams,
+} from "@/lib/est";
 import { Panel } from "./Panel";
 import { useAgentCallDetails } from "../_lib/hooks";
 
 const PAGE_LIMIT = DEFAULT_PAGE_SIZE;
-
-function localDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, "0");
-  const d = `${date.getDate()}`.padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function rangeToParams(range: DateRange | undefined): { startDate: string; endDate: string } {
-  const today = new Date();
-  const from = range?.from ?? today;
-  const to = range?.to ?? from;
-  return { startDate: localDate(from), endDate: localDate(to) };
-}
-
-function formatTime(ts: string): string {
-  return new Date(ts).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return "—";
@@ -43,11 +27,11 @@ export function AgentCallDetailsPanel({
   agentSlug: string | null;
 }) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(),
-    to: new Date(),
+    from: easternTodayDate(),
+    to: easternTodayDate(),
   });
   const [page, setPage] = useState(1);
-  const { startDate, endDate } = rangeToParams(dateRange);
+  const { startDate, endDate } = rangeToDateParams(dateRange);
   const { data, isLoading } = useAgentCallDetails(
     agentSlug,
     startDate,
@@ -114,7 +98,7 @@ export function AgentCallDetailsPanel({
                   className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
                 >
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
-                    {formatTime(row.calledAt)}
+                    {formatEasternTime(row.calledAt)}
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                     {row.fullName ?? "—"}

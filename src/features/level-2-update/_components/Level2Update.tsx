@@ -1,5 +1,3 @@
-
-
 import {
   Badge,
   Button,
@@ -12,10 +10,9 @@ import {
 import { type Column } from "@/components/ui/Table";
 import clsx from "clsx";
 import { FileText, Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
-import { api } from "@/lib/api";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUsers } from "@/features/backoffice-shared/use-users";
 import {
@@ -23,15 +20,26 @@ import {
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
 import {
+  boardRowToUpdateRow,
+  brandCodeFor,
   createEmptyLevel2UpdateRow,
+  isLoggedRow,
+  isPendingRow,
   level2ResultUpdateOptions,
   level2UpdateCampaignOptions,
   type Level2UpdateRow,
 } from "../_lib/data";
 import {
+  useCreateLevel2Draft,
+  useDeleteLevel2Draft,
+  usePatchLevel2Draft,
+  useLevel2Board,
+  type Level2DraftPatch,
+} from "../_lib/board";
+import {
   useLeadSelectSource,
   useLogLevel2Result,
-  type BrandStatesResponse,
+  waitForLevel2Result,
 } from "../_lib/hooks";
 import {
   buildRevertMessage,
@@ -66,6 +74,11 @@ const cellDatePickerClass =
 const leadSelectOptionsClass =
   "z-[300] !w-[26rem] max-w-[90vw] max-h-72 rounded-xl border-slate-200 p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950";
 
+// Typing shouldn't cost a Tokyo round-trip per character. Long enough to
+// coalesce a burst, short enough that a colleague sees the note within a
+// poll or two.
+const TEXT_SAVE_DEBOUNCE_MS = 500;
+
 function ReadText({
   value,
   placeholder = "-",
@@ -97,7 +110,7 @@ const RESULT_CATEGORY: Record<
   string,
   "positive" | "callback" | "negative" | "admin"
 > = {
-  Intersted: "positive",
+  Interested: "positive",
   "Contract Closed": "positive",
 
   "Call back Lead": "callback",
@@ -135,35 +148,80 @@ function ResultBadge({ value }: { value: string }) {
   return <Badge>{value}</Badge>;
 }
 
-// Maps the frontend BRAND value to the lowercase brand code the API expects.
-function brandCodeFor(brand: BRAND | ""): "svg" | "95rm" | "benton" | null {
-  if (brand === "SVG") return "svg";
-  if (brand === "BENTON") return "benton";
-  if (brand === "95RM") return "95rm";
-  return null;
+// A logged row is still being applied by the worker, so its lead types are
+// genuinely not decided yet. Say so rather than showing three blanks.
+function LeadTypeCell({
+  value,
+  pending,
+}: {
+  value: string;
+  pending: boolean;
+}) {
+  if (pending && !value.trim()) {
+    return (
+      <span className="px-2.5 text-sm text-slate-400 dark:text-slate-500">
+        Applying…
+      </span>
+    );
+  }
+  if (!value.trim()) {
+    return (
+      <span className="px-2.5 text-sm text-slate-400 dark:text-slate-500">
+        —
+      </span>
+    );
+  }
+  return <TypeBadge value={value} kind="lead" />;
 }
 
-const DRAFT_KEY = "level2_update_draft_rows";
-
 export function Level2Update() {
-  const [rows, setRows] = useState<Level2UpdateRow[]>(() => {
-    try {
-      const saved = sessionStorage.getItem(DRAFT_KEY);
-      return saved ? (JSON.parse(saved) as Level2UpdateRow[]) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [editingRowId, setEditingRowId] = useState<string | null>(null);
-  const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
+  const board = useLevel2Board();
 
+  // Rows that have a lead but not yet a campaign (or neither). They cannot be
+  // stored: level_2_requests requires both. They live here until the second
+  // field is picked, then become a shared draft.
+  const [localRows, setLocalRows] = useState<Level2UpdateRow[]>([]);
+  const localCounter = useRef(0);
+
+  // Edits typed or picked but not yet confirmed by the server, keyed by row
+  // id. Rendered on top of the board so a poll landing mid-edit cannot blank
+  // the field being worked on.
+  const [pendingEdits, setPendingEdits] = useState<
+    Record<string, Partial<Level2UpdateRow>>
+  >({});
+
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [busyRowId, setBusyRowId] = useState<string | null>(null);
+
+  const createDraft = useCreateLevel2Draft();
+  const patchDraft = usePatchLevel2Draft();
+  const deleteDraft = useDeleteLevel2Draft();
+  const logResult = useLogLevel2Result();
+  const revertResult = useRevertLevel2Result();
+
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   useEffect(() => {
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(rows));
-    } catch {
-      // ignore quota/private-mode errors
-    }
-  }, [rows]);
+    const timers = saveTimers.current;
+    return () => {
+      for (const timer of Object.values(timers)) clearTimeout(timer);
+    };
+  }, []);
+
+  const serverRows = useMemo(
+    () => (board.data ?? []).map(boardRowToUpdateRow),
+    [board.data],
+  );
+
+  // Local rows first: the board is newest-first and the Add Lead button sits
+  // at the top, so a row being started stays under the cursor.
+  const rows = useMemo(
+    () =>
+      [...localRows, ...serverRows].map((row) => {
+        const pending = pendingEdits[row.id];
+        return pending ? { ...row, ...pending } : row;
+      }),
+    [localRows, serverRows, pendingEdits],
+  );
 
   const extraLeadOptions = useMemo(
     () =>
@@ -184,8 +242,6 @@ export function Level2Update() {
   const svgAgents = useUsers("svg");
   const rm95Agents = useUsers("95rm");
   const bentonAgents = useUsers("benton");
-  const logResult = useLogLevel2Result();
-  const revertResult = useRevertLevel2Result();
 
   const getLeadLabel = (leadId: string) =>
     leadSelectSource.options.find((option) => String(option.value) === leadId)
@@ -216,104 +272,239 @@ export function Level2Update() {
     return false;
   };
 
-  const updateRow = <K extends keyof Level2UpdateRow>(
-    rowId: string,
-    key: K,
-    value: Level2UpdateRow[K],
-  ) => {
-    setRows((current) =>
-      current.map((row) => (row.id === rowId ? { ...row, [key]: value } : row)),
-    );
+  const findRow = (rowId: string) => rows.find((row) => row.id === rowId);
+
+  const stageEdit = (rowId: string, patch: Partial<Level2UpdateRow>) => {
+    setPendingEdits((current) => ({
+      ...current,
+      [rowId]: { ...current[rowId], ...patch },
+    }));
   };
 
-  const patchRow = (rowId: string, patch: Partial<Level2UpdateRow>) => {
-    setRows((current) =>
+  const clearEdit = (rowId: string, keys: (keyof Level2UpdateRow)[]) => {
+    setPendingEdits((current) => {
+      const existing = current[rowId];
+      if (!existing) return current;
+      const next = { ...existing };
+      for (const key of keys) delete next[key];
+      if (Object.keys(next).length === 0) {
+        const { [rowId]: _dropped, ...rest } = current;
+        return rest;
+      }
+      return { ...current, [rowId]: next };
+    });
+  };
+
+  const patchLocal = (rowId: string, patch: Partial<Level2UpdateRow>) => {
+    setLocalRows((current) =>
       current.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
     );
   };
 
-  const handleAddLead = () => {
-    const newRow = createEmptyLevel2UpdateRow(rows.length + 1);
-    setRows((current) => [...current, newRow]);
-    setEditingRowId(newRow.id);
-  };
-
-  const handleDelete = async (rowId: string) => {
-    const row = rows.find((r) => r.id === rowId);
-    if (!row) return;
-
-    // A row that was logged but has lost its server id must not be dropped
-    // from the grid — that is how deletes used to look like they worked while
-    // the request, the call log and the lead's new type all stayed behind.
-    if (row.logged_at && !row.api_id) {
-      showErrorToast({
-        message:
-          "This row was logged in an earlier session, so it can't be reverted from here. Use Level 2 History instead.",
-      });
-      return;
-    }
-
-    if (row.api_id) {
-      setDeletingRowId(rowId);
-      try {
-        const result = await revertResult.mutateAsync(row.api_id);
-        setRows((current) => current.filter((r) => r.id !== rowId));
-        setEditingRowId((current) => (current === rowId ? null : current));
-        showSuccessToast(buildRevertMessage(result));
-      } catch (err) {
-        showErrorToast(err);
-      } finally {
-        setDeletingRowId(null);
-      }
-    } else {
-      // Never logged — a draft that only ever existed in the browser.
-      setRows((current) => current.filter((r) => r.id !== rowId));
-      setEditingRowId((current) => (current === rowId ? null : current));
-    }
-  };
-
-  const handleCampaignChange = (rowId: string, nextCampaign: BRAND | "") => {
-    // Resetting level_2_agent prevents a stale SVG agent name from sticking
-    // around when the user switches the row to Benton — that would fail at
-    // log time with "User not found" because the resolver only matches the
-    // agent name, not the brand. Better to clear it and force a re-pick.
-    patchRow(rowId, { campaign: nextCampaign, level_2_agent: "" });
-  };
-
-  const handleLeadChange = async (rowId: string, leadId: string) => {
-    const label = getLeadLabel(leadId);
-    // Reset the brand lead types until the fetch resolves so the user never
-    // sees stale data from the previously selected lead.
-    patchRow(rowId, {
-      lead: leadId,
-      lead_label: label,
-      lead_type_sidago: "",
-      lead_type_benton: "",
-      lead_type_95rm: "",
-    });
-
-    if (!leadId) return;
+  /**
+   * Promote a local row to a shared draft, once it has both a lead and a
+   * campaign. Any values already typed into it are saved straight after, so
+   * nothing entered before the promotion is lost.
+   */
+  const promoteToDraft = async (row: Level2UpdateRow, next: Level2UpdateRow) => {
+    const brand = brandCodeFor(next.campaign);
+    if (!next.lead || !brand) return;
 
     try {
-      const json = (await api.get(
-        `/leads/${leadId}/brand-states`,
-      )) as BrandStatesResponse;
-      patchRow(rowId, {
-        lead_type_sidago: (json.brandStates.svg.leadType ?? "") as LEAD_TYPE | "",
-        lead_type_benton: (json.brandStates.benton.leadType ?? "") as
-          | LEAD_TYPE
-          | "",
-        lead_type_95rm: (json.brandStates["95rm"].leadType ?? "") as
-          | LEAD_TYPE
-          | "",
+      const created = await createDraft.mutateAsync({
+        leadId: next.lead,
+        brand,
       });
+
+      const carried: Level2DraftPatch = {};
+      if (next.level_2_agent) carried.level2AgentName = next.level_2_agent;
+      if (next.level_2_result_update)
+        carried.resultUpdate = next.level_2_result_update;
+      if (next.updated_notes) carried.updatedNotes = next.updated_notes;
+      if (next.call_back_date) carried.callBackDate = next.call_back_date;
+
+      if (Object.keys(carried).length > 0) {
+        await patchDraft.mutateAsync({ id: created.id, patch: carried });
+      }
+
+      // Wait for the board to actually contain the new row before dropping
+      // the local one. Removing it first would blank the line the agent is
+      // looking at until the next fetch landed.
+      await board.refetch();
+
+      setLocalRows((current) => current.filter((item) => item.id !== row.id));
+      setEditingRowId((current) => (current === row.id ? created.id : current));
     } catch (err) {
       showErrorToast(err);
     }
   };
 
+  /** Save a field of a shared draft, keeping the typed value on screen. */
+  const saveField = (
+    rowId: string,
+    serverId: string,
+    patch: Level2DraftPatch,
+    keys: (keyof Level2UpdateRow)[],
+  ) => {
+    patchDraft
+      .mutateAsync({ id: serverId, patch })
+      .then(() => clearEdit(rowId, keys))
+      .catch((err) => {
+        // Put the stored value back on screen; the overlay was a guess that
+        // the save would land, and it did not.
+        clearEdit(rowId, keys);
+        showErrorToast(err);
+        void board.refetch();
+      });
+  };
+
+  const saveFieldDebounced = (
+    rowId: string,
+    serverId: string,
+    field: keyof Level2UpdateRow,
+    patch: Level2DraftPatch,
+  ) => {
+    const timerKey = `${rowId}:${String(field)}`;
+    clearTimeout(saveTimers.current[timerKey]);
+    saveTimers.current[timerKey] = setTimeout(() => {
+      delete saveTimers.current[timerKey];
+      saveField(rowId, serverId, patch, [field]);
+    }, TEXT_SAVE_DEBOUNCE_MS);
+  };
+
+  const handleAddLead = () => {
+    localCounter.current += 1;
+    const newRow = createEmptyLevel2UpdateRow(localCounter.current);
+    setLocalRows((current) => [newRow, ...current]);
+    setEditingRowId(newRow.id);
+  };
+
+  const handleLeadChange = async (rowId: string, leadId: string) => {
+    const row = findRow(rowId);
+    if (!row) return;
+
+    const label = getLeadLabel(leadId);
+
+    // A shared draft is pinned to its lead: changing which person the row is
+    // about would rewrite a row a colleague may already be filling in. Discard
+    // and start again instead.
+    if (row.serverId) {
+      showErrorToast({
+        message:
+          "This row is already shared. Delete it and add the lead again to change who it is for.",
+      });
+      return;
+    }
+
+    const next = { ...row, lead: leadId, lead_label: label };
+    patchLocal(rowId, { lead: leadId, lead_label: label });
+    if (leadId && next.campaign) await promoteToDraft(row, next);
+  };
+
+  const handleCampaignChange = async (
+    rowId: string,
+    nextCampaign: BRAND | "",
+  ) => {
+    const row = findRow(rowId);
+    if (!row) return;
+
+    // Resetting level_2_agent prevents a stale SVG agent name from sticking
+    // around when the user switches the row to Benton — that would fail at
+    // log time with "User not found" because the resolver only matches the
+    // agent name, not the brand. Better to clear it and force a re-pick.
+    if (row.serverId) {
+      stageEdit(rowId, { campaign: nextCampaign, level_2_agent: "" });
+      const brand = brandCodeFor(nextCampaign);
+      if (brand) {
+        saveField(rowId, row.serverId, { brand }, ["campaign", "level_2_agent"]);
+      }
+      return;
+    }
+
+    const next = { ...row, campaign: nextCampaign, level_2_agent: "" };
+    patchLocal(rowId, { campaign: nextCampaign, level_2_agent: "" });
+    if (row.lead && nextCampaign) await promoteToDraft(row, next);
+  };
+
+  const handleAgentChange = (rowId: string, name: string) => {
+    const row = findRow(rowId);
+    if (!row) return;
+    if (!row.serverId) {
+      patchLocal(rowId, { level_2_agent: name });
+      return;
+    }
+    stageEdit(rowId, { level_2_agent: name });
+    saveField(rowId, row.serverId, { level2AgentName: name }, ["level_2_agent"]);
+  };
+
+  const handleResultChange = (rowId: string, value: string) => {
+    const row = findRow(rowId);
+    if (!row) return;
+    if (!row.serverId) {
+      patchLocal(rowId, { level_2_result_update: value });
+      return;
+    }
+    stageEdit(rowId, { level_2_result_update: value });
+    saveField(rowId, row.serverId, { resultUpdate: value }, [
+      "level_2_result_update",
+    ]);
+  };
+
+  const handleNotesChange = (rowId: string, value: string) => {
+    const row = findRow(rowId);
+    if (!row) return;
+    if (!row.serverId) {
+      patchLocal(rowId, { updated_notes: value });
+      return;
+    }
+    stageEdit(rowId, { updated_notes: value });
+    saveFieldDebounced(rowId, row.serverId, "updated_notes", {
+      updatedNotes: value,
+    });
+  };
+
+  const handleCallBackChange = (rowId: string, value: string) => {
+    const row = findRow(rowId);
+    if (!row) return;
+    if (!row.serverId) {
+      patchLocal(rowId, { call_back_date: value });
+      return;
+    }
+    stageEdit(rowId, { call_back_date: value });
+    saveField(rowId, row.serverId, { callBackDate: value }, ["call_back_date"]);
+  };
+
+  const handleDelete = async (rowId: string) => {
+    const row = findRow(rowId);
+    if (!row) return;
+
+    // Never stored — just drop it.
+    if (!row.serverId) {
+      setLocalRows((current) => current.filter((item) => item.id !== rowId));
+      setEditingRowId((current) => (current === rowId ? null : current));
+      return;
+    }
+
+    setBusyRowId(rowId);
+    try {
+      if (isLoggedRow(row)) {
+        // Already applied to the lead, so removing it means undoing it.
+        const result = await revertResult.mutateAsync(row.serverId);
+        showSuccessToast(buildRevertMessage(result));
+      } else {
+        await deleteDraft.mutateAsync(row.serverId);
+      }
+      setEditingRowId((current) => (current === rowId ? null : current));
+    } catch (err) {
+      showErrorToast(err);
+    } finally {
+      setBusyRowId(null);
+      void board.refetch();
+    }
+  };
+
   const handleLogResult = async (rowId: string) => {
-    const row = rows.find((r) => r.id === rowId);
+    const row = findRow(rowId);
     if (!row) return;
 
     if (!row.lead) {
@@ -329,6 +520,12 @@ export function Level2Update() {
       showErrorToast({ message: "Pick a Level 2 result before logging." });
       return;
     }
+    if (!row.serverId) {
+      showErrorToast({
+        message: "This row is still being created. Try again in a moment.",
+      });
+      return;
+    }
 
     const callbackError = getCallBackDateError(row.call_back_date, "");
     if (callbackError) {
@@ -336,8 +533,20 @@ export function Level2Update() {
       return;
     }
 
+    // A debounced note may still be waiting. Flush it, or the submitted row
+    // silently loses the last thing typed into it.
+    const notesTimer = saveTimers.current[`${rowId}:updated_notes`];
+    if (notesTimer) {
+      clearTimeout(notesTimer);
+      delete saveTimers.current[`${rowId}:updated_notes`];
+    }
+
+    setBusyRowId(rowId);
     try {
-      const result = await logResult.mutateAsync({
+      const submitted = await logResult.mutateAsync({
+        // The draft row itself becomes the request — promoted in place rather
+        // than copied, so the board never shows it twice.
+        draftId: row.serverId,
         leadId: row.lead,
         brand,
         level2AgentName: row.level_2_agent || null,
@@ -345,26 +554,32 @@ export function Level2Update() {
         updatedNotes: row.updated_notes,
         callBackDate: row.call_back_date,
       });
+
+      // The worker usually finishes in a second or two, and the board's own
+      // poll is ten. Watch the cheap status endpoint instead so the lead-type
+      // columns fill in as soon as they are decided rather than at the next
+      // tick. Not awaited — the row is already logged and the agent should be
+      // free to move on.
+      void waitForLevel2Result(submitted.id).then(() => board.refetch());
+      clearEdit(rowId, [
+        "campaign",
+        "level_2_agent",
+        "level_2_result_update",
+        "updated_notes",
+        "call_back_date",
+      ]);
+      setEditingRowId((current) => (current === rowId ? null : current));
       showSuccessToast("Level 2 result logged.");
-      // The response carries the lead types the update produced and the row's
-      // real created_at. Both are frozen onto the row: this is a record of what
-      // happened, so it must not drift when the lead moves again later.
-      patchRow(rowId, {
-        logged_at: new Date().toISOString(),
-        api_id: result.id,
-        created_date: result.createdAt
-          ? result.createdAt.slice(0, 10)
-          : row.created_date,
-        lead_type_sidago: (result.leadTypes?.svg ?? "") as LEAD_TYPE | "",
-        lead_type_benton: (result.leadTypes?.benton ?? "") as LEAD_TYPE | "",
-        lead_type_95rm: (result.leadTypes?.["95rm"] ?? "") as LEAD_TYPE | "",
-      });
     } catch (err) {
       showErrorToast(err);
+    } finally {
+      setBusyRowId(null);
+      void board.refetch();
     }
   };
 
-  const isEditingRow = (rowId: string) => editingRowId === rowId;
+  const isEditingRow = (row: Level2UpdateRow) =>
+    editingRowId === row.id && !isLoggedRow(row);
 
   const columns: Column<Level2UpdateRow>[] = [
     {
@@ -372,7 +587,7 @@ export function Level2Update() {
       key: "lead",
       getValue: (row) => row.lead_label || row.lead,
       render: (row) =>
-        isEditingRow(row.id) ? (
+        isEditingRow(row) && !row.serverId ? (
           <div onClick={(event) => event.stopPropagation()}>
             <Select
               value={row.lead}
@@ -407,7 +622,7 @@ export function Level2Update() {
       title: "Campaign",
       key: "campaign",
       render: (row) =>
-        isEditingRow(row.id) ? (
+        isEditingRow(row) ? (
           <div onClick={(event) => event.stopPropagation()}>
             <Select
               value={row.campaign}
@@ -430,7 +645,7 @@ export function Level2Update() {
       title: "level 2 agent",
       key: "level_2_agent",
       render: (row) => {
-        if (!isEditingRow(row.id)) {
+        if (!isEditingRow(row)) {
           return <ReadText value={row.level_2_agent} />;
         }
         const agentOptions = getAgentOptions(row.campaign);
@@ -449,7 +664,7 @@ export function Level2Update() {
               searchPlaceholder="Search agent"
               disabled={!row.campaign}
               onChange={(nextValue) =>
-                updateRow(row.id, "level_2_agent", String(nextValue))
+                handleAgentChange(row.id, String(nextValue))
               }
               className={cellSelectClass}
               optionsClassName={cellSelectOptionsClass}
@@ -462,7 +677,7 @@ export function Level2Update() {
       title: "Level 2 result update",
       key: "level_2_result_update",
       render: (row) =>
-        isEditingRow(row.id) ? (
+        isEditingRow(row) ? (
           <div onClick={(event) => event.stopPropagation()}>
             <Select
               value={row.level_2_result_update}
@@ -471,7 +686,7 @@ export function Level2Update() {
               searchable
               searchPlaceholder="Search result"
               onChange={(nextValue) =>
-                updateRow(row.id, "level_2_result_update", String(nextValue))
+                handleResultChange(row.id, String(nextValue))
               }
               className={cellSelectClass}
               optionsClassName={cellSelectOptionsClass}
@@ -485,14 +700,12 @@ export function Level2Update() {
       title: "Updated Notes",
       key: "updated_notes",
       render: (row) =>
-        isEditingRow(row.id) ? (
+        isEditingRow(row) ? (
           <input
             type="text"
             value={row.updated_notes}
             onClick={(event) => event.stopPropagation()}
-            onChange={(event) =>
-              updateRow(row.id, "updated_notes", event.target.value)
-            }
+            onChange={(event) => handleNotesChange(row.id, event.target.value)}
             className={cellInputClass}
             placeholder="Updated notes"
           />
@@ -505,11 +718,11 @@ export function Level2Update() {
       key: "call_back_date",
       type: "date",
       render: (row) =>
-        isEditingRow(row.id) ? (
+        isEditingRow(row) ? (
           <div onClick={(event) => event.stopPropagation()}>
             <DatePickerField
               value={row.call_back_date}
-              onChange={(value) => updateRow(row.id, "call_back_date", value)}
+              onChange={(value) => handleCallBackChange(row.id, value)}
               className={cellDatePickerClass}
               placeholder="Pick a date"
               minDate={getMinCallBackDate("")}
@@ -522,59 +735,77 @@ export function Level2Update() {
     {
       // Read-only. This used to render a date picker, but created_date is not
       // part of the POST body — and could not be, since the API rejects
-      // unknown fields — so editing it changed nothing. It shows today while
-      // the row is a draft and the row's real created_at once it is logged.
+      // unknown fields — so editing it changed nothing.
       title: "Created date",
       key: "created_date",
       type: "date",
       render: (row) => <ReadText value={row.created_date} />,
     },
     {
-      title: "Lead Type Sidago",
+      title: "Added by",
+      key: "submitted_by",
+      render: (row) => <ReadText value={row.submitted_by} placeholder="You" />,
+    },
+    {
+      title: "Lead Type SVG",
       key: "lead_type_sidago",
-      render: (row) => <TypeBadge value={row.lead_type_sidago} kind="lead" />,
+      render: (row) => (
+        <LeadTypeCell value={row.lead_type_sidago} pending={isPendingRow(row)} />
+      ),
     },
     {
       title: "Lead Type Benton",
       key: "lead_type_benton",
-      render: (row) => <TypeBadge value={row.lead_type_benton} kind="lead" />,
+      render: (row) => (
+        <LeadTypeCell value={row.lead_type_benton} pending={isPendingRow(row)} />
+      ),
     },
     {
       title: "Lead Type 95 RM",
       key: "lead_type_95rm",
-      render: (row) => <TypeBadge value={row.lead_type_95rm} kind="lead" />,
+      render: (row) => (
+        <LeadTypeCell value={row.lead_type_95rm} pending={isPendingRow(row)} />
+      ),
     },
     {
       title: "Log Result",
       key: "log_result",
-      render: (row) => (
-        <button
-          type="button"
-          disabled={logResult.isPending}
-          onClick={(event) => {
-            event.stopPropagation();
-            handleLogResult(row.id);
-          }}
-          className={clsx(
-            actionButtonClass,
-            "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
-            logResult.isPending && "opacity-50 cursor-not-allowed",
-          )}
-        >
-          <FileText size={16} />
-          {row.logged_at ? "Logged" : "Log Result"}
-        </button>
-      ),
+      render: (row) => {
+        const logged = isLoggedRow(row);
+        // Per row, not per grid. A single shared `isPending` disabled every
+        // row's button while any one of them was in flight.
+        const isBusy = busyRowId === row.id;
+        return (
+          <button
+            type="button"
+            disabled={logged || isBusy || !row.serverId}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleLogResult(row.id);
+            }}
+            className={clsx(
+              actionButtonClass,
+              "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+              (logged || isBusy || !row.serverId) &&
+                "opacity-50 cursor-not-allowed",
+            )}
+          >
+            <FileText size={16} />
+            {logged ? "Logged" : isBusy ? "Logging..." : "Log Result"}
+          </button>
+        );
+      },
     },
     {
       title: "Delete",
       key: "delete",
       render: (row) => {
-        const isDeleting = deletingRowId === row.id;
+        const isBusy = busyRowId === row.id;
+        const logged = isLoggedRow(row);
         return (
           <button
             type="button"
-            disabled={isDeleting}
+            disabled={isBusy}
             onClick={(event) => {
               event.stopPropagation();
               handleDelete(row.id);
@@ -582,12 +813,12 @@ export function Level2Update() {
             className={clsx(
               actionButtonClass,
               "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
-              isDeleting && "opacity-50 cursor-not-allowed",
+              isBusy && "opacity-50 cursor-not-allowed",
             )}
-            aria-label={`Delete ${row.lead_label || "row"}`}
+            aria-label={`${logged ? "Revert" : "Delete"} ${row.lead_label || "row"}`}
           >
             <Trash2 size={16} />
-            {isDeleting ? "Reverting..." : "Delete"}
+            {isBusy ? "Working..." : logged ? "Revert" : "Delete"}
           </button>
         );
       },
@@ -602,7 +833,7 @@ export function Level2Update() {
             Level 2 Update
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Update level 2 results, notes, callbacks, and lead types inline.
+            Shared across everyone — open rows and today's logged results.
           </p>
         </div>
 
@@ -618,8 +849,9 @@ export function Level2Update() {
       <Table
         data={rows}
         columns={columns}
+        isLoading={board.isLoading}
         title="Level 2 Update"
-        description="Update level 2 results, notes, callbacks, and lead types inline."
+        description="Shared across everyone — open rows and today's logged results."
         showToolbarTitle={false}
         emptyText="Click Add Lead to start a new Level 2 update."
         onRowClick={(row) => setEditingRowId(row.id)}

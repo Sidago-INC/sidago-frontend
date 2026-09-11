@@ -5,7 +5,6 @@ import type {
   QueueResponse,
   LeadDetailResponse,
   LogResultBody,
-  DialResponse,
 } from "./apiTypes";
 
 export const AGENT_SLUG_MAP: Record<string, string> = {
@@ -73,7 +72,4 @@ export const agentCallsApi = {
 
   logResult: (body: LogResultBody) =>
     api.post("/agent-calls/log-result", body),
-
-  dial: (agentSlug: string, leadId: string): Promise<DialResponse> =>
-    api.post("/agent-calls/dial", { agentSlug, leadId }),
 };

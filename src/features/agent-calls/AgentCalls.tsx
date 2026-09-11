@@ -13,7 +13,7 @@ import { HeroCard } from "./_components/HeroCard";
 import { PhoneCard } from "./_components/PhoneCard";
 import { WorkToggleRow } from "./_components/WorkToggleRow";
 import type { CallsFormState, CallsModalState } from "@/types";
-import { getAgentKeyFromCookie, getCallBackDateError, getDialErrorMessage } from "./_lib/utils";
+import { getAgentKeyFromCookie, getCallBackDateError } from "./_lib/utils";
 import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
 import { QueuePriorityNotice } from "./_components/QueuePriorityNotice";
@@ -25,28 +25,10 @@ import { getHistoryEntries } from "./_lib/history";
 import { MessageSquare, NotebookText } from "lucide-react";
 
 const QUEUE_REFETCH_MS = 90_000;
-const PENDING_OUTCOME_STORAGE_KEY = "agent-calls:pending-outcome";
 
-type PendingOutcomeState = {
-  leadId: string;
-  callId: string | null;
-};
-
-function readPendingOutcomeState(): PendingOutcomeState | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(PENDING_OUTCOME_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<PendingOutcomeState>;
-    if (typeof parsed.leadId !== "string") return null;
-    return {
-      leadId: parsed.leadId,
-      callId: typeof parsed.callId === "string" ? parsed.callId : null,
-    };
-  } catch {
-    return null;
-  }
-}
+// Legacy key from the MightyCall dialer era. The dialer is gone; clear any
+// value a mid-session browser is still holding so it cannot linger.
+const LEGACY_PENDING_OUTCOME_KEY = "agent-calls:pending-outcome";
 
 function emptyForm(): CallsFormState {
   return {
@@ -90,10 +72,6 @@ export function AgentCalls() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
-  const [dialLoading, setDialLoading] = useState(false);
-  const [pendingOutcome, setPendingOutcome] = useState<PendingOutcomeState | null>(
-    () => readPendingOutcomeState(),
-  );
   const [callBackDateError, setCallBackDateError] = useState<string>();
   const currentLeadIdRef = useRef<string | null>(null);
 
@@ -130,10 +108,6 @@ export function AgentCalls() {
   }, [agentSlug]);
 
   const currentLead: QueueLead | null = leads[currentIndex] ?? null;
-  const canLogCurrentLeadOutcome =
-    pendingOutcome?.leadId != null &&
-    pendingOutcome.leadId === currentLead?.leadId;
-  const activeCallId = canLogCurrentLeadOutcome ? pendingOutcome.callId : null;
 
   useEffect(() => {
     currentLeadIdRef.current = currentLead?.leadId ?? null;
@@ -173,15 +147,8 @@ export function AgentCalls() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (pendingOutcome) {
-      window.sessionStorage.setItem(
-        PENDING_OUTCOME_STORAGE_KEY,
-        JSON.stringify(pendingOutcome),
-      );
-      return;
-    }
-    window.sessionStorage.removeItem(PENDING_OUTCOME_STORAGE_KEY);
-  }, [pendingOutcome]);
+    window.sessionStorage.removeItem(LEGACY_PENDING_OUTCOME_KEY);
+  }, []);
 
   const handleSelectLead = (index: number) => setCurrentIndex(index);
 
@@ -194,38 +161,6 @@ export function AgentCalls() {
       setCurrentIndex(Math.min(currentIndex, Math.max(newLeads.length - 1, 0)));
     } catch (err) {
       setModal({ title: "Skip Failed", message: errMessage(err), direction: "right" });
-    }
-  };
-
-  // Shared dial logic. Takes the target lead explicitly so it is safe to call
-  // from anywhere without stale-closure bugs. Returns the callId on success, null on error.
-  const dialOneLead = async (lead: QueueLead): Promise<string | null> => {
-    const previousPendingOutcome = pendingOutcome;
-    setPendingOutcome({
-      leadId: lead.leadId,
-      callId:
-        previousPendingOutcome?.leadId === lead.leadId
-          ? previousPendingOutcome.callId
-          : null,
-    });
-    setDialLoading(true);
-    try {
-      const res = await agentCallsApi.dial(agentSlug, lead.leadId);
-      setPendingOutcome({
-        leadId: lead.leadId,
-        callId: res.callId,
-      });
-      return res.callId;
-    } catch (err) {
-      setPendingOutcome(previousPendingOutcome);
-      setModal({
-        title: "Dial Error",
-        message: getDialErrorMessage(err),
-        direction: "top",
-      });
-      return null;
-    } finally {
-      setDialLoading(false);
     }
   };
 
@@ -246,22 +181,16 @@ export function AgentCalls() {
       return;
     }
 
-    const loggedCallId = activeCallId;
-
     setOutcomeLoading(true);
     try {
       await agentCallsApi.logResult({
         agentSlug,
         leadId: currentLead.leadId,
-        callId: loggedCallId ?? undefined,
         resultCode,
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
-        source: loggedCallId ? "dialer" : "manual",
+        source: "manual",
       });
-      setPendingOutcome((prev) =>
-        prev?.leadId === currentLead.leadId ? null : prev,
-      );
 
       const [detailRes, queueRes] = await Promise.all([
         agentCallsApi.detail(currentLead.leadId, agentSlug),
@@ -323,11 +252,6 @@ export function AgentCalls() {
     }
   };
 
-  const handleCallCurrentLead = async () => {
-    if (!currentLead || dialLoading) return;
-    await dialOneLead(currentLead);
-  };
-
   if (queueLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -354,12 +278,7 @@ export function AgentCalls() {
       <main className="space-y-3 px-4 py-4 sm:space-y-4 sm:px-4 sm:py-6">
         <QueuePriorityNotice leads={leads} />
 
-        <HeroCard
-          currentLead={currentLead}
-          onCall={handleCallCurrentLead}
-          callLoading={dialLoading}
-          callDisabled={false}
-        />
+        <HeroCard currentLead={currentLead} />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-1">

@@ -55,6 +55,36 @@ export function gridStateKey(pathname: string): string {
   return PREFIX + pathname;
 }
 
+/**
+ * Forget every remembered grid view.
+ *
+ * sessionStorage is scoped to the TAB, not to the session — it outlives a
+ * logout, so signing out and signing back in as someone else in the same tab
+ * handed the second person the first person's filters. Reported after the
+ * migration: a "Timezone is INTL" filter set by one user was still applied for
+ * the next.
+ *
+ * Called from `logout()`, which is the single exit point for both the menu
+ * action and an expired-token redirect, so there is no way out of the app that
+ * skips it.
+ */
+export function clearAllGridState(): void {
+  const store = storage();
+  if (!store) return;
+
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (key && key.startsWith(PREFIX)) keys.push(key);
+    }
+    // Collected first: removing during iteration reindexes the store.
+    for (const key of keys) store.removeItem(key);
+  } catch {
+    // Storage disabled — nothing was remembered in the first place.
+  }
+}
+
 export function readGridState(pathname: string): GridStateSnapshot | null {
   const store = storage();
   if (!store) return null;
@@ -90,6 +120,63 @@ export function writeGridState(
       return;
     }
     store.setItem(gridStateKey(pathname), JSON.stringify(cleaned));
+  } catch {
+    // Quota or private-mode write failure: not worth breaking the page over.
+  }
+}
+
+/**
+ * The same memory, for a page's OWN query params.
+ *
+ * Some pages have filters that are not part of the shared grid — the Fix Queue
+ * has a contacts bucket, a timezone and a has-other-contacts toggle. Putting
+ * them in the URL makes them survive Back and a refresh, but NOT a fresh
+ * navigation: clicking "Fix Leads" in the sidebar goes to a bare path and the
+ * query string is dropped, which is the very gap this module exists to close.
+ * Without this, the built-in Filter/Sort/Group came back and the page's own
+ * filters did not — which reads as "the filters don't save" even though the
+ * grid ones do.
+ *
+ * Stored under the same `sidago.grid:` prefix on purpose: `clearAllGridState()`
+ * matches on that prefix, so these are wiped on logout too. Anything stored
+ * outside it would leak one user's filters to the next in the same tab, which
+ * is exactly the bug that prefix was introduced to fix.
+ */
+const PARAMS_PREFIX = `${PREFIX}params:`;
+
+export function readPageParams(pathname: string): Record<string, string> {
+  const store = storage();
+  if (!store) return {};
+  try {
+    const raw = store.getItem(PARAMS_PREFIX + pathname);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writePageParams(
+  pathname: string,
+  params: Record<string, string>,
+): void {
+  const store = storage();
+  if (!store) return;
+
+  const cleaned: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value) cleaned[key] = value;
+  }
+
+  try {
+    if (Object.keys(cleaned).length === 0) {
+      // Clearing every filter must really clear it, not leave an empty object
+      // that gets restored as "something was remembered".
+      store.removeItem(PARAMS_PREFIX + pathname);
+      return;
+    }
+    store.setItem(PARAMS_PREFIX + pathname, JSON.stringify(cleaned));
   } catch {
     // Quota or private-mode write failure: not worth breaking the page over.
   }

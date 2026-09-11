@@ -168,7 +168,7 @@ export const CompanySymbolBadge = ({
   return (
     <span
       className={badgeClassName(
-        "inline-flex shrink-0 items-center justify-center px-2.5 py-1 text-xs font-semibold",
+        "inline-flex shrink-0 items-center justify-center px-2.5 py-0.5 text-xs font-medium",
         shouldFitText && "overflow-hidden",
         color,
         className,
@@ -216,7 +216,7 @@ export const TypeBadge = ({
   return (
     <span
       className={badgeClassName(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold",
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
         tone ??
           "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
       className,
@@ -269,7 +269,7 @@ export const TimezoneBadge = ({
   return (
     <span
       className={badgeClassName(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium",
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
         timezoneStyle,
         className,
       )}

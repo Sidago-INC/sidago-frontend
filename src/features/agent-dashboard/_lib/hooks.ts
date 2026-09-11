@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 import type { PaginationMeta } from "@/lib/pagination";
 import { resolveLeaderboardBadgeStatuses } from "@/lib/resolveLeaderboardBadge";
 import { ensureAbsoluteUrl } from "@/lib/url";
+import { easternTodayDate, toDateParam, toMonthParam } from "@/lib/est";
 import type { Agent } from "@/types";
 
 type DailyScoresResponse = {
@@ -38,21 +39,6 @@ type MonthlyScoresResponse = {
     isWinner: boolean;
   }>;
 };
-
-function formatLocalDateParam(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatLocalMonthParam(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-
-  return `${year}-${month}`;
-}
 
 function addMonths(date: Date, offset: number) {
   const next = new Date(date);
@@ -362,10 +348,10 @@ export function useAgentHotAndClosed(
 
 // ── All-agents merged scores (still used by StatusSection) ────────────────
 
-export function useAgentDashboard(selectedDate = new Date()) {
-  const date = formatLocalDateParam(selectedDate);
-  const currentMonth = formatLocalMonthParam(selectedDate);
-  const previousMonth = formatLocalMonthParam(addMonths(selectedDate, -1));
+export function useAgentDashboard(selectedDate = easternTodayDate()) {
+  const date = toDateParam(selectedDate);
+  const currentMonth = toMonthParam(selectedDate);
+  const previousMonth = toMonthParam(addMonths(selectedDate, -1));
 
   return useQuery({
     queryKey: [

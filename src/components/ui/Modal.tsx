@@ -24,6 +24,14 @@ type ModalProps = {
   onClose: () => void;
   primaryAction?: ModalAction;
   secondaryAction?: ModalAction;
+  /**
+   * Stacking order. Defaults above Drawer (panel 200 / backdrop 199) because a
+   * modal is almost always raised FROM something — the "Save New Lead" confirm
+   * opens on top of the New Lead drawer. While this was Tailwind's `z-50` the
+   * confirm rendered *under* the drawer's blurred backdrop: visible, greyed
+   * out, and impossible to click.
+   */
+  zIndex?: number;
 };
 
 const directionVariants: Record<ModalDirection, Variants> = {
@@ -72,6 +80,7 @@ export function Modal({
   onClose,
   primaryAction,
   secondaryAction,
+  zIndex = 1000,
 }: ModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -88,7 +97,8 @@ export function Modal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+          style={{ zIndex }}
+          className="fixed inset-0 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

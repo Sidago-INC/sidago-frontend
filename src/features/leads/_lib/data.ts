@@ -1,5 +1,4 @@
 import {
-  assigneeOptions,
   contactTypeOptions,
   getCompanySymbol,
   getCompanySymbolOptions,
@@ -47,7 +46,6 @@ export const leadsData: LeadDirectoryRow[] = generateHotLeadRows(18).map(
 );
 
 export {
-  assigneeOptions,
   contactTypeOptions,
   getCompanySymbol,
   getCompanySymbolOptions,

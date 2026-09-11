@@ -123,7 +123,7 @@ export function EmailInput({
           )}
         >
           {trimmed ? (
-            <EmailLink value={value} />
+            <EmailLink value={value} wrap />
           ) : (
             <span className="font-normal text-slate-400 dark:text-slate-500">
               {placeholder || "\u00a0"}

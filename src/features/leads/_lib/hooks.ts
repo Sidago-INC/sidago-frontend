@@ -201,9 +201,11 @@ type CreateLeadBody = {
   lastName?: string;
   phone: string;
   phoneExtension?: string;
+  /** One or more addresses, comma-joined — matches how the column stores them. */
   email: string;
   role: string;
   timezone?: string;
+  otherContacts?: string;
 };
 
 type CreateLeadResponse = {

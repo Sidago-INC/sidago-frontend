@@ -78,7 +78,7 @@ function getEditablePreview(
   if (!value) return <EmptyPreview label={label} />;
 
   if (label.toLowerCase().includes("email")) {
-    return <EmailLink value={value} />;
+    return <EmailLink value={value} wrap />;
   }
 
   const option = props.options?.find((item) => String(item.value) === value);

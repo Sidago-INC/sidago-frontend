@@ -8,7 +8,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FilterPanel } from "./table/FilterPanel";
 import { GroupPanel } from "./table/GroupPanel";
 import { SortPanel } from "./table/SortPanel";
@@ -35,6 +35,17 @@ const TOOLBAR_BUTTON_CLASS =
 const TOOLBAR_ICON_BUTTON_CLASS =
   "flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-900";
 
+const RESIZE_HANDLE_WIDTH = 8;
+const RESIZE_HANDLE_LINE_WIDTH = 2;
+// Table rows resolve to 53px in the browser once cell content and badges are
+// laid out. This must match the actual row height so virtual spacers do not
+// leave a blank area near the end of a large page.
+const VIRTUAL_ROW_HEIGHT = 53;
+const VIRTUAL_ROW_OVERSCAN = 12;
+// The grid exposes at most 500 rows per page. Rendering that page directly
+// prevents table spacer rows from desynchronizing during native scrolling.
+const VIRTUALIZATION_THRESHOLD = 501;
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
 
@@ -45,6 +56,25 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return Boolean(
     target.closest("input, textarea, select, [contenteditable='true']"),
   );
+}
+
+function getDefaultColumnWidth<T>(column: import("./table/types").Column<T>): number {
+  const key = String(column.key).toLowerCase();
+  const title = column.title.toLowerCase();
+
+  if (column.longText || /(description|notes|details|summary|comments?|body|message)/.test(`${key} ${title}`)) {
+    return 220;
+  }
+  if (/(date|time|last.*date|called.*date|action.*date|to be called by|timezone|country|status|lead type|contact type)/.test(`${key} ${title}`)) {
+    return 130;
+  }
+  if (/(phone|email|website|twitter|zip|symbol|id)/.test(`${key} ${title}`)) {
+    return 130;
+  }
+  if (/(company name|full name|city|state|market cap|lead name)/.test(`${key} ${title}`)) {
+    return 170;
+  }
+  return 140;
 }
 
 export function Table<T>({
@@ -74,6 +104,194 @@ export function Table<T>({
     serverSearch,
     serverGrid,
   });
+
+  const columnWidthsKey = useMemo(
+    () => columns.map((column) => String(column.key)).join("|"),
+    [columns],
+  );
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [hoveredHeaderKey, setHoveredHeaderKey] = useState<string | null>(null);
+  // This is a viewport coordinate, taken from the actual header cell rather
+  // than calculated from configured widths. CSS table layout can distribute
+  // widths differently from those configured values, so summing widths can
+  // place the guide inside a column.
+  const [resizeIndicatorLeft, setResizeIndicatorLeft] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [virtualScrollTop, setVirtualScrollTop] = useState(0);
+  const [virtualViewportHeight, setVirtualViewportHeight] = useState(600);
+  const dragState = useRef<{
+    key: string;
+    startX: number;
+    startWidth: number;
+    columnLeftOffset: number;
+    currentWidth: number;
+    startIndicatorLeft: number;
+    headerElement: HTMLTableCellElement;
+  } | null>(null);
+  const resizeFrameRef = useRef<number | null>(null);
+  const pendingResizeXRef = useRef<number | null>(null);
+
+  const resolvedColumnWidths = useMemo(() => {
+    const next: Record<string, number> = {};
+    for (const column of columns) {
+      const key = String(column.key);
+      const defaultWidth = Number(column.width ?? getDefaultColumnWidth(column));
+      const stored = columnWidths[key];
+      next[key] = typeof stored === "number" ? stored : defaultWidth;
+    }
+    return next;
+  }, [columnWidths, columns]);
+
+  useEffect(() => {
+    setColumnWidths((current) => {
+      const next: Record<string, number> = {};
+      for (const column of columns) {
+        const key = String(column.key);
+        const currentWidth = current[key];
+        const defaultWidth = Number(column.width ?? getDefaultColumnWidth(column));
+        next[key] = typeof currentWidth === "number" ? currentWidth : defaultWidth;
+      }
+      return next;
+    });
+  }, [columnWidthsKey, columns]);
+
+  const handleResizeStart = (
+    event: React.PointerEvent<HTMLElement>,
+    column: import("./table/types").Column<T>,
+  ) => {
+    if (column.resizable === false) return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const headerElement = event.currentTarget.parentElement;
+    if (!(headerElement instanceof HTMLTableCellElement)) return;
+
+    // Calculate the column's left offset by summing previous column widths
+    let columnLeftOffset = 0;
+    for (const col of columns) {
+      if (String(col.key) === String(column.key)) break;
+      const colKey = String(col.key);
+      columnLeftOffset += resolvedColumnWidths[colKey] ?? Number(col.width ?? getDefaultColumnWidth(col));
+    }
+    
+    const startIndicatorLeft = headerElement.getBoundingClientRect().right;
+    dragState.current = {
+      key: String(column.key),
+      startX: event.clientX,
+      startWidth:
+        resolvedColumnWidths[String(column.key)] ??
+        Number(column.width ?? getDefaultColumnWidth(column)),
+      columnLeftOffset,
+      currentWidth:
+        resolvedColumnWidths[String(column.key)] ??
+        Number(column.width ?? getDefaultColumnWidth(column)),
+      startIndicatorLeft,
+      headerElement,
+    };
+
+    // Anchor the guide to the rendered right edge of this exact header. The
+    // browser may adjust fixed table column widths, making a summed offset
+    // inaccurate.
+    setResizeIndicatorLeft(startIndicatorLeft);
+    setIsDragging(true);
+    
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  // Resize work is limited to one paint per frame. Pointer events can arrive
+  // far faster than the browser can lay out a wide grid, especially on a
+  // trackpad or high-refresh-rate display.
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const applyPendingResize = () => {
+      resizeFrameRef.current = null;
+      const clientX = pendingResizeXRef.current;
+      pendingResizeXRef.current = null;
+      const drag = dragState.current;
+      if (!drag || clientX === null) return;
+
+      const column = columns.find((entry) => String(entry.key) === drag.key);
+      if (!column) return;
+
+      const minWidth = column.minWidth ?? 80;
+      const requestedWidth = Math.max(
+        drag.startWidth + clientX - drag.startX,
+        minWidth,
+      );
+      // Columns are unlimited by default. A maximum applies only when the
+      // column definition explicitly sets one.
+      const nextWidth =
+        column.maxWidth === undefined
+          ? requestedWidth
+          : Math.min(requestedWidth, column.maxWidth);
+      drag.currentWidth = nextWidth;
+      setColumnWidths((current) =>
+        current[drag.key] === nextWidth
+          ? current
+          : { ...current, [drag.key]: nextWidth },
+      );
+
+      const container = scrollContainerRef.current;
+      if (container) {
+        setResizeIndicatorLeft(
+          drag.startIndicatorLeft + nextWidth - drag.startWidth,
+        );
+      }
+    };
+
+    const queueResize = (clientX: number) => {
+      pendingResizeXRef.current = clientX;
+      if (resizeFrameRef.current === null) {
+        resizeFrameRef.current = window.requestAnimationFrame(applyPendingResize);
+      }
+    };
+
+    const handleGlobalPointerMove = (event: PointerEvent) => {
+      event.preventDefault();
+      queueResize(event.clientX);
+    };
+
+    const updateIndicatorForScroll = () => {
+      const drag = dragState.current;
+      const container = scrollContainerRef.current;
+      if (!drag || !container) return;
+      setResizeIndicatorLeft(drag.headerElement.getBoundingClientRect().right);
+    };
+
+    const handleGlobalPointerUp = () => {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        applyPendingResize();
+      }
+      dragState.current = null;
+      pendingResizeXRef.current = null;
+      setResizeIndicatorLeft(null);
+      setIsDragging(false);
+    };
+
+    const container = scrollContainerRef.current;
+    document.addEventListener("pointermove", handleGlobalPointerMove);
+    document.addEventListener("pointerup", handleGlobalPointerUp);
+    document.addEventListener("pointercancel", handleGlobalPointerUp);
+    container?.addEventListener("scroll", updateIndicatorForScroll, {
+      passive: true,
+    });
+
+    return () => {
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+      document.removeEventListener("pointermove", handleGlobalPointerMove);
+      document.removeEventListener("pointerup", handleGlobalPointerUp);
+      document.removeEventListener("pointercancel", handleGlobalPointerUp);
+      container?.removeEventListener("scroll", updateIndicatorForScroll);
+    };
+  }, [isDragging, columns]);
 
   const {
     scrollContainerRef,
@@ -112,6 +330,7 @@ export function Table<T>({
     activeFilterConditionCount,
     hasActiveSearch,
     paginationContextKey,
+    viewContextKey,
     closeSearch,
     handlePrintPage,
     handlePrintData,
@@ -119,6 +338,77 @@ export function Table<T>({
     setPageState,
     appendFilterItemToGroup,
   } = state;
+
+  // A 500-row page may otherwise mount thousands of cells and Headless UI
+  // popovers. Keep only the rows around the viewport in the DOM. Grouped rows
+  // remain unvirtualized because their expandable hierarchy has variable
+  // heights and must stay fully accessible.
+  const shouldVirtualizeRows =
+    !groupedData && paginatedData.length >= VIRTUALIZATION_THRESHOLD;
+  const virtualRows = useMemo(() => {
+    if (!shouldVirtualizeRows) return undefined;
+
+    const startIndex = Math.max(
+      0,
+      Math.floor(virtualScrollTop / VIRTUAL_ROW_HEIGHT) - VIRTUAL_ROW_OVERSCAN,
+    );
+    const endIndex = Math.min(
+      paginatedData.length,
+      Math.ceil(
+        (virtualScrollTop + virtualViewportHeight) / VIRTUAL_ROW_HEIGHT,
+      ) + VIRTUAL_ROW_OVERSCAN,
+    );
+
+    return {
+      startIndex,
+      endIndex,
+      topSpacerHeight: startIndex * VIRTUAL_ROW_HEIGHT,
+      bottomSpacerHeight:
+        (paginatedData.length - endIndex) * VIRTUAL_ROW_HEIGHT,
+    };
+  }, [
+    paginatedData.length,
+    shouldVirtualizeRows,
+    virtualScrollTop,
+    virtualViewportHeight,
+  ]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let frame: number | undefined;
+    const updateViewport = () => {
+      setVirtualViewportHeight(container.clientHeight || 600);
+    };
+    const handleScroll = () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        setVirtualScrollTop(container.scrollTop);
+      });
+    };
+
+    updateViewport();
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(container);
+
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      container.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+    };
+  }, [scrollContainerRef]);
+
+  // Reset scroll when the grid starts showing something else — a new page, or
+  // a new search / filter / sort / grouping. Deliberately NOT on the data
+  // itself: `paginatedData` is rebuilt whenever the `data` array changes
+  // identity, and a grid with inline editing produces a fresh array on every
+  // keystroke, so this used to throw the user back to the top mid-edit.
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    setVirtualScrollTop(0);
+  }, [safeCurrentPage, viewContextKey]);
 
   useEffect(() => {
     onRowsPerPageChange?.(rowsPerPage);
@@ -394,25 +684,92 @@ export function Table<T>({
         tabIndex={0}
         onKeyDown={handleTableScrollKeys}
         onPointerDown={focusScrollContainer}
-        className="min-h-0 flex-1 overflow-auto px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
+        className="min-h-0 flex-1 overflow-auto px-4 outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 relative"
         aria-label="Scrollable table"
       >
+        {/* Resize indicator line - floats above table during dragging */}
+        {resizeIndicatorLeft !== null && (
+          <div
+            className="fixed pointer-events-none z-50"
+            style={{
+              left: `${resizeIndicatorLeft}px`,
+              top: `${scrollContainerRef.current?.getBoundingClientRect().top ?? 0}px`,
+              height: `${scrollContainerRef.current?.getBoundingClientRect().height ?? 0}px`,
+              width: 0,
+              borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
+              boxShadow: "0 0 8px rgba(14, 165, 233, 0.6)",
+              boxSizing: "border-box",
+              transform: "translateX(-1px)",
+            }}
+          />
+        )}
+        
         <table
           ref={tableElementRef}
-          className={`min-w-240 w-full transition-opacity ${
+          className={`w-full min-w-full table-fixed transition-opacity ${
             isRefreshing ? "opacity-60" : "opacity-100"
           }`}
+          style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}
         >
-          <thead className="text-xs uppercase tracking-wide text-gray-500 transition-colors dark:text-white">
+          <thead className="text-[11px] tracking-normal text-slate-500 transition-colors dark:text-slate-300">
             <tr>
-              {columns.map((col) => (
-                <th
-                  key={col.title}
-                  className="sticky top-0 z-10 whitespace-nowrap border-b border-slate-200/80 bg-white px-6 py-4 text-left font-semibold dark:border-slate-600 dark:bg-slate-900"
-                >
-                  {col.title}
-                </th>
-              ))}
+              {columns.map((col) => {
+                const key = String(col.key);
+                const isHovered = hoveredHeaderKey === key;
+
+                return (
+                  <th
+                    key={key}
+                    onMouseEnter={() => setHoveredHeaderKey(key)}
+                    onMouseLeave={() =>
+                      setHoveredHeaderKey((current) =>
+                        current === key ? null : current,
+                      )
+                    }
+                    className="sticky top-0 z-10 overflow-hidden border-b border-slate-200/80 bg-white text-left font-medium dark:border-slate-600 dark:bg-slate-900"
+                    style={{
+                      width: `${resolvedColumnWidths[key] ?? Number(col.width ?? getDefaultColumnWidth(col))}px`,
+                      minWidth: `${col.minWidth ?? 80}px`,
+                      ...(col.maxWidth === undefined
+                        ? {}
+                        : { maxWidth: `${col.maxWidth}px` }),
+                      position: "relative",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <span className="block truncate">{col.title}</span>
+                    </div>
+
+                    {col.resizable !== false && (
+                      <div
+                        onPointerDown={(event) => handleResizeStart(event, col)}
+                        className="absolute inset-y-0 right-0 flex cursor-col-resize items-center justify-center transition-opacity duration-150"
+                        style={{
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: `${RESIZE_HANDLE_WIDTH}px`,
+                          boxSizing: "border-box",
+                          opacity: isHovered && !isDragging ? 1 : 0,
+                          pointerEvents: isHovered ? "auto" : "none",
+                          zIndex: 2,
+                        }}
+                        aria-label={`Resize ${col.title} column`}
+                        role="separator"
+                        title={`Resize ${col.title} column`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-y-0 right-0"
+                          style={{
+                            borderLeft: `${RESIZE_HANDLE_LINE_WIDTH}px solid rgb(14, 165, 233)`,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
 
@@ -458,6 +815,8 @@ export function Table<T>({
                   }
                 : undefined
             }
+            columnWidths={resolvedColumnWidths}
+            virtualRows={virtualRows}
           />
         </table>
       </div>

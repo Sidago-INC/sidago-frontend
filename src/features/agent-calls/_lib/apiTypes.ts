@@ -158,13 +158,3 @@ export type LogResultBody = {
   mightyCallId?: string;
   source?: string;
 };
-
-export type DialResponse = {
-  ok: boolean;
-  callId: string;
-  mightyCallId: string | null;
-  to: string;
-  from: string;
-  testMode: boolean;
-  upstreamStatus: string;
-};

@@ -56,6 +56,27 @@ export const tokenService = {
     return refreshToken;
   },
 
+  /**
+   * Is there a session in PERSISTENT storage?
+   *
+   * Deliberately reads localStorage rather than the module variables above.
+   * Those live on the JS heap, and the back/forward cache restores the heap
+   * verbatim — so after logging out and pressing Back, an older page comes
+   * back with `accessToken` still populated even though `clear()` emptied
+   * localStorage. Only the persisted copy tells the truth about whether the
+   * user is still signed in.
+   */
+  hasPersistedSession() {
+    if (!canUseBrowserStorage()) return false;
+    try {
+      return Boolean(
+        localStorage.getItem(ACCESS_KEY) || localStorage.getItem(REFRESH_KEY),
+      );
+    } catch {
+      return false;
+    }
+  },
+
   async setTokens(access: string, refresh: string) {
     accessToken = access;
     refreshToken = refresh;

@@ -7,7 +7,12 @@ import { maxLength, pattern, required, url, type Rule } from "./index";
 export const companyValidationSchema: Record<keyof COMPANY, Rule[]> = {
   symbol: [
     required("Company symbol is required."),
-    maxLength(16, "Company symbol must be 16 characters or fewer."),
+    // 128 is the width of companies.company_symbol (migration 040 widened it
+    // from the original 16). The old 16 predated that and made most of the
+    // real data un-saveable: 2,323 of 15,919 production symbols are longer
+    // than 16 characters — every "SP : <firm name>" row — the longest being
+    // 114. Keep this in step with the column, not with a guess.
+    maxLength(128, "Company symbol must be 128 characters or fewer."),
   ],
   name: [
     required("Company name is required."),

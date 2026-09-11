@@ -17,7 +17,10 @@ import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users } from "lucide-react";
-import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  getLeadGridLabel,
+  timezoneOptions,
+} from "@/features/backoffice-shared/constants";
 import {
   type FixQueueRow,
   getFixQueueTimezone,
@@ -75,10 +78,9 @@ export function FixLeadsTable({
         title: "Company",
         key: "companySymbol",
         getValue: (row) => displaySymbol(row),
-        type: "select",
-        options: Array.from(new Set(data.map(displaySymbol)))
-          .filter(Boolean)
-          .map((value) => ({ label: value, value })),
+        // Open-ended: there is no fixed list of company symbols to pick from,
+        // so this filters as free text ("contains", "does not contain", …).
+        type: "text",
         render: (row) => (
           <CompanySymbolBadge
             symbol={displaySymbol(row)}
@@ -91,9 +93,12 @@ export function FixLeadsTable({
         key: "timezone",
         getValue: (row) => getFixQueueTimezoneLabel(row),
         type: "select",
-        options: Array.from(
-          new Set(data.map(getFixQueueTimezoneLabel).filter(Boolean)),
-        ).map((value) => ({ label: value, value })),
+        // The five timezones the system knows about, NOT the ones present in
+        // the rows on screen. Deriving them from `data` meant the list shrank
+        // as filters narrowed it: after "Timezone is PST", the value dropdown
+        // for a second condition offered only PST, because PST was all that
+        // survived the first. A closed set has to come from the domain.
+        options: timezoneOptions,
         render: (row) => {
           const timezone = getFixQueueTimezone(row);
           return timezone ? (
@@ -172,7 +177,25 @@ export function FixLeadsTable({
         groupable: false,
         render: (row) => (
           <Button
-            onClick={() => navigate(`/fix-leads/${row.leadId}`)}
+            onClick={() =>
+              // Carry the filtered list URL along, so leaving the edit form
+              // returns to the queue the user was actually working — not a
+              // bare /fix-leads.
+              //
+              // Read from `window.location`, NOT from useLocation(): this
+              // callback is created inside a useMemo keyed on [data, navigate],
+              // and React Query structurally shares its result, so a filter
+              // change often leaves `data` referentially identical and the memo
+              // never recomputes. A captured location object would then still
+              // be the one from mount — no query string — and the filter would
+              // be silently dropped on the way back. window.location is always
+              // the live URL, so there is nothing to go stale.
+              navigate(`/fix-leads/${row.leadId}`, {
+                state: {
+                  from: `${window.location.pathname}${window.location.search}`,
+                },
+              })
+            }
             className="cursor-pointer inline-flex h-6 items-center justify-center rounded border border-blue-600 bg-blue-500 px-4 text-sm font-semibold text-white transition hover:bg-blue-600 dark:border-blue-400 dark:bg-blue-600 dark:text-white dark:hover:bg-blue-500"
           >
             Fix
@@ -189,7 +212,7 @@ export function FixLeadsTable({
           row.otherContacts ? (
             <span
               title={row.otherContacts}
-              className="block max-w-[220px] truncate text-sm text-slate-700 dark:text-slate-200"
+              className="block truncate text-sm text-slate-700 dark:text-slate-200"
             >
               {row.otherContacts}
             </span>

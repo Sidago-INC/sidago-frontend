@@ -416,6 +416,7 @@ export function AgentEmailDrawer({
               {row.email ? (
                 <EmailLink
                   value={row.email}
+                  wrap
                   className="text-xs font-semibold"
                 />
               ) : (

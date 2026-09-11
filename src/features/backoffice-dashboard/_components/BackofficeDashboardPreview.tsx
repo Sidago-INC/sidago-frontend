@@ -3,6 +3,7 @@ import { Button, CompanySymbolBadge, StatusCard } from "@/components/ui";
 import { WinnerBadge } from "@/features/agent-dashboard/_components/WinnerBadge";
 import { AdminTodayStatsCards } from "@/features/admin-dashboard/AdminTodayStatsCards";
 import { useAdminTodayAgentCards } from "@/features/admin-dashboard/_lib/hooks";
+import { easternTodayDate } from "@/lib/est";
 import { AgentCallInspector } from "./AgentCallInspector";
 import clsx from "clsx";
 import { ArrowRight } from "lucide-react";
@@ -16,7 +17,7 @@ type BackofficeDashboardPreviewProps = {
 export function BackofficeDashboardPreview({
   onOpenMonthlyStats,
 }: BackofficeDashboardPreviewProps) {
-  const today = new Date();
+  const today = easternTodayDate();
   const { data } = useAdminTodayAgentCards(today);
   const cards = data?.cards ?? [];
   const winner = cards.find((c) => c.isWinner);

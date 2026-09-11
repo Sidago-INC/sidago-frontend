@@ -3,8 +3,10 @@
 import {
   Drawer,
   EditableDrawerFooter,
+  EmailListField,
   Modal,
   TextInput,
+  Textarea,
 } from "@/components/ui";
 import { validateForm } from "@/lib/validation";
 import {
@@ -36,6 +38,7 @@ const blankForm: LeadCreateFormValues = {
   phoneExtension: "",
   email: "",
   role: "",
+  otherContacts: "",
 };
 
 const inputClassName =
@@ -62,6 +65,7 @@ export function NewLeadDrawer({
       phoneExtension: form.phoneExtension.trim(),
       email: form.email.trim(),
       role: form.role.trim(),
+      otherContacts: form.otherContacts.trim(),
     }),
     [fixedCompany?.id, form],
   );
@@ -162,13 +166,11 @@ export function NewLeadDrawer({
             error={errors.phoneExtension}
             className={inputClassName}
           />
-          <TextInput
-            label="Email"
-            type="email"
+          <EmailListField
             value={form.email}
-            onChange={(event) => updateField("email", event.target.value)}
+            onChange={(value) => updateField("email", value)}
             error={errors.email}
-            className={inputClassName}
+            inputClassName={inputClassName}
           />
           <TextInput
             label="Role"
@@ -177,6 +179,18 @@ export function NewLeadDrawer({
             error={errors.role}
             className={inputClassName}
           />
+          <div className="md:col-span-2">
+            <Textarea
+              label="Other Contacts (optional)"
+              value={form.otherContacts}
+              onChange={(event) =>
+                updateField("otherContacts", event.target.value)
+              }
+              error={errors.otherContacts}
+              rows={3}
+              placeholder="Additional phone numbers, alternate contacts, notes…"
+            />
+          </div>
         </div>
       </Drawer>
 

@@ -15,15 +15,6 @@ export const contactTypeOptions = CONTACT_TYPE_VALUES;
 
 export const leadTypeOptions = LEAD_TYPE_VALUES;
 
-export const assigneeOptions = [
-  "Hasib",
-  "Nafis",
-  "Asha",
-  "Rafi",
-  "Maliha",
-  "Tanvir",
-];
-
 export const timezoneOptions = TIMEZONE_OPTIONS;
 
 /**

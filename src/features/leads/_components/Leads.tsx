@@ -12,12 +12,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
 import { LeadsDrawer } from "./LeadsDrawer";
 import {
-  assigneeOptions,
   leadTypeOptions,
   timezoneOptions,
   type LeadDirectoryRow,
 } from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
+import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 
 export function Leads() {
   const [searchParams] = useSearchParams();
@@ -55,13 +55,18 @@ export function Leads() {
     setSelectedIndex(findDrawerRouteIndex(rows, selectedLead));
   }, [rows, selectedLead]);
 
+  const svgAgents = useAgentSelectOptions("svg");
+  const bentonAgents = useAgentSelectOptions("benton");
+  const rm95Agents = useAgentSelectOptions("95rm");
+
   const columns = useMemo<Column<LeadDirectoryRow>[]>(
     () => [
       {
         title: "Lead ID",
         key: "lead",
+        width: 280,
         getValue: (row) => getLeadGridLabel(row),
-        type: "select",
+        type: "text",
         options: rows.map(getLeadGridLabel).filter(Boolean).map((value) => ({
           label: value,
           value,
@@ -71,8 +76,9 @@ export function Leads() {
       {
         title: "Company Symbol",
         key: "companySymbol",
+        width: 190,
         getValue: (row) => getRowCompanySymbol(row),
-        type: "select",
+        type: "text",
         options: getCompanySymbolOptions(rows).map((value) => ({
           label: value,
           value,
@@ -84,13 +90,14 @@ export function Leads() {
           />
         ),
       },
-      { title: "Company Name", key: "companyName" },
-      { title: "Full Name", key: "fullName" },
-      { title: "Phone", key: "phone" },
-      { title: "Email", key: "email" },
+      { title: "Company Name", key: "companyName", width: 200 },
+      { title: "Full Name", key: "fullName", width: 195 },
+      { title: "Phone", key: "phone", width: 150 },
+      { title: "Email", key: "email", width: 220 },
       {
         title: "Timezone",
         key: "timezone",
+        width: 125,
         type: "select",
         options: timezoneOptions,
         render: (row) =>
@@ -99,6 +106,7 @@ export function Leads() {
       {
         title: "Contact Type",
         key: "contactType",
+        width: 165,
         type: "select",
         options: CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
         render: (row) => <TypeBadge value={row.contactType} kind="contact" />,
@@ -106,6 +114,7 @@ export function Leads() {
       {
         title: "SVG Lead Type",
         key: "svgLeadType",
+        width: 160,
         type: "select",
         options: leadTypeOptions,
         render: (row) => <TypeBadge value={row.svgLeadType} kind="lead" />,
@@ -113,17 +122,20 @@ export function Leads() {
       {
         title: "SVG To Be Called By",
         key: "svgToBeCalledBy",
+        width: 190,
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: svgAgents.options,
       },
       {
         title: "SVG Last Called Date",
         key: "svgLastCallDate",
+        width: 165,
         type: "date",
       },
       {
         title: "Benton Lead Type",
         key: "bentonLeadType",
+        width: 175,
         type: "select",
         options: leadTypeOptions,
         render: (row) => <TypeBadge value={row.bentonLeadType} kind="lead" />,
@@ -131,17 +143,20 @@ export function Leads() {
       {
         title: "Benton To Be Called By",
         key: "bentonToBeCalledBy",
+        width: 205,
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: bentonAgents.options,
       },
       {
         title: "Benton Last Called Date",
         key: "bentonLastCallDate",
+        width: 180,
         type: "date",
       },
       {
         title: "95RM Lead Type",
         key: "rm95LeadType",
+        width: 160,
         type: "select",
         options: leadTypeOptions,
         render: (row) => <TypeBadge value={row.rm95LeadType} kind="lead" />,
@@ -149,21 +164,24 @@ export function Leads() {
       {
         title: "95RM To Be Called By",
         key: "rm95ToBeCalledBy",
+        width: 195,
         type: "select",
-        options: assigneeOptions.map((value) => ({ label: value, value })),
+        options: rm95Agents.options,
       },
       {
         title: "95RM Last Called Date",
         key: "rm95LastCallDate",
+        width: 170,
         type: "date",
       },
       {
         title: "Last Action Date",
         key: "lastActionDate",
+        width: 165,
         type: "date",
       },
     ],
-    [rows],
+    [rows, svgAgents.options, bentonAgents.options, rm95Agents.options],
   );
 
   return (

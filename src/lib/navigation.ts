@@ -36,6 +36,15 @@ export type NavigationItem = {
   icon: LucideIcon;
   href?: string;
   children?: NavigationItem[];
+  /**
+   * Open in a new browser tab instead of navigating in place.
+   *
+   * Used by Add New: the team works from a source list in another window and
+   * copies each contact across, so navigating away from that list and back for
+   * every lead is the slow part. The old CRM opened its Create Contact form in
+   * its own window for exactly this reason.
+   */
+  openInNewTab?: boolean;
 };
 
 export type NavigationUserContext = {
@@ -245,6 +254,7 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
         label: "Add New",
         href: "/leads/add",
         icon: UserPlus,
+        openInNewTab: true,
       },
       {
         label: "Bulk Import",

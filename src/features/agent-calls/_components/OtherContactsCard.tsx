@@ -39,13 +39,10 @@ export function OtherContactsCard({ contacts, className }: Props) {
                 ) : null}
 
                 {contact.phone ? (
-                  <a
-                    href={`tel:${contact.phone}`}
-                    className="flex items-start gap-2 transition-colors hover:text-sky-600 dark:hover:text-sky-400"
-                  >
+                  <p className="flex items-start gap-2">
                     <Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-gray-500" />
-                    <span>{contact.phone}</span>
-                  </a>
+                    <span className="select-all">{contact.phone}</span>
+                  </p>
                 ) : null}
 
                 {contact.email ? (

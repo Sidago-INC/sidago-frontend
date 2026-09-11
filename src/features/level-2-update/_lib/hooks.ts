@@ -7,6 +7,7 @@ import {
 } from "@/lib/pagination";
 import { usePaginatedSelectSource } from "@/lib/use-paginated-select-source";
 import { formatLeadDisplayTitle } from "@/features/agent-calls/_lib/utils";
+import { LEVEL2_BOARD_KEY } from "./board";
 
 export type LeadPickerRow = {
   id: string;
@@ -45,6 +46,9 @@ type LeadsResponse = {
 type AgentsResponse = { ok: true; count: number; data: AgentUser[] };
 
 const LEAD_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+// Browsing pulls a full page at a time; a search only needs enough rows to
+// cover one company's contacts, and a shorter page comes back faster.
+const LEAD_SEARCH_LIMIT = 100;
 
 export async function fetchLeadsPage({
   limit = LEAD_PAGE_SIZE,
@@ -83,7 +87,16 @@ export function useLeadSelectSource(
   return usePaginatedSelectSource({
     queryKeyPrefix: "leads",
     pageSize: LEAD_PAGE_SIZE,
+    searchPageSize: LEAD_SEARCH_LIMIT,
     fetchPage: fetchLeadsPage,
+    // Load-bearing. Without it the hook only queries the server when the local
+    // filter over already-downloaded pages matches NOTHING, so one stale
+    // partial match hid every other lead under that symbol — and with 36k
+    // leads at 500 a page, whether a ticker search was complete came down to
+    // how far the dropdown happened to have been scrolled. Every company
+    // picker already passes this; the lead picker was the one that did not.
+    fetchSearchPage: ({ limit, page, search }) =>
+      fetchLeadsPage({ limit, page, search }),
     buildOptions: buildLeadSelectOptions,
     extraOptions,
   });
@@ -139,6 +152,12 @@ type Level2PostBody = {
   resultUpdate: string;
   updatedNotes: string;
   callBackDate: string;
+  /**
+   * The shared draft this came from. The server promotes that row in place
+   * instead of inserting a second one, so the board never shows the same
+   * update twice and no orphan draft is left behind.
+   */
+  draftId?: string;
 };
 
 type Level2PostResponse = {
@@ -163,11 +182,50 @@ export function useLogLevel2Result() {
       (await api.post("/level-2-requests", body)) as Level2PostResponse,
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["level-2-history"] });
+      qc.invalidateQueries({ queryKey: LEVEL2_BOARD_KEY });
       qc.invalidateQueries({
         queryKey: ["lead-brand-states", variables.leadId],
       });
     },
   });
+}
+
+type Level2StatusResponse = {
+  ok: true;
+  status: string;
+  processed: boolean;
+  leadTypes: { svg: string | null; benton: string | null; "95rm": string | null };
+};
+
+/**
+ * Waits for a submitted Level 2 request to be interpreted, then returns the
+ * lead types it produced.
+ *
+ * The submit response cannot carry them: the endpoint records the request and a
+ * worker applies it moments later, so at submit time the three per-brand lead
+ * types are genuinely not decided yet. Without this the row would show blank
+ * columns until the page was reloaded.
+ *
+ * Polls every 1.5s for up to ~30s. Returns null on timeout rather than
+ * throwing - a slow cascade is not an error the agent should see, and the
+ * columns simply stay as they are until the next refresh.
+ */
+export async function waitForLevel2Result(
+  requestId: string,
+  { attempts = 20, intervalMs = 1500 } = {},
+): Promise<Level2StatusResponse["leadTypes"] | null> {
+  for (let i = 0; i < attempts; i++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    try {
+      const res = (await api.get(
+        `/level-2-requests/${requestId}/status`,
+      )) as Level2StatusResponse;
+      if (res.processed) return res.leadTypes;
+    } catch {
+      // Transient failure - keep polling; the worker is unaffected either way.
+    }
+  }
+  return null;
 }
 
 // Reverting lives in features/level-2-shared/revert.ts — both this page and
