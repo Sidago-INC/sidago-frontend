@@ -15,8 +15,8 @@ export const email = (msg = "Invalid email address"): Rule => {
 /** Split a stored email list into its addresses. Mirrors the backend's
  *  `splitList` in src/common/import-normalize.ts, so what the form produces and
  *  what the importer produces are the same shape. */
-export const splitEmails = (value: string): string[] =>
-  value
+export const splitEmails = (value: string | null | undefined): string[] =>
+  String(value ?? "")
     .split(/[,;/|\n\r]+/)
     .map((token) => token.trim())
     .filter((token) => token !== "");
