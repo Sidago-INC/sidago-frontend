@@ -196,6 +196,10 @@ export function usePaginatedSelectSource<
     isLoadingMore: activeQuery.isFetchingNextPage,
     isSearching:
       browseQuery.isLoading ||
+      // The 300ms debounce counts as searching. Otherwise the panel sits
+      // showing the previous query's rows with nothing to say they are stale,
+      // which reads as "the search returned the wrong leads".
+      searchInput.trim() !== debouncedSearch.trim() ||
       (shouldRemoteSearch &&
         remoteQuery.isFetching &&
         !remoteQuery.isFetchingNextPage),

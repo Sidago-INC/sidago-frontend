@@ -330,6 +330,7 @@ export function Table<T>({
     activeFilterConditionCount,
     hasActiveSearch,
     paginationContextKey,
+    viewContextKey,
     closeSearch,
     handlePrintPage,
     handlePrintData,
@@ -399,10 +400,15 @@ export function Table<T>({
     };
   }, [scrollContainerRef]);
 
+  // Reset scroll when the grid starts showing something else — a new page, or
+  // a new search / filter / sort / grouping. Deliberately NOT on the data
+  // itself: `paginatedData` is rebuilt whenever the `data` array changes
+  // identity, and a grid with inline editing produces a fresh array on every
+  // keystroke, so this used to throw the user back to the top mid-edit.
   useEffect(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
     setVirtualScrollTop(0);
-  }, [safeCurrentPage, paginatedData]);
+  }, [safeCurrentPage, viewContextKey]);
 
   useEffect(() => {
     onRowsPerPageChange?.(rowsPerPage);
