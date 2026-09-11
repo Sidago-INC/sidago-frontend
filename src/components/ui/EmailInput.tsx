@@ -14,7 +14,7 @@ type EmailInputProps = Omit<
   TextareaHTMLAttributes<HTMLTextAreaElement>,
   "value" | "onChange" | "rows"
 > & {
-  value: string;
+  value?: string | null;
   onChange?: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   label?: string;
   error?: string;
@@ -46,7 +46,8 @@ export function EmailInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [editing, setEditing] = useState(false);
   const canEdit = Boolean(onChange) && !readOnly && !disabled;
-  const trimmed = value.trim();
+  const safeValue = String(value ?? "");
+  const trimmed = safeValue.trim();
   const showEditor = canEdit && (editing || !trimmed);
 
   useEffect(() => {
@@ -80,7 +81,7 @@ export function EmailInput({
           {...props}
           id={inputId}
           ref={textareaRef}
-          value={value}
+          value={safeValue}
           rows={1}
           placeholder={placeholder}
           disabled={disabled}
@@ -123,7 +124,7 @@ export function EmailInput({
           )}
         >
           {trimmed ? (
-            <EmailLink value={value} wrap />
+            <EmailLink value={safeValue} wrap />
           ) : (
             <span className="font-normal text-slate-400 dark:text-slate-500">
               {placeholder || "\u00a0"}
