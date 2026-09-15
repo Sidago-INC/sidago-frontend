@@ -1,13 +1,6 @@
 
 
-import {
-  DatePickerField,
-  Drawer,
-  Select,
-  Textarea,
-  TextInput,
-  TypeBadge,
-} from "@/components/ui";
+import { Drawer, Textarea, TextInput, TypeBadge } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { openPrintFrame } from "@/lib/print-html";
 import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
@@ -16,31 +9,25 @@ import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
-import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
-import {
-  getCallBackDateError,
-  getMinCallBackDate,
-} from "@/features/agent-calls/_lib/utils";
-import { toggleMarkVoid, jsonEqualIgnoringKeys } from "@/features/agent-calls/_lib/markVoid";
-import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
-import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
-import {
-  useUpdateLead,
-  type LeadPatchBody,
-} from "@/features/backoffice-shared/use-update-lead";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 type EverBeenHotDrawerProps = {
   data: EverBeenHotRow[];
   columns?: Column<EverBeenHotRow>[];
-  variant: "svg" | "95rm" | "benton";
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;
 };
 
 const iconClass = "w-4 h-4 stroke-[2]";
+
+// Ever Been Hot is a report, not an editing surface. Every field below renders
+// read-only and the drawer has no save path — edits belong on All Leads or the
+// Fix Leads form, which are the screens the workflows are built around. The
+// History fields were already presented this way; this is the same treatment
+// applied to the rest.
+const readOnlyFieldClass =
+  "cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50";
 const defaultHistoryCalls = `04/17/2026 - LEVEL 2 TOM - No Answer
 04/13/2026 - LEVEL 1 TOM - Left Voicemail
 04/10/2026 - LEVEL 1 TOM - No Answer`;
@@ -100,33 +87,25 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-function ToggleField({
-  checked,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
+// Read-only indicator. Previously a switch that marked the lead Void — that
+// action now lives only on the screens that own it.
+function ToggleField({ checked, label }: { checked: boolean; label: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
         {label}
       </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
+      <span
+        role="img"
+        aria-label={`${label}: ${checked ? "yes" : "no"}`}
         className={
           checked
-            ? "flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/70"
-            : "flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-slate-100 text-slate-400 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-slate-700"
+            ? "flex h-8 w-8 cursor-default items-center justify-center rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+            : "flex h-8 w-8 cursor-default items-center justify-center rounded bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
         }
       >
         <Check size={16} />
-      </button>
+      </span>
     </div>
   );
 }
@@ -134,7 +113,6 @@ function ToggleField({
 export function EverBeenHotDrawer({
   data,
   columns,
-  variant,
   selectedIndex,
   onSelectedIndexChange,
   onClose,
@@ -142,61 +120,12 @@ export function EverBeenHotDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
-  const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
-  const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
-    useState<string>();
-  const [formState, setFormState] = useState<{
-    key: string;
-    value: EditableDrawerState;
-  } | null>(null);
 
   const row = selectedIndex === null ? null : (data[selectedIndex] ?? null);
-  const rowKey = row?.email ?? "";
   const drawerOpen = row !== null && selectedIndex !== null;
-  const initialForm = useMemo(
-    () => (row ? getEditableState(row) : null),
-    [row],
-  );
-  const form = formState?.key === rowKey ? formState.value : initialForm;
-  const updateLead = useUpdateLead();
-  const svgAgentsQuery = useAgentSelectOptions("svg");
-  const bentonAgentsQuery = useAgentSelectOptions("benton");
-  const isDirty = useMemo(() => {
-    if (!form || !initialForm) return false;
-    return !jsonEqualIgnoringKeys(form, initialForm, ["notWorked"]);
-  }, [form, initialForm]);
-
-  const updateForm = <Key extends keyof EditableDrawerState>(
-    key: Key,
-    value: EditableDrawerState[Key],
-  ) => {
-    if (!form) return;
-
-    setFormState({
-      key: rowKey,
-      value: {
-        ...(formState?.key === rowKey && formState.value ? formState.value : form),
-        [key]: value,
-      },
-    });
-  };
-
-  const handleNotWorkedChange = async (checked: boolean) => {
-    if (!row?.leadId) {
-      showErrorToast(new Error("Cannot update: this row has no leadId."));
-      return;
-    }
-
-    updateForm("notWorked", checked);
-    if (!checked) return;
-
-    const ok = await toggleMarkVoid(variant, row.leadId, checked, {
-      successMessage: "Lead marked as no longer working at the company.",
-    });
-    if (!ok) {
-      updateForm("notWorked", false);
-    }
-  };
+  // Derived straight from the row. This drawer is read-only, so there is no
+  // form state to hold, nothing to diff, and no save path.
+  const form = useMemo(() => (row ? getEditableState(row) : null), [row]);
 
   const {
     displayCompanySymbol,
@@ -207,15 +136,6 @@ export function EverBeenHotDrawer({
     rowCompanyName: row?.companyName,
     rowTimezone: row?.timezone,
   });
-  const leadTypeOptions = useMemo(
-    () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
-    [],
-  );
-  const contactTypeOptions = useMemo(
-    () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
-    [],
-  );
-
   const detailItems = useMemo(() => {
     if (!row) return [];
 
@@ -251,105 +171,9 @@ export function EverBeenHotDrawer({
     return () => window.clearTimeout(timer);
   }, [copied]);
 
-  useEffect(() => {
-    setSvgToBeCalledOnError(undefined);
-    setBentonToBeCalledOnError(undefined);
-  }, [rowKey]);
-
   if (!row || selectedIndex === null || !form) return null;
 
   const currentIndex = selectedIndex;
-
-  const handleReset = () => {
-    setFormState(null);
-    setSvgToBeCalledOnError(undefined);
-    setBentonToBeCalledOnError(undefined);
-  };
-
-  const handleSvgToBeCalledOnChange = (value: string) => {
-    const error = getCallBackDateError(value, row.svgLastCallDate ?? "");
-    setSvgToBeCalledOnError(error);
-    if (error) return;
-    updateForm("svgToBeCalledOn", value);
-  };
-
-  const handleBentonToBeCalledOnChange = (value: string) => {
-    const error = getCallBackDateError(value, row.bentonLastCallDate ?? "");
-    setBentonToBeCalledOnError(error);
-    if (error) return;
-    updateForm("bentonToBeCalledOn", value);
-  };
-
-  const handleSave = async () => {
-    if (!row || !form || !initialForm) return;
-
-    if (!row.leadId) {
-      showErrorToast(
-        new Error("Cannot save: this row has no leadId (mock data?)"),
-      );
-      return;
-    }
-
-    const body: LeadPatchBody = {};
-    const leadDiff: NonNullable<LeadPatchBody["lead"]> = {};
-
-    if (form.fullName !== initialForm.fullName) leadDiff.full_name = form.fullName;
-    if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
-    if (form.email !== initialForm.email) leadDiff.email = form.email;
-    if (form.role !== initialForm.role) leadDiff.role = form.role;
-    if (form.contactType !== initialForm.contactType) {
-      leadDiff.contact_type = form.contactType;
-    }
-    if (form.companyName !== initialForm.companyName) {
-      leadDiff.company_name = form.companyName;
-    }
-
-    if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
-
-    const brandStates: NonNullable<LeadPatchBody["brandStates"]> = {};
-
-    const svgDiff: NonNullable<NonNullable<LeadPatchBody["brandStates"]>["svg"]> =
-      {};
-    if (form.svgLeadType !== initialForm.svgLeadType) {
-      svgDiff.lead_type = form.svgLeadType;
-    }
-    if (form.svgToBeCalledBy !== initialForm.svgToBeCalledBy) {
-      svgDiff.to_be_called_by = form.svgToBeCalledBy || null;
-    }
-    if (form.svgToBeCalledOn !== initialForm.svgToBeCalledOn) {
-      svgDiff.last_called_date = form.svgToBeCalledOn || null;
-    }
-    if (Object.keys(svgDiff).length > 0) brandStates.svg = svgDiff;
-
-    const bentonDiff: NonNullable<
-      NonNullable<LeadPatchBody["brandStates"]>["benton"]
-    > = {};
-    if (form.bentonLeadType !== initialForm.bentonLeadType) {
-      bentonDiff.lead_type = form.bentonLeadType;
-    }
-    if (form.bentonToBeCalledBy !== initialForm.bentonToBeCalledBy) {
-      bentonDiff.to_be_called_by = form.bentonToBeCalledBy || null;
-    }
-    if (form.bentonToBeCalledOn !== initialForm.bentonToBeCalledOn) {
-      bentonDiff.last_called_date = form.bentonToBeCalledOn || null;
-    }
-    if (Object.keys(bentonDiff).length > 0) brandStates.benton = bentonDiff;
-
-    if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
-
-    if (!body.lead && !body.brandStates) {
-      showErrorToast(new Error("No changes to save"));
-      return;
-    }
-
-    try {
-      await updateLead.mutateAsync({ leadId: row.leadId, body });
-      showSuccessToast("Lead updated");
-      setFormState(null);
-    } catch (err) {
-      showErrorToast(err);
-    }
-  };
 
   const handleCopyUrl = async () => {
     if (!drawerUrl) return;
@@ -466,26 +290,6 @@ export function EverBeenHotDrawer({
           </div>
         </div>
       }
-      footer={
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={!isDirty || updateLead.isPending}
-            className="cursor-pointer rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            Discard
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!isDirty || updateLead.isPending || !row?.leadId}
-            className="cursor-pointer rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {updateLead.isPending ? "Saving..." : "Save"}
-          </button>
-        </div>
-      }
     >
       <div className="space-y-5">
         <DetailCard>
@@ -499,52 +303,31 @@ export function EverBeenHotDrawer({
 
         <DetailCard label="Personal Details">
           <EditableField label="Full Name">
-            <TextInput
-              value={form.fullName}
-              onChange={(event) => updateForm("fullName", event.target.value)}
-              className="text-xs font-semibold"
-            />
+            <TextInput value={form.fullName} readOnly className={readOnlyFieldClass} />
           </EditableField>
           <EditableField label="Role">
-            <TextInput
-              value={form.role}
-              onChange={(event) => updateForm("role", event.target.value)}
-              className="text-xs font-semibold"
-            />
+            <TextInput value={form.role} readOnly className={readOnlyFieldClass} />
           </EditableField>
           <EditableField label="Phone">
-            <TextInput
-              value={form.phone}
-              onChange={(event) => updateForm("phone", event.target.value)}
-              className="text-xs font-semibold"
-            />
+            <TextInput value={form.phone} readOnly className={readOnlyFieldClass} />
           </EditableField>
           <EditableField label="Email">
-            <TextInput
-              type="email"
-              value={form.email}
-              onChange={(event) => updateForm("email", event.target.value)}
-              className="text-xs font-semibold"
-            />
+            {/* Not type="email": leads.email holds a comma-joined LIST of
+                addresses, which an email input renders as invalid. */}
+            <TextInput value={form.email} readOnly className={readOnlyFieldClass} />
           </EditableField>
         </DetailCard>
 
         <DetailCard label="Lead Details">
           <EditableField label="Contact Type">
-            <Select
+            <TextInput
               value={form.contactType}
-              onChange={(value) => updateForm("contactType", String(value))}
-              options={contactTypeOptions}
-              placeholder="Select contact type"
-              className="py-1.5 text-xs"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <div className="py-1.5">
-            <ToggleField
-              label="Not Work Anymore"
-              checked={form.notWorked}
-              onChange={handleNotWorkedChange}
-            />
+            <ToggleField label="Not Work Anymore" checked={form.notWorked} />
           </div>
         </DetailCard>
 
@@ -552,45 +335,32 @@ export function EverBeenHotDrawer({
           <EditableField label="Contacts" align="stack">
             <Textarea
               value={form.otherContacts}
-              onChange={(event) =>
-                updateForm("otherContacts", event.target.value)
-              }
-              className="text-xs font-semibold leading-5"
+              readOnly
+              className={`${readOnlyFieldClass} resize-none leading-5`}
             />
           </EditableField>
         </DetailCard>
 
         <DetailCard label="SVG Details">
           <EditableField label="Lead Type">
-            <Select
+            <TextInput
               value={form.svgLeadType}
-              onChange={(value) => updateForm("svgLeadType", String(value))}
-              options={leadTypeOptions}
-              placeholder="Select lead type"
-              className="py-1.5 text-xs"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <EditableField label="To Be Called By">
-            <Select
+            <TextInput
               value={form.svgToBeCalledBy}
-              onChange={(value) => updateForm("svgToBeCalledBy", String(value))}
-              options={svgAgentsQuery.options}
-              placeholder={
-                svgAgentsQuery.isLoading ? "Loading agents..." : "Select assignee"
-              }
-              disabled={svgAgentsQuery.isLoading}
-              searchable
-              searchPlaceholder="Search agent"
-              className="py-1.5 text-xs"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <EditableField label="To Be Called On">
-            <DatePickerField
+            <TextInput
               value={form.svgToBeCalledOn}
-              onChange={handleSvgToBeCalledOnChange}
-              minDate={getMinCallBackDate(row.svgLastCallDate ?? "")}
-              error={svgToBeCalledOnError}
-              className="text-xs font-semibold"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <EditableField label="History Calls" align="stack">
@@ -613,39 +383,24 @@ export function EverBeenHotDrawer({
 
         <DetailCard label="Benton Details">
           <EditableField label="Lead Type">
-            <Select
+            <TextInput
               value={form.bentonLeadType}
-              onChange={(value) => updateForm("bentonLeadType", String(value))}
-              options={leadTypeOptions}
-              placeholder="Select lead type"
-              className="py-1.5 text-xs"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <EditableField label="To Be Called By">
-            <Select
+            <TextInput
               value={form.bentonToBeCalledBy}
-              onChange={(value) =>
-                updateForm("bentonToBeCalledBy", String(value))
-              }
-              options={bentonAgentsQuery.options}
-              placeholder={
-                bentonAgentsQuery.isLoading
-                  ? "Loading agents..."
-                  : "Select assignee"
-              }
-              disabled={bentonAgentsQuery.isLoading}
-              searchable
-              searchPlaceholder="Search agent"
-              className="py-1.5 text-xs"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <EditableField label="To Be Called On">
-            <DatePickerField
+            <TextInput
               value={form.bentonToBeCalledOn}
-              onChange={handleBentonToBeCalledOnChange}
-              minDate={getMinCallBackDate(row.bentonLastCallDate ?? "")}
-              error={bentonToBeCalledOnError}
-              className="text-xs font-semibold"
+              readOnly
+              className={readOnlyFieldClass}
             />
           </EditableField>
           <EditableField label="History Calls" align="stack">
