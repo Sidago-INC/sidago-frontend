@@ -288,6 +288,7 @@ export function EverBeenHotTable({
       <EverBeenHotDrawer
         data={data}
         columns={columns}
+        variant={variant}
         selectedIndex={selectedIndex}
         onSelectedIndexChange={setSelectedIndex}
         onClose={() => setSelectedIndex(null)}
