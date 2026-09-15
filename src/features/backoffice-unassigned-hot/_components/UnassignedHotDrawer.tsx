@@ -3,6 +3,7 @@
 import {
   DatePickerField,
   Drawer,
+  EmailInput,
   Select,
   Textarea,
   TextInput,
@@ -523,8 +524,7 @@ export function UnassignedHotDrawer({
             />
           </EditableField>
           <EditableField label="Email">
-            <TextInput
-              type="email"
+            <EmailInput
               value={form.email}
               onChange={(event) => updateForm("email", event.target.value)}
               className="text-xs font-semibold"
@@ -731,7 +731,7 @@ function EditableField({
       <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
+      <div className={align === "stack" ? "w-full" : "min-w-0 w-64 max-w-[65%]"}>
         {children}
       </div>
     </div>

@@ -44,7 +44,7 @@ function emptyForm(): CallsFormState {
 function formFromDetail(d: LeadDetailResponse): CallsFormState {
   const history = getHistoryEntries(d.history, d.brandState.brandCode);
   return {
-    email: d.lead.email,
+    email: d.lead.email ?? "",
     notes: history.find((entry) => entry.notes)?.notes ?? "",
     callBackDate: d.brandState.followUpDate ?? "",
     leadType: d.brandState.leadType,
@@ -287,9 +287,6 @@ export function AgentCalls() {
               <IdentityCard
                 form={form}
                 leadName={currentLead.fullName}
-                onChange={(patch) =>
-                  setForm((prev) => ({ ...prev, ...patch }))
-                }
               />
               <WorkToggleRow
                 value={form.notWorkAnymore}
