@@ -14,6 +14,7 @@ import { useAdminTodayAgentCards } from "@/features/admin-dashboard/_lib/hooks";
 import {
   useAgentCallReport,
   useAgentCallDetails,
+  fetchAllCallDetails,
   type CallDetailRow,
 } from "@/features/agent-dashboard/_lib/hooks";
 import { Panel } from "@/features/agent-dashboard/_components/Panel";
@@ -21,6 +22,7 @@ import { TablePagination } from "@/components/ui/table/TablePagination";
 import { createPaginationMeta, getPageNumbers, getPaginationRange, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { downloadWorkbook } from "@/lib/excel";
 import { ensureAbsoluteUrl } from "@/lib/url";
+import { showErrorToast } from "@/lib/toast";
 import {
   easternTodayDate,
   formatEasternDateTime,
@@ -58,25 +60,65 @@ function formatDuration(seconds: number | null): string {
   return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 }
 
+// Matches the column set the old CRM's call-results sheet carried, which is
+// what the sales team asked for: lead ID label, company SYMBOL, company name,
+// full name, phone, email, contact type, lead type, who called, the result,
+// the next follow-up, the notes and the call time.
+//
+// The New CRM's export previously had eight columns and no symbol, so a row
+// could not be matched back to a ticker — the whole of the complaint.
+// Duration and Recording are kept: both are new here and worth having.
 const EXPORT_COLUMNS = [
-  "Date / Time",
-  "Lead",
-  "Company",
-  "Outcome",
+  "Lead ID",
+  "Company Symbol",
+  "Company Name",
+  "Full Name",
+  "Phone",
+  "Email",
+  "Role",
+  "Contact Type",
   "Lead Type",
-  "Notes",
+  "Timezone",
+  "Called By",
+  "Call Result",
+  "Next Follow Up",
+  "Call Notes",
+  "Date / Time",
   "Duration",
   "Recording",
 ] as const;
 
+/** "SYMBOL - Full Name", the composed label the old sheet's lead_id column held. */
+function leadIdLabel(row: CallDetailRow): string {
+  const symbol = row.companySymbol?.trim();
+  const name = row.fullName?.trim();
+  if (symbol && name) return `${symbol} - ${name}`;
+  return symbol || name || row.leadIdExternal || "";
+}
+
+function formatPhone(row: CallDetailRow): string {
+  const phone = row.phone?.trim() ?? "";
+  const ext = row.phoneExtension?.trim();
+  return ext ? `${phone} x${ext}` : phone;
+}
+
 function rowToExportValues(row: CallDetailRow): Record<(typeof EXPORT_COLUMNS)[number], string> {
   return {
-    "Date / Time": formatEasternDateTime(row.calledAt),
-    Lead: row.fullName ?? "",
-    Company: row.companyName ?? "",
-    Outcome: row.resultCode ?? "",
+    "Lead ID": leadIdLabel(row),
+    "Company Symbol": row.companySymbol ?? "",
+    "Company Name": row.companyName ?? "",
+    "Full Name": row.fullName ?? "",
+    Phone: formatPhone(row),
+    Email: row.email ?? "",
+    Role: row.role ?? "",
+    "Contact Type": row.contactType ?? "",
     "Lead Type": row.leadType ?? "",
-    Notes: row.notes ?? "",
+    Timezone: row.timezone ?? "",
+    "Called By": row.lastCalledByName ?? "",
+    "Call Result": row.resultCode ?? "",
+    "Next Follow Up": row.followUpDate ?? "",
+    "Call Notes": row.notes ?? "",
+    "Date / Time": formatEasternDateTime(row.calledAt),
     Duration: formatDuration(row.mcDurationSeconds ?? row.durationSeconds),
     Recording: row.mcRecordingLink ? ensureAbsoluteUrl(row.mcRecordingLink) : "",
   };
@@ -131,6 +173,10 @@ export function AgentCallInspector() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(DEFAULT_DETAILS_PAGE_SIZE);
   const [resultFilters, setResultFilters] = useState<string[]>([]);
+  // Per-button, so the two export buttons can show progress while the full
+  // range is fetched — an export is no longer instant now that it pulls every
+  // row rather than reusing the page already on screen.
+  const [isExporting, setIsExporting] = useState(false);
 
   const { startDate, endDate } = rangeToDateParams(dateRange);
   const isAgentSelected = selectedSlug !== "";
@@ -253,12 +299,46 @@ export function AgentCallInspector() {
     setPage(1);
   };
 
-  const handleExportCsv = () => {
-    downloadCsv(`${exportBasename}.csv`, visibleRows);
+  /**
+   * Rows for the file — the WHOLE date range, not the page on screen.
+   *
+   * This used to hand `visibleRows` straight to the writer, so a 300-call range
+   * produced a 100-row file while the dashboard above it said 300. Any result
+   * filter the user has set is re-applied here, because that filter is
+   * client-side and the server does not know about it.
+   */
+  const collectExportRows = async (): Promise<CallDetailRow[]> => {
+    if (!selectedSlug) return visibleRows;
+
+    const all = await fetchAllCallDetails(selectedSlug, startDate, endDate);
+    if (!hasResultFilter) return all;
+
+    const selected = new Set(resultFilters);
+    return all.filter(
+      (row) => row.resultCode != null && selected.has(row.resultCode),
+    );
+  };
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      downloadCsv(`${exportBasename}.csv`, await collectExportRows());
+    } catch (error) {
+      showErrorToast(error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleExportXlsx = async () => {
-    await downloadXlsx(`${exportBasename}.xlsx`, visibleRows);
+    setIsExporting(true);
+    try {
+      await downloadXlsx(`${exportBasename}.xlsx`, await collectExportRows());
+    } catch (error) {
+      showErrorToast(error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -422,21 +502,35 @@ export function AgentCallInspector() {
                   >
                     <button
                       type="button"
-                      onClick={handleExportCsv}
-                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
+                      disabled={isExporting}
+                      onClick={() => {
+                        void handleExportCsv();
+                      }}
+                      className={clsx(
+                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition dark:text-slate-200",
+                        isExporting
+                          ? "cursor-not-allowed opacity-50"
+                          : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900",
+                      )}
                     >
                       <FileText className="h-4 w-4 text-slate-500" />
-                      Download CSV
+                      {isExporting ? "Preparing..." : "Download CSV"}
                     </button>
                     <button
                       type="button"
+                      disabled={isExporting}
                       onClick={() => {
                         void handleExportXlsx();
                       }}
-                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900"
+                      className={clsx(
+                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition dark:text-slate-200",
+                        isExporting
+                          ? "cursor-not-allowed opacity-50"
+                          : "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900",
+                      )}
                     >
                       <FileSpreadsheet className="h-4 w-4 text-slate-500" />
-                      Download XLSX
+                      {isExporting ? "Preparing..." : "Download XLSX"}
                     </button>
                   </PopoverPanel>
                 </Popover>
