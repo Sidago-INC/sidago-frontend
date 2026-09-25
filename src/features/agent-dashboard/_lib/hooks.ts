@@ -236,10 +236,21 @@ export type CallDetailRow = {
   mcRecordingLink: string | null;
   source: string | null;
   leadId: string;
+  leadIdExternal: string | null;
   fullName: string | null;
   companyName: string | null;
   companySymbol: string | null;
   leadType: string | null;
+  // Carried so the downloadable call-results sheet can match the old CRM's
+  // columns. The New CRM's export had only the lead's name and company.
+  phone: string | null;
+  phoneExtension: string | null;
+  email: string | null;
+  role: string | null;
+  contactType: string | null;
+  timezone: string | null;
+  followUpDate: string | null;
+  lastCalledByName: string | null;
 };
 
 type CallDetailsResponse = {
@@ -294,6 +305,47 @@ export function useAgentCallDetails(
     enabled: Boolean(agentSlug),
     staleTime: 60_000,
   });
+}
+
+/** Ceiling the call-details endpoint accepts in one page. */
+const CALL_DETAILS_MAX_LIMIT = 5000;
+
+/**
+ * Every call in the range, in one request — for the download button.
+ *
+ * The export used to be built from `visibleRows`, i.e. whatever page was on
+ * screen, so an agent with 300 calls produced a 100-row file while the
+ * dashboard directly above it said 300. That is half of what the sales team
+ * reported as the download "containing very less information"; the other half
+ * was the missing columns.
+ *
+ * One request rather than paging: the endpoint loads the whole range with a
+ * single query and slices it in memory, so asking page by page would re-run
+ * that same query once per page for no benefit.
+ */
+export async function fetchAllCallDetails(
+  agentSlug: string,
+  startDate: string,
+  endDate: string,
+): Promise<CallDetailRow[]> {
+  const params = new URLSearchParams({
+    agentSlug,
+    startDate,
+    endDate,
+    page: "1",
+    limit: String(CALL_DETAILS_MAX_LIMIT),
+  });
+
+  const json = (await api.get(
+    `/dashboard/call-details?${params.toString()}`,
+  )) as CallDetailsResponse;
+
+  return json.data.map((row) => ({
+    ...row,
+    mcRecordingLink: row.mcRecordingLink
+      ? ensureAbsoluteUrl(row.mcRecordingLink)
+      : null,
+  }));
 }
 
 // ── Panel 3: hot and closed ───────────────────────────────────────────────

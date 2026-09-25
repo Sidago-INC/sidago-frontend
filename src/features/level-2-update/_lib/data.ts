@@ -54,22 +54,33 @@ export function isPendingRow(row: Level2UpdateRow): boolean {
 }
 
 // The 14 result options the agent can pick from when updating a Level 2 row.
-// Matches the spec from the Level 2 Update brief verbatim.
+//
+// Spellings match the Agent Calls page exactly. They used not to: this form
+// sent "no answer", "left message", "bad number", "not interested" and
+// "Call back Lead" where Calls sent "No Answer", "Left Message", "Bad Number",
+// "Not Interested" and "Call Lead Back". Both write the same
+// `call_logs.result_code` column, so every one of those pairs showed up as two
+// separate entries in the dashboard's Call Result filter and split any count
+// keyed on the exact string.
+//
+// The backend also canonicalises on the way in, so an older client sending the
+// previous spellings still stores the right value — but these are what a
+// current client sends.
 export const level2ResultUpdateOptions = [
   { label: "Interested", value: "Interested" },
-  { label: "Call back Lead", value: "Call back Lead" },
-  { label: "needs more time", value: "needs more time" },
-  { label: "no answer", value: "no answer" },
-  { label: "left message", value: "left message" },
-  { label: "bad number", value: "bad number" },
-  { label: "wrong number", value: "wrong number" },
-  { label: "not interested", value: "not interested" },
+  { label: "Call Lead Back", value: "Call Lead Back" },
+  { label: "Needs More Time", value: "Needs More Time" },
+  { label: "No Answer", value: "No Answer" },
+  { label: "Left Message", value: "Left Message" },
+  { label: "Bad Number", value: "Bad Number" },
+  { label: "Wrong Number", value: "Wrong Number" },
+  { label: "Not Interested", value: "Not Interested" },
   { label: "DNC", value: "DNC" },
   { label: "Contract Closed", value: "Contract Closed" },
   { label: "Force Fix", value: "Force Fix" },
   { label: "Force General", value: "Force General" },
   { label: "Force Void", value: "Force Void" },
-  { label: "Block Email to", value: "Block Email to" },
+  { label: "Block Email To", value: "Block Email To" },
 ];
 
 export const level2UpdateCampaignOptions = BRAND_OPTIONS.map((option) => ({
