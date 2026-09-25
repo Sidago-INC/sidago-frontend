@@ -38,6 +38,8 @@ type MonthlyScoresResponse = {
     wins: number;
     isWinner: boolean;
   }>;
+  /** Month's top scorer across all agents, name only (server-computed). */
+  leaderName?: string | null;
 };
 
 function addMonths(date: Date, offset: number) {
@@ -292,6 +294,46 @@ export function useAgentCallDetails(
       };
     },
     enabled: Boolean(agentSlug),
+    // Keep the current page visible while the next one loads (Monthly Stats
+    // pages through a month's calls without collapsing the list).
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  });
+}
+
+// ── Monthly Stats: exact date-range totals ────────────────────────────────
+
+export type RangeScoreTotals = {
+  callsMade: number;
+  hotLeads: number;
+  lostHotLeads: number;
+  contractsClosed: number;
+  points: number;
+  daysWithScores: number;
+};
+
+type AgentRangeSummaryResponse = {
+  ok: true;
+  agentSlug: string;
+  brandCode: string;
+  startDate: string;
+  endDate: string;
+  totals: RangeScoreTotals;
+};
+
+export function useAgentRangeSummary(
+  agentSlug: string | null | undefined,
+  startDate: string | null,
+  endDate: string | null,
+) {
+  return useQuery({
+    queryKey: ["agent-dashboard", "range-summary", agentSlug, startDate, endDate],
+    queryFn: async () =>
+      api.get(
+        `/dashboard/agent-range-summary?agentSlug=${agentSlug}&startDate=${startDate}&endDate=${endDate}`,
+      ) as Promise<AgentRangeSummaryResponse>,
+    enabled: Boolean(agentSlug && startDate && endDate),
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
 }
@@ -381,8 +423,11 @@ export function useAgentDashboard(selectedDate = easternTodayDate()) {
         reportDate: daily.date,
         currentReportMonth: currentMonthly.month,
         previousReportMonth: previousMonthly.month,
+        // An agent now receives only their own monthly row, so the leader can't
+        // be derived client-side from the roster — the server supplies it.
+        monthlyLeaderName: currentMonthly.leaderName ?? null,
       };
     },
     staleTime: 60_000,
-  });
+  }); 
 }
