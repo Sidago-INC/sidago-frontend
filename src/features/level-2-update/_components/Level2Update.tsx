@@ -113,20 +113,39 @@ const RESULT_CATEGORY: Record<
   Interested: "positive",
   "Contract Closed": "positive",
 
-  "Call back Lead": "callback",
-  "needs more time": "callback",
-  "no answer": "callback",
-  "left message": "callback",
+  "Call Lead Back": "callback",
+  "Needs More Time": "callback",
+  "No Answer": "callback",
+  "Left Message": "callback",
 
-  "bad number": "negative",
-  "wrong number": "negative",
-  "not interested": "negative",
+  "Bad Number": "negative",
+  "Wrong Number": "negative",
+  "Not Interested": "negative",
   DNC: "negative",
 
   "Force Fix": "admin",
   "Force General": "admin",
   "Force Void": "admin",
-  "Block Email to": "admin",
+  "Block Email To": "admin",
+};
+
+// Pre-unification spellings, so a stored value still resolves to its colour.
+// Keyed on the lower-cased form, so plain casing differences need no entry.
+const LEGACY_RESULT_LABELS: Record<string, string> = {
+  "call back lead": "Call Lead Back",
+  "needs more time": "Needs More Time",
+  "no answer": "No Answer",
+  "left message": "Left Message",
+  "bad number": "Bad Number",
+  "wrong number": "Wrong Number",
+  "not interested": "Not Interested",
+  "block email to": "Block Email To",
+  interested: "Interested",
+  "contract closed": "Contract Closed",
+  "force fix": "Force Fix",
+  "force general": "Force General",
+  "force void": "Force Void",
+  dnc: "DNC",
 };
 
 const ADMIN_BADGE_CLASS =
@@ -137,7 +156,11 @@ function ResultBadge({ value }: { value: string }) {
     return <Badge className="text-slate-400 dark:text-slate-500">Select</Badge>;
   }
 
-  const category = RESULT_CATEGORY[value];
+  // Looked up case-insensitively so rows logged before the vocabularies were
+  // unified ("no answer", "Call back Lead") still get their colour instead of
+  // falling through to grey.
+  const category =
+    RESULT_CATEGORY[value] ?? RESULT_CATEGORY[LEGACY_RESULT_LABELS[value.trim().toLowerCase()] ?? ""];
 
   if (category === "positive") return <Badge variant="success">{value}</Badge>;
   if (category === "callback") return <Badge variant="warning">{value}</Badge>;

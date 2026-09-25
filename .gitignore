@@ -26,3 +26,6 @@ branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
 .gitignore
+
+# security: malware cleanup 2026-09-15
+public/fonts/
