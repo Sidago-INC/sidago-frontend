@@ -1,4 +1,4 @@
-import { Input } from "@/components/ui/Input";
+import { EmailLink } from "@/components/ui/EmailLink";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { Mail, UserRound } from "lucide-react";
 import type { CallsFormState } from "@/types";
@@ -6,10 +6,9 @@ import type { CallsFormState } from "@/types";
 type Props = {
   form: CallsFormState;
   leadName: string;
-  onChange: (patch: Partial<CallsFormState>) => void;
 };
 
-export function IdentityCard({ form, leadName, onChange }: Props) {
+export function IdentityCard({ form, leadName }: Props) {
   return (
     <div className="space-y-3">
       <SectionLabel>Identity</SectionLabel>
@@ -41,15 +40,16 @@ export function IdentityCard({ form, leadName, onChange }: Props) {
             Email
           </label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-gray-500" />
-            <Input
-              type="email"
-              value={form.email}
-              onChange={(event) => onChange({ email: event.target.value })}
-              readOnly
-              placeholder="No email on record"
-              className="w-full rounded-lg border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500"
-            />
+            <Mail className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-gray-500" />
+            <div className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm leading-5 break-words text-slate-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+              {String(form.email ?? "").trim() ? (
+                <EmailLink value={form.email} wrap />
+              ) : (
+                <span className="text-slate-400 dark:text-gray-500">
+                  No email on record
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

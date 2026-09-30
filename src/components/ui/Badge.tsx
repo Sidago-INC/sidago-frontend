@@ -255,10 +255,10 @@ export const TimezoneBadge = ({
   timezone,
   className,
 }: {
-  timezone: string;
+  timezone: string | null | undefined;
   className?: string;
 }) => {
-  const trimmedTimezone = timezone.trim();
+  const trimmedTimezone = String(timezone ?? "").trim();
   if (!trimmedTimezone) {
     return null;
   }

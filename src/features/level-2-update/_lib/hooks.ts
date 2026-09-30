@@ -7,6 +7,7 @@ import {
 } from "@/lib/pagination";
 import { usePaginatedSelectSource } from "@/lib/use-paginated-select-source";
 import { formatLeadDisplayTitle } from "@/features/agent-calls/_lib/utils";
+import { LEVEL2_BOARD_KEY } from "./board";
 
 export type LeadPickerRow = {
   id: string;
@@ -45,6 +46,9 @@ type LeadsResponse = {
 type AgentsResponse = { ok: true; count: number; data: AgentUser[] };
 
 const LEAD_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+// Browsing pulls a full page at a time; a search only needs enough rows to
+// cover one company's contacts, and a shorter page comes back faster.
+const LEAD_SEARCH_LIMIT = 100;
 
 export async function fetchLeadsPage({
   limit = LEAD_PAGE_SIZE,
@@ -83,7 +87,16 @@ export function useLeadSelectSource(
   return usePaginatedSelectSource({
     queryKeyPrefix: "leads",
     pageSize: LEAD_PAGE_SIZE,
+    searchPageSize: LEAD_SEARCH_LIMIT,
     fetchPage: fetchLeadsPage,
+    // Load-bearing. Without it the hook only queries the server when the local
+    // filter over already-downloaded pages matches NOTHING, so one stale
+    // partial match hid every other lead under that symbol — and with 36k
+    // leads at 500 a page, whether a ticker search was complete came down to
+    // how far the dropdown happened to have been scrolled. Every company
+    // picker already passes this; the lead picker was the one that did not.
+    fetchSearchPage: ({ limit, page, search }) =>
+      fetchLeadsPage({ limit, page, search }),
     buildOptions: buildLeadSelectOptions,
     extraOptions,
   });
@@ -139,6 +152,12 @@ type Level2PostBody = {
   resultUpdate: string;
   updatedNotes: string;
   callBackDate: string;
+  /**
+   * The shared draft this came from. The server promotes that row in place
+   * instead of inserting a second one, so the board never shows the same
+   * update twice and no orphan draft is left behind.
+   */
+  draftId?: string;
 };
 
 type Level2PostResponse = {
@@ -163,6 +182,7 @@ export function useLogLevel2Result() {
       (await api.post("/level-2-requests", body)) as Level2PostResponse,
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: ["level-2-history"] });
+      qc.invalidateQueries({ queryKey: LEVEL2_BOARD_KEY });
       qc.invalidateQueries({
         queryKey: ["lead-brand-states", variables.leadId],
       });

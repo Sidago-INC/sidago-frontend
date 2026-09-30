@@ -6,6 +6,7 @@ import {
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
+  EmailLink,
   EmailPriorityBadge,
   Select,
   Textarea,
@@ -127,7 +128,7 @@ function EditableField({
       <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
+      <div className={align === "stack" ? "w-full" : "min-w-0 w-64 max-w-[65%]"}>
         {children}
       </div>
     </div>
@@ -412,9 +413,17 @@ export function AgentEmailDrawer({
               </span>
             </EditableField>
             <EditableField label="Email">
-              <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                {row.email || "—"}
-              </span>
+              {row.email ? (
+                <EmailLink
+                  value={row.email}
+                  wrap
+                  className="text-xs font-semibold"
+                />
+              ) : (
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                  —
+                </span>
+              )}
             </EditableField>
           </DetailCard>
 

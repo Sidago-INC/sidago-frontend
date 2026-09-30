@@ -19,7 +19,7 @@ import { splitEmails } from "@/lib/validation";
 
 const ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const toRows = (joined: string): string[] => {
+const toRows = (joined: string | null | undefined): string[] => {
   const rows = splitEmails(joined);
   return rows.length > 0 ? rows : [""];
 };

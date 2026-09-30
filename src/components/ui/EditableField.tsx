@@ -28,7 +28,7 @@ export function EditableField({
       <p className="shrink-0 text-[10px] uppercase tracking-widest text-slate-400">
         {label}
       </p>
-      <div className={align === "stack" ? "w-full" : "w-64 max-w-[65%]"}>
+      <div className={align === "stack" ? "w-full" : "min-w-0 w-64 max-w-[65%]"}>
         {isEditing ? (
           children
         ) : (
@@ -45,7 +45,9 @@ export function EditableField({
             className={`w-full cursor-text rounded border border-gray-300 bg-white text-xs font-semibold text-slate-600 transition focus:border-indigo-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-slate-200 ${
               align === "stack"
                 ? "min-h-24.5 px-3 py-2 text-left whitespace-pre-line"
-                : "min-h-7.5 px-3 py-1.5 text-left truncate"
+                : label.toLowerCase().includes("email")
+                  ? "min-h-7.5 px-3 py-1.5 text-left whitespace-normal break-words"
+                  : "min-h-7.5 px-3 py-1.5 text-left truncate"
             }`}
           >
             {preview}
@@ -76,7 +78,7 @@ function getEditablePreview(
   if (!value) return <EmptyPreview label={label} />;
 
   if (label.toLowerCase().includes("email")) {
-    return <EmailLink value={value} />;
+    return <EmailLink value={value} wrap />;
   }
 
   const option = props.options?.find((item) => String(item.value) === value);

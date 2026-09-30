@@ -20,6 +20,7 @@ export { DrawerActionHeader } from "./DrawerActionHeader";
 export { DropdownPanel } from "./DropdownPanel";
 export { EditableDrawerFooter } from "./EditableDrawerFooter";
 export { EditableField } from "./EditableField";
+export { EmailInput } from "./EmailInput";
 export { EmailLink } from "./EmailLink";
 export { Card, CardContent } from "./Card";
 export { CardShell } from "./CardShell";

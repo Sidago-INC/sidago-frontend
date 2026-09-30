@@ -84,6 +84,7 @@ export interface UseTableStateReturn<T> {
   activeFilterConditionCount: number;
   hasActiveSearch: boolean;
   paginationContextKey: string;
+  viewContextKey: string;
   closeSearch: () => void;
   handlePrintPage: () => void;
   handlePrintData: () => void;
@@ -527,6 +528,34 @@ export function useTableState<T>({
     ],
   );
 
+  // What the grid is *showing*, independent of the rows themselves.
+  //
+  // `paginationContextKey` folds in `data.length` and the column set because a
+  // changed dataset has to reset the *page*. Scroll position must not key off
+  // those: a grid with inline editing rewrites its data array on every
+  // keystroke, so anything watching the data threw the user back to the top
+  // mid-edit. Only a change to what is being shown — search, filters, sort,
+  // grouping, page size — makes the row under the cursor meaningless.
+  const viewContextKey = useMemo(
+    () =>
+      JSON.stringify({
+        filterSearch,
+        filterItems,
+        rootFilterGate,
+        sortRules,
+        groupRules,
+        rowsPerPage,
+      }),
+    [
+      filterItems,
+      filterSearch,
+      groupRules,
+      rootFilterGate,
+      rowsPerPage,
+      sortRules,
+    ],
+  );
+
   const totalPages = serverPagination
     ? serverPagination.meta.total_pages
     : Math.max(1, Math.ceil(processedData.length / rowsPerPage));
@@ -707,6 +736,7 @@ export function useTableState<T>({
     activeFilterConditionCount,
     hasActiveSearch,
     paginationContextKey,
+    viewContextKey,
     closeSearch,
     handlePrintPage,
     handlePrintData,
