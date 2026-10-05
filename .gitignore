@@ -6,6 +6,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+pnpm-lock.yaml
+pnpm-workspace.yaml
 
 node_modules
 dist
@@ -28,5 +30,4 @@ temp_interactive_push.bat
 .gitignore
 
 # security: malware cleanup 2026-09-15
-.vscode/
 public/fonts/

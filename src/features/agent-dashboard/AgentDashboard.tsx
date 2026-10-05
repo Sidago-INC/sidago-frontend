@@ -3,7 +3,7 @@ import { StatusSection } from "./_components/StatusSection";
 import { AgentCallReportPanel } from "./_components/AgentCallReportPanel";
 import { AgentCallDetailsPanel } from "./_components/AgentCallDetailsPanel";
 import { AgentHotAndClosedPanel } from "./_components/AgentHotAndClosedPanel";
-import { findAgentByLoggedInName, getMonthlyWinner } from "./_lib/utils";
+import { findAgentByLoggedInName } from "./_lib/utils";
 import { useAuth } from "@/providers/AuthProvider";
 import { ErrorState, Preloader } from "@/components/ui";
 import { useAgentDashboard } from "./_lib/hooks";
@@ -16,7 +16,7 @@ export default function AgentDashboard() {
   const currentAgent = agentSlug
     ? agents.find((a) => a.recordId === agentSlug)
     : findAgentByLoggedInName(agents, user?.name);
-  const monthlyWinner = getMonthlyWinner(agents);
+  const monthlyLeaderName = data?.monthlyLeaderName ?? null;
 
   if (isLoading && agents.length === 0) {
     return (
@@ -45,7 +45,7 @@ export default function AgentDashboard() {
       <main className="mx-auto space-y-5 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6">
         <StatusSection
           currentAgent={currentAgent}
-          monthlyWinner={monthlyWinner}
+          monthlyLeaderName={monthlyLeaderName}
           loggedInName={user?.name ?? ""}
         />
 

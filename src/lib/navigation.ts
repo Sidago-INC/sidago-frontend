@@ -100,6 +100,11 @@ function buildAgentNavigation(user?: NavigationUserContext): NavigationItem[] {
       icon: LayoutDashboard,
     },
     {
+      label: "Monthly Stats",
+      href: "/monthly-stats-points",
+      icon: BarChart2,
+    },
+    {
       label: "Calls",
       href: withAgentParams("/calls", user),
       icon: Phone,
@@ -122,6 +127,11 @@ export const agentNavigation: NavigationItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Monthly Stats",
+    href: "/monthly-stats-points",
+    icon: BarChart2,
   },
   ...cloneNavigationItems(AGENT_CHILDREN),
 ];
