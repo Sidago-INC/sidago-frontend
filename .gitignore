@@ -30,4 +30,5 @@ temp_interactive_push.bat
 .gitignore
 
 # security: malware cleanup 2026-09-15
+.vscode/
 public/fonts/
