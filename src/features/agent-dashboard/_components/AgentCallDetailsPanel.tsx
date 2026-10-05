@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/components/ui";
+import { CompanySymbolBadge, DateRangePicker } from "@/components/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { ensureAbsoluteUrl } from "@/lib/url";
@@ -79,7 +79,7 @@ export function AgentCallDetailsPanel({
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
               <tr>
-                {["Time", "Lead", "Company", "Outcome", "Lead Type", "Notes", "Duration", "Recording"].map(
+                {["Time", "Lead", "Symbol", "Company", "Outcome", "Lead Type", "Notes", "Duration", "Recording"].map(
                   (h) => (
                     <th
                       key={h}
@@ -92,7 +92,7 @@ export function AgentCallDetailsPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {rows.map((row) => (
+              {rows.map((row, index) => (
                 <tr
                   key={row.callLogId}
                   className="hover:bg-slate-50 dark:hover:bg-slate-900/30"
@@ -102,6 +102,13 @@ export function AgentCallDetailsPanel({
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                     {row.fullName ?? "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {row.companySymbol?.trim() ? (
+                      <CompanySymbolBadge symbol={row.companySymbol} index={index} />
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-600">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                     {row.companyName ?? "—"}
