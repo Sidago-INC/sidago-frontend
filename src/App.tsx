@@ -15,6 +15,7 @@ import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 // Protected pages
 import DashboardSwitch from "@/features/dashboard/_components/DashboardSwitch";
+import MonthlyStatsPage from "@/features/dashboard/_components/MonthlyStatsPage";
 import { AgentCalls } from "@/features/agent-calls/AgentCalls";
 import { AgentCallLogs } from "@/features/agent-call-logs/AgentCallLogs";
 import { Leads } from "@/features/leads/_components/Leads";
@@ -32,7 +33,6 @@ import { LeadsStats } from "@/features/leads-stats/_components/LeadsStats";
 import { BlockedEmail } from "@/features/blocked-email/_components/BlockedEmail";
 import { EmailBlocklistDirectory } from "@/features/email-blocklist-directory/_components/EmailBlocklistDirectory";
 import { DeadMissingEmail } from "@/features/dead-missing-email/_components/DeadMissingEmail";
-import { BackofficeDashboard } from "@/features/backoffice-dashboard/_components/BackofficeDashboard";
 import { ClosedContacts } from "@/features/backoffice-closed-contacts/_components/ClosedContacts";
 import { CallFraud } from "@/features/call-fraud/CallFraud";
 
@@ -117,7 +117,7 @@ export default function App() {
                 <Route path="/additional-contacts" element={<P><AdditionalContactsForm /></P>} />
 
                 {/* Backoffice dashboard */}
-                <Route path="/monthly-stats-points" element={<P><BackofficeDashboard initialView="monthly" /></P>} />
+                <Route path="/monthly-stats-points" element={<P><MonthlyStatsPage /></P>} />
                 <Route path="/closed-contacts" element={<P><ClosedContacts /></P>} />
 
                 {/* Call Fraud (admin only) */}

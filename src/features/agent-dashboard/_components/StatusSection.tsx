@@ -5,11 +5,11 @@ import { WidgetCard } from "./WidgetCard";
 
 export function StatusSection({
   currentAgent,
-  monthlyWinner,
+  monthlyLeaderName,
   loggedInName,
 }: {
   currentAgent?: Agent;
-  monthlyWinner?: Agent;
+  monthlyLeaderName?: string | null;
   loggedInName: string;
 }) {
   if (!currentAgent) {
@@ -53,11 +53,7 @@ export function StatusSection({
         />
         <WidgetCard
           label="Monthly Leader"
-          value={
-            monthlyWinner
-              ? `${monthlyWinner.name} ${monthlyWinner.surname}`
-              : "-"
-          }
+          value={monthlyLeaderName || "-"}
           colorClass="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
           icon={
             <Trophy className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
