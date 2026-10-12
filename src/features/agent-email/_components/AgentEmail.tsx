@@ -59,6 +59,7 @@ function formatEmailHistory(
     status: string | null;
     subject: string | null;
     body: string | null;
+    toAddress?: string | null;
   }>,
 ) {
   return history
@@ -67,6 +68,7 @@ function formatEmailHistory(
         formatHistoryDate(entry.sentAt),
         entry.userName,
         entry.status,
+        entry.toAddress ? `to ${entry.toAddress}` : null,
         entry.subject || entry.body,
       ]
         .filter(Boolean)
@@ -495,6 +497,24 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     }
   };
 
+  // The drawer's "Log as sent" logged the email for the selected recipients.
+  // Mirror what the table's Check To Log does: tick it on the row and the draft.
+  const handleEmailLogged = () => {
+    const rowId = drawerState.draft?.id;
+    if (!rowId) return;
+    updateRow(rowId, (current) => ({ ...current, checkToLog: true }));
+    setDrawerState((current) =>
+      current.draft
+        ? {
+            original: current.original
+              ? { ...current.original, checkToLog: true }
+              : current.original,
+            draft: { ...current.draft, checkToLog: true },
+          }
+        : current,
+    );
+  };
+
   const saveDraft = async () => {
     if (!drawerState.draft) {
       return;
@@ -575,6 +595,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         onSave={saveDraft}
         onOutcomeSelect={handleOutcome}
         outcomeLoading={logCallResult.isPending}
+        onEmailLogged={handleEmailLogged}
       />
     </div>
   );

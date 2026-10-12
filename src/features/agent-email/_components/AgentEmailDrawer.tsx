@@ -6,7 +6,6 @@ import {
   DatePickerField,
   Drawer,
   EditableDrawerFooter,
-  EmailLink,
   EmailPriorityBadge,
   Select,
   Textarea,
@@ -14,6 +13,8 @@ import {
   TimezoneBadge,
 } from "@/components/ui";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
+import { EmailRecipientsCard } from "@/features/lead-emails/_components/EmailRecipientsCard";
+import { LeadEmailsCard } from "@/features/lead-emails/_components/LeadEmailsCard";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
 import {
@@ -58,6 +59,8 @@ type AgentEmailDrawerProps = {
   onSave: () => void;
   onOutcomeSelect: (resultCode: string) => void;
   outcomeLoading?: boolean;
+  /** The drawer logged an email for the chosen recipients. */
+  onEmailLogged: () => void;
 };
 
 function escapeHtml(value: string) {
@@ -201,6 +204,7 @@ export function AgentEmailDrawer({
   onSave,
   onOutcomeSelect,
   outcomeLoading = false,
+  onEmailLogged,
 }: AgentEmailDrawerProps) {
   const [copied, setCopied] = useState(false);
   const [callBackDateError, setCallBackDateError] = useState<string>();
@@ -412,19 +416,32 @@ export function AgentEmailDrawer({
                 {row.phone || "—"}
               </span>
             </EditableField>
-            <EditableField label="Email">
-              {row.email ? (
-                <EmailLink
-                  value={row.email}
-                  wrap
-                  className="text-xs font-semibold"
-                />
-              ) : (
-                <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                  —
-                </span>
-              )}
+            <EditableField label="Email" align="stack">
+              {/* Each address is its own record (confirm / mark invalid /
+                  add). Falls back to the comma-joined value while the feature
+                  is off on the server. */}
+              <LeadEmailsCard
+                leadId={row.leadId}
+                fallbackEmail={row.email}
+                confirmMethod="agent_promoted"
+              />
             </EditableField>
+          </DetailCard>
+
+          <DetailCard label="Send Email">
+            <EmailRecipientsCard
+              leadId={row.leadId}
+              brandCode={row.brandCode}
+              status={row.emailToBeSent}
+              logSubject={`Email log for ${row.fullName || row.companyName || row.leadId}`}
+              logBody={
+                row.history.trim() ||
+                row.notes.trim() ||
+                `Email log recorded for ${row.fullName || row.companyName || row.leadId}`
+              }
+              alreadyLogged={row.checkToLog}
+              onLogged={onEmailLogged}
+            />
           </DetailCard>
 
           <DetailCard label="Lead Details">

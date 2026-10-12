@@ -21,6 +21,17 @@ export type EmailQueueItem = {
   lastEmailSentAt: string | null;
   notWorkAnymore: boolean;
   companyId: string | null;
+  // Only present when the backend resolves recipients from lead_emails
+  // (LEAD_EMAILS_READS). The page still works from `email` without them.
+  recipients?: {
+    id: string;
+    address: string;
+    verification: string;
+    deliverability: string;
+  }[];
+  recipientMode?: string | null;
+  recipientBlockedReason?: string | null;
+  recipientWarnings?: string[];
 };
 
 export type EmailQueueResponse = {
@@ -45,6 +56,11 @@ export type EmailHistoryEntry = {
   body: string | null;
   status: string | null;
   userName: string | null;
+  // Which address the email went to (null on logs from before per-address
+  // tracking) and the send action it belonged to.
+  toAddress?: string | null;
+  sendGroupId?: string | null;
+  recipientMode?: string | null;
 };
 
 export type EmailHistoryResponse = {
@@ -66,4 +82,18 @@ export type EmailLogBody = {
   subject: string;
   body: string;
   status: string;
+  /** lead_emails ids the agent sent to. Omit to let the backend resolve them. */
+  recipientIds?: string[];
+};
+
+export type EmailLogResponse = {
+  ok: true;
+  id: string;
+  emailStatus?: string;
+  /** Present when the send was attributed to specific addresses. */
+  ids?: string[];
+  sendGroupId?: string;
+  recipientMode?: string;
+  recipients?: { id: string; address: string }[];
+  warnings?: string[];
 };
