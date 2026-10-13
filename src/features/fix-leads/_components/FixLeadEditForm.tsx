@@ -18,6 +18,7 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { NewLeadDrawer } from "@/features/leads/_components/NewLeadDrawer";
+import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
 import { createLead } from "@/features/leads/_lib/hooks";
 import type { LeadCreateFormValues } from "@/lib/validation/lead-create";
 import {
@@ -80,7 +81,11 @@ export function FixLeadEditForm() {
   // Adding a colleague at this company. Reuses the Add-Lead form and the same
   // endpoint — the only difference is that the company is fixed and the user
   // never leaves the lead they were fixing.
-  const handleCreateLead = async (values: LeadCreateFormValues) => {
+  const handleCreateLead = async (
+    values: LeadCreateFormValues & {
+      phones?: import("@/components/ui").PhoneEntry[];
+    },
+  ) => {
     setCreatingLead(true);
     try {
       const response = await createLead({
@@ -88,6 +93,7 @@ export function FixLeadEditForm() {
         fullName: values.fullName,
         phone: values.phone,
         phoneExtension: values.phoneExtension || undefined,
+        phones: values.phones?.filter((p) => p.phone.trim() !== ""),
         email: values.email,
         role: values.role,
         otherContacts: values.otherContacts || undefined,
@@ -289,8 +295,10 @@ export function FixLeadEditForm() {
                 onChange={(value) => updateField("email", value)}
                 inputClassName={inputClassName}
               />
+              {/* Replaces the PREFERRED number; the old one is retired, not
+                  lost. Every other number is in Phone Numbers below. */}
               <TextInput
-                label="Phone"
+                label="Preferred Phone"
                 value={form.phone}
                 onChange={(event) => updateField("phone", event.target.value)}
                 className={inputClassName}
@@ -457,6 +465,34 @@ export function FixLeadEditForm() {
               </button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Outside the form on purpose: these actions save one number at a time,
+          and Enter in the add-number field must not submit the Fix form. */}
+      <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <CardContent className="p-0">
+          <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-700 sm:px-6">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              Phone Numbers
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Add the correct number, or mark a bad one. A lead only goes to Fix
+              once every number has run out of attempts.
+            </p>
+          </div>
+          <div className="px-5 py-4 sm:px-6">
+            <LeadPhonesPanel
+              leadId={lead.id}
+              phones={data.phones ?? []}
+              onChanged={() =>
+                Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["lead-full", leadId] }),
+                  queryClient.invalidateQueries({ queryKey: ["fix-queue"] }),
+                ])
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 

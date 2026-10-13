@@ -1,3 +1,4 @@
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { getHistoryEntries } from "@/features/agent-calls/_lib/history";
 import type { LeadDetailResponse } from "@/features/agent-calls/_lib/apiTypes";
 
@@ -29,7 +30,13 @@ export function formatCallsHistory(
 ): string {
   return getHistoryEntries(history, brandCode)
     .map((entry) =>
-      [formatCallLogDate(entry.calledAt), entry.agentName, entry.resultCode]
+      [
+        formatCallLogDate(entry.calledAt),
+        entry.agentName,
+        entry.resultCode,
+        // Which number was dialled, once calls start recording it.
+        entry.phoneDialled ? formatPhone(entry.phoneDialled) : null,
+      ]
         .filter(Boolean)
         .join(" - "),
     )

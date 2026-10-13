@@ -37,6 +37,11 @@ const phoneShape = (): Rule => (value) => {
   return null;
 };
 
+export type PhoneEntry = {
+  phone: string;
+  phoneExtension: string;
+};
+
 export type LeadCreateFormValues = {
   companyId: string;
   fullName: string;
@@ -48,6 +53,37 @@ export type LeadCreateFormValues = {
   /** Free text: extra phones, alternate contacts, notes. Optional. */
   otherContacts: string;
 };
+
+export function validatePhonesList(phones: PhoneEntry[]): string | null {
+  if (!phones || phones.length === 0) return null;
+  const seenDigits = new Set<string>();
+  for (let i = 0; i < phones.length; i++) {
+    const item = phones[i];
+    const p = item?.phone?.trim() ?? "";
+    if (i === 0 && !p) {
+      return "Phone is required.";
+    }
+    if (p) {
+      const err = phoneShape()(p);
+      if (err) return `Phone ${i + 1}: ${err}`;
+      const pureDigits = digitCount(p) >= 7 ? p.replace(/\D/g, "") : "";
+      if (pureDigits && seenDigits.has(pureDigits)) {
+        return `Phone ${i + 1}: Duplicate phone number entered.`;
+      }
+      if (pureDigits) seenDigits.add(pureDigits);
+    }
+    const ext = item?.phoneExtension?.trim() ?? "";
+    if (ext) {
+      if (!/^\d*$/.test(ext)) {
+        return `Phone ${i + 1} extension must be digits only.`;
+      }
+      if (ext.length > 12) {
+        return `Phone ${i + 1} extension must be 12 characters or fewer.`;
+      }
+    }
+  }
+  return null;
+}
 
 // Every field is required at the form level except phone extension. The
 // backend ultimately persists the phone extension as nullable text, so an

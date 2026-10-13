@@ -16,6 +16,7 @@ import {
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { PhoneWithCount } from "@/features/lead-phones/_components/PhoneWithCount";
 import { Users } from "lucide-react";
 import {
   getLeadGridLabel,
@@ -109,7 +110,17 @@ export function FixLeadsTable({
         },
       },
       { title: "Name", key: "fullName" },
-      { title: "Phone", key: "phone" },
+      {
+        title: "Phone",
+        key: "phone",
+        render: (row) => (
+          <PhoneWithCount
+            phone={row.phone}
+            count={row.phoneCount}
+            usable={row.usablePhoneCount}
+          />
+        ),
+      },
       {
         // Not in the fix-queue endpoint's permitted filter/sort/group fields.
         title: "Fix Entry Date",

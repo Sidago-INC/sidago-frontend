@@ -5,12 +5,15 @@ import {
   EditableDrawerFooter,
   EmailListField,
   Modal,
+  PhoneListField,
   TextInput,
   Textarea,
+  type PhoneEntry,
 } from "@/components/ui";
 import { validateForm } from "@/lib/validation";
 import {
   leadCreateValidationSchema,
+  validatePhonesList,
   type LeadCreateFormValues,
 } from "@/lib/validation/lead-create";
 import { CircleHelp } from "lucide-react";
@@ -19,7 +22,9 @@ import { useMemo, useState } from "react";
 type NewLeadDrawerProps = {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (values: LeadCreateFormValues) => void | Promise<void>;
+  onCreate: (
+    values: LeadCreateFormValues & { phones?: PhoneEntry[] },
+  ) => void | Promise<void>;
   /**
    * Opened from a lead's own page, the company is already known and must not
    * be changed — the point is to add a colleague AT this company. Passing it
@@ -52,22 +57,35 @@ export function NewLeadDrawer({
   isSaving = false,
 }: NewLeadDrawerProps) {
   const [form, setForm] = useState<LeadCreateFormValues>(blankForm);
+  const [phones, setPhones] = useState<PhoneEntry[]>([
+    { phone: "", phoneExtension: "" },
+  ]);
   const [errors, setErrors] = useState<
     Partial<Record<keyof LeadCreateFormValues, string>>
   >({});
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const normalizedPhones = useMemo(
+    () =>
+      phones.map((p) => ({
+        phone: p.phone.trim(),
+        phoneExtension: p.phoneExtension.trim(),
+      })),
+    [phones],
+  );
+
   const normalizedForm = useMemo(
     () => ({
       companyId: fixedCompany?.id ?? form.companyId,
       fullName: form.fullName.trim(),
-      phone: form.phone.trim(),
-      phoneExtension: form.phoneExtension.trim(),
+      phone: normalizedPhones[0]?.phone ?? form.phone.trim(),
+      phoneExtension:
+        normalizedPhones[0]?.phoneExtension ?? form.phoneExtension.trim(),
       email: form.email.trim(),
       role: form.role.trim(),
       otherContacts: form.otherContacts.trim(),
     }),
-    [fixedCompany?.id, form],
+    [fixedCompany?.id, form, normalizedPhones],
   );
 
   const updateField = (field: keyof LeadCreateFormValues, value: string) => {
@@ -75,14 +93,35 @@ export function NewLeadDrawer({
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
+  const updatePhones = (newPhones: PhoneEntry[]) => {
+    setPhones(newPhones);
+    const primaryPhone = newPhones[0]?.phone ?? "";
+    const primaryExt = newPhones[0]?.phoneExtension ?? "";
+    setForm((current) => ({
+      ...current,
+      phone: primaryPhone,
+      phoneExtension: primaryExt,
+    }));
+    setErrors((current) => ({
+      ...current,
+      phone: undefined,
+      phoneExtension: undefined,
+    }));
+  };
+
   const handleReset = () => {
     setForm({ ...blankForm, companyId: fixedCompany?.id ?? "" });
+    setPhones([{ phone: "", phoneExtension: "" }]);
     setErrors({});
     setConfirmOpen(false);
   };
 
   const handleSave = () => {
     const nextErrors = validateForm(normalizedForm, leadCreateValidationSchema);
+    const phonesError = validatePhonesList(normalizedPhones);
+    if (phonesError && !nextErrors.phone) {
+      nextErrors.phone = phonesError;
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -97,7 +136,10 @@ export function NewLeadDrawer({
     try {
       // Await it: if the request fails the drawer has to stay open with the
       // user's input intact, rather than closing and losing everything typed.
-      await onCreate(normalizedForm);
+      await onCreate({
+        ...normalizedForm,
+        phones: normalizedPhones.filter((p) => p.phone !== ""),
+      });
     } catch {
       setConfirmOpen(false);
       return;
@@ -150,22 +192,14 @@ export function NewLeadDrawer({
             className={inputClassName}
             wrapperClassName="md:col-span-2"
           />
-          <TextInput
-            label="Phone"
-            value={form.phone}
-            onChange={(event) => updateField("phone", event.target.value)}
-            error={errors.phone}
-            className={inputClassName}
-          />
-          <TextInput
-            label="Phone Extension"
-            value={form.phoneExtension}
-            onChange={(event) =>
-              updateField("phoneExtension", event.target.value)
-            }
-            error={errors.phoneExtension}
-            className={inputClassName}
-          />
+          <div className="md:col-span-2">
+            <PhoneListField
+              values={phones}
+              onChange={updatePhones}
+              error={errors.phone}
+              required
+            />
+          </div>
           <EmailListField
             value={form.email}
             onChange={(value) => updateField("email", value)}

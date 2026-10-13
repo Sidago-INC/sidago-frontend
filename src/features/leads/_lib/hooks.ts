@@ -201,6 +201,7 @@ type CreateLeadBody = {
   lastName?: string;
   phone: string;
   phoneExtension?: string;
+  phones?: Array<{ phone: string; phoneExtension?: string }>;
   /** One or more addresses, comma-joined — matches how the column stores them. */
   email: string;
   role: string;
