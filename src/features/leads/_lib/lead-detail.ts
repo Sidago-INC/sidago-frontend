@@ -187,7 +187,11 @@ export function mapLeadDetailResponseToPayload(
     "95rm": emptyBrandState(),
   };
 
-  for (const state of [brandState, ...peerBrandStates]) {
+  const allStates = [brandState, ...(peerBrandStates ?? [])].filter(
+    (state): state is BrandState => Boolean(state && state.brandCode),
+  );
+
+  for (const state of allStates) {
     const key = toBrandStatesKey(state.brandCode);
     if (!key) continue;
     brandStates[key] = {

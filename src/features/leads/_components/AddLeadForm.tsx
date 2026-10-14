@@ -4,16 +4,18 @@ import {
   Card,
   CardContent,
   EmailListField,
-  PhoneInputField,
+  PhoneListField,
   Select,
   TextInput,
   Textarea,
+  type PhoneEntry,
 } from "@/components/ui";
 import { createLead } from "../_lib/hooks";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateForm } from "@/lib/validation";
 import {
   leadCreateValidationSchema,
+  validatePhonesList,
   type LeadCreateFormValues,
 } from "@/lib/validation/lead-create";
 import { useCompanyIdSelectSource } from "@/features/companies/_lib/hooks";
@@ -46,6 +48,9 @@ const companySelectOptionsClass =
 export function AddLeadForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState<LeadCreateFormValues>(blankForm);
+  const [phones, setPhones] = useState<PhoneEntry[]>([
+    { phone: "", phoneExtension: "" },
+  ]);
   const [errors, setErrors] = useState<
     Partial<Record<keyof LeadCreateFormValues, string>>
   >({});
@@ -53,17 +58,27 @@ export function AddLeadForm() {
 
   const companySelectSource = useCompanyIdSelectSource();
 
+  const normalizedPhones = useMemo(
+    () =>
+      phones.map((p) => ({
+        phone: p.phone.trim(),
+        phoneExtension: p.phoneExtension.trim(),
+      })),
+    [phones],
+  );
+
   const normalizedForm = useMemo(
     () => ({
       companyId: form.companyId,
       fullName: form.fullName.trim(),
-      phone: form.phone.trim(),
-      phoneExtension: form.phoneExtension.trim(),
+      phone: normalizedPhones[0]?.phone ?? form.phone.trim(),
+      phoneExtension:
+        normalizedPhones[0]?.phoneExtension ?? form.phoneExtension.trim(),
       email: form.email.trim(),
       role: form.role.trim(),
       otherContacts: form.otherContacts.trim(),
     }),
-    [form],
+    [form, normalizedPhones],
   );
 
   const updateField = (field: keyof LeadCreateFormValues, value: string) => {
@@ -71,13 +86,34 @@ export function AddLeadForm() {
     setErrors((current) => ({ ...current, [field]: undefined }));
   };
 
+  const updatePhones = (newPhones: PhoneEntry[]) => {
+    setPhones(newPhones);
+    const primaryPhone = newPhones[0]?.phone ?? "";
+    const primaryExt = newPhones[0]?.phoneExtension ?? "";
+    setForm((current) => ({
+      ...current,
+      phone: primaryPhone,
+      phoneExtension: primaryExt,
+    }));
+    setErrors((current) => ({
+      ...current,
+      phone: undefined,
+      phoneExtension: undefined,
+    }));
+  };
+
   const handleClear = () => {
     setForm(blankForm);
+    setPhones([{ phone: "", phoneExtension: "" }]);
     setErrors({});
   };
 
   const handleSave = async () => {
     const nextErrors = validateForm(normalizedForm, leadCreateValidationSchema);
+    const phonesError = validatePhonesList(normalizedPhones);
+    if (phonesError && !nextErrors.phone) {
+      nextErrors.phone = phonesError;
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -91,12 +127,14 @@ export function AddLeadForm() {
         fullName: normalizedForm.fullName,
         phone: normalizedForm.phone,
         phoneExtension: normalizedForm.phoneExtension,
+        phones: normalizedPhones.filter((p) => p.phone !== ""),
         email: normalizedForm.email,
         role: normalizedForm.role,
         otherContacts: normalizedForm.otherContacts || undefined,
       });
 
       setForm(blankForm);
+      setPhones([{ phone: "", phoneExtension: "" }]);
       setErrors({});
       showSuccessToast(`Lead "${response.fullName}" saved.`);
       navigate(`/leads?lead=${encodeURIComponent(response.id)}`);
@@ -161,20 +199,14 @@ export function AddLeadForm() {
                 className={inputClassName}
                 wrapperClassName="md:col-span-2"
               />
-              <PhoneInputField
-                value={form.phone}
-                onChange={(value) => updateField("phone", value)}
-                error={errors.phone}
-              />
-              <TextInput
-                label="Phone Extension (optional)"
-                value={form.phoneExtension}
-                onChange={(event) =>
-                  updateField("phoneExtension", event.target.value)
-                }
-                error={errors.phoneExtension}
-                className={inputClassName}
-              />
+              <div className="md:col-span-2">
+                <PhoneListField
+                  values={phones}
+                  onChange={updatePhones}
+                  error={errors.phone}
+                  required
+                />
+              </div>
               <EmailListField
                 value={form.email}
                 onChange={(value) => updateField("email", value)}

@@ -74,6 +74,8 @@ import {
   usePatchCallLogLead,
 } from "./_lib/hooks";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useQueryClient } from "@tanstack/react-query";
+import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
 
 // A co-worker at the same company, as served by the detail endpoint. Only the
 // fields the "All Company Contacts" card renders — clicking one loads its own
@@ -702,6 +704,8 @@ export function AgentCallLogs() {
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
         source: "manual",
+        // Recorded against the number marked "Next to dial" in Phone Numbers.
+        leadPhoneId: detail?.nextPhone?.id,
       });
       showSuccessToast("Call outcome logged successfully.");
     } catch (error) {
@@ -1242,6 +1246,7 @@ export function AgentCallLogs() {
                   followUpDate:
                     selectedCompanyContactForm.callBackDate || undefined,
                   source: "manual",
+                  leadPhoneId: companyContactDetail?.nextPhone?.id,
                 });
                 showSuccessToast("Call outcome logged successfully.");
               } catch (error) {
@@ -1335,6 +1340,7 @@ function CallLogDetailContent({
 }) {
   const companySymbol =
     lead.companySymbol ?? getCompanySymbol(lead.companyName);
+  const queryClient = useQueryClient();
 
   return (
     <div className="min-w-0 space-y-5">
@@ -1374,7 +1380,9 @@ function CallLogDetailContent({
             className="text-xs font-semibold"
           />
         </EditableField>
-        <EditableField label="Phone">
+        {/* A new number here replaces the PREFERRED one (the old one is
+            retired, not lost). Other numbers live in Phone Numbers below. */}
+        <EditableField label="Preferred Phone">
           <TextInput
             value={form.phone}
             onChange={(event) => onUpdateForm("phone", event.target.value)}
@@ -1388,6 +1396,19 @@ function CallLogDetailContent({
             className="text-xs font-semibold"
           />
         </EditableField>
+      </DetailCard>
+
+      <DetailCard label="Phone Numbers">
+        <LeadPhonesPanel
+          leadId={lead.leadId}
+          phones={detail.phones ?? []}
+          nextPhoneId={detail.nextPhone?.id ?? null}
+          onChanged={() =>
+            queryClient.invalidateQueries({
+              queryKey: ["call-log-detail", lead.leadId],
+            })
+          }
+        />
       </DetailCard>
 
       <DetailCard label="Lead Details">

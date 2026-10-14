@@ -43,6 +43,7 @@ import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { AssociatedContactsSection } from "./AssociatedContacts";
+import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
 import {
   directoryRowToFormState,
   leadDetailToDirectoryRow,
@@ -818,7 +819,10 @@ export function LeadsDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Phone">
+          {/* Typing a new number here replaces the PREFERRED number: the old
+              one is retired, not lost. Other numbers are managed in the
+              Phone Numbers card below. */}
+          <EditableField label="Preferred Phone">
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
@@ -849,6 +853,29 @@ export function LeadsDrawer({
             />
           </EditableField>
         </DetailCard>
+
+        {detailQuery.data && row.leadId ? (
+          <DetailCard label="Phone Numbers">
+            {/* Saves on its own, number by number - it must not flip the
+                drawer into edit mode (the wrapper's onFocus does that). */}
+            <div onFocus={(event) => event.stopPropagation()}>
+            <LeadPhonesPanel
+              leadId={row.leadId}
+              phones={detailQuery.data.phones ?? []}
+              nextPhoneId={detailQuery.data.nextPhone?.id ?? null}
+              onChanged={() =>
+                Promise.all([
+                  detailQuery.refetch(),
+                  queryClient.refetchQueries({
+                    queryKey: ["leads", "directory"],
+                    type: "active",
+                  }),
+                ])
+              }
+            />
+            </div>
+          </DetailCard>
+        ) : null}
 
         <DetailCard label="Lead Details">
           <EditableField label="Contact Type">

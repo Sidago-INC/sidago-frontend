@@ -39,6 +39,7 @@ export { Wave } from "./Spinner";
 export { Table } from "./Table";
 export { EmailListField } from "./EmailListField";
 export { PhoneInputField } from "./PhoneInputField";
+export { PhoneListField, type PhoneEntry } from "./PhoneListField";
 export { Textarea } from "./Textarea";
 export { TextInput } from "./TextInput";
 export { TimezoneSelect } from "./TimezoneSelect";
