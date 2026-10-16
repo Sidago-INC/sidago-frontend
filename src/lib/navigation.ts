@@ -14,6 +14,7 @@ import {
   Package,
   Phone,
   RefreshCw,
+  Repeat,
   RotateCcw,
   ShieldAlert,
   Target,
@@ -166,6 +167,19 @@ function buildSmsNavSection(agents: BrandWithAgents["agents"]): NavigationItem {
   };
 }
 
+// Admin-only (backend permission email.settings): stripped from backoffice.
+const EMAIL_ROTATION_HREF = "/email-rotation";
+
+function withoutHref(items: NavigationItem[], href: string): NavigationItem[] {
+  return items
+    .filter((item) => item.href !== href)
+    .map((item) =>
+      item.children
+        ? { ...item, children: withoutHref(item.children, href) }
+        : item,
+    );
+}
+
 function buildEmailNavSection(agents: BrandWithAgents["agents"]): NavigationItem {
   return {
     label: "Email",
@@ -190,6 +204,11 @@ function buildEmailNavSection(agents: BrandWithAgents["agents"]): NavigationItem
         label: "Dead/Missing",
         href: "/dead-missing-email",
         icon: MailWarning,
+      },
+      {
+        label: "Rotation Settings",
+        href: EMAIL_ROTATION_HREF,
+        icon: Repeat,
       },
     ],
   };
@@ -387,7 +406,10 @@ export function buildBackofficeNavigation(
   brandsWithAgents?: BrandWithAgents[],
 ): NavigationItem[] {
   return cloneNavigationItems(
-    buildAdminNavigation(brandsWithAgents).filter((item) => item.label !== "Agents"),
+    withoutHref(
+      buildAdminNavigation(brandsWithAgents).filter((item) => item.label !== "Agents"),
+      EMAIL_ROTATION_HREF,
+    ),
   );
 }
 
@@ -500,6 +522,7 @@ const ROUTE_LABEL_FALLBACKS: Record<string, string> = {
   "/blocked-email": "Blocked Email",
   "/email-blocklist-directory": "Email Blocklist Directory",
   "/dead-missing-email": "Dead / Missing Email",
+  "/email-rotation": "Email Rotation",
   "/level-2-update": "Level 2 Update",
   "/level-2-history": "Level 2 History",
   "/fix-leads": "Fix Leads",
