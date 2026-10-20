@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { Archive, Phone, Plus, Star } from "lucide-react";
+import { useAuth } from "@/providers/AuthProvider";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { leadPhonesApi } from "../_lib/api";
 import {
@@ -33,6 +34,8 @@ type Props = {
  * deleted - a retired number stays listed, folded away under "retired".
  */
 export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Props) {
+  const { hasRole } = useAuth();
+  const canManagePreferred = hasRole(["admin", "backoffice"]);
   const [adding, setAdding] = useState(false);
   const [showRetired, setShowRetired] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -70,6 +73,7 @@ export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Prop
             isNext={phone.id === nextPhoneId}
             busy={busyId === phone.id}
             confirmingRetire={confirmRetireId === phone.id}
+            canManagePreferred={canManagePreferred}
             onMakePreferred={() =>
               run(
                 phone.id,
@@ -140,6 +144,7 @@ function PhoneRow({
   isNext,
   busy,
   confirmingRetire = false,
+  canManagePreferred = false,
   onMakePreferred,
   onStatusChange,
   onRetireRequest,
@@ -150,6 +155,7 @@ function PhoneRow({
   isNext: boolean;
   busy: boolean;
   confirmingRetire?: boolean;
+  canManagePreferred?: boolean;
   onMakePreferred?: () => void;
   onStatusChange?: (status: LeadPhoneStatus) => void;
   onRetireRequest?: () => void;
@@ -157,7 +163,8 @@ function PhoneRow({
   onRetireConfirm?: () => void;
 }) {
   const retired = phone.retiredAt !== null;
-  const canPrefer = !retired && !phone.isPreferred && isDialable(phone);
+  const canPrefer =
+    canManagePreferred && !retired && !phone.isPreferred && isDialable(phone);
 
   return (
     <div
@@ -215,9 +222,11 @@ function PhoneRow({
               title={
                 phone.isPreferred
                   ? "This is the preferred number"
-                  : canPrefer
-                    ? "Make preferred"
-                    : "Only an active number can be preferred"
+                  : !canManagePreferred
+                    ? "Only a manager can set the preferred number"
+                    : canPrefer
+                      ? "Make preferred"
+                      : "Only an active number can be preferred"
               }
               className="flex h-7 w-7 cursor-pointer items-center justify-center rounded border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-default disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
