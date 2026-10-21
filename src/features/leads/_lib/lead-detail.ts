@@ -4,6 +4,7 @@ import type {
   LeadDetailResponse,
   RelatedContact,
 } from "@/features/agent-calls/_lib/apiTypes";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { getHistoryEntries } from "@/features/agent-calls/_lib/history";
 import {
   normalizeBrandCode,
@@ -22,6 +23,7 @@ type CallHistoryEntry = {
   userName?: string | null;
   resultCode?: string | null;
   notes?: string | null;
+  phoneDialled?: string | null;
 };
 
 type ExtendedBrandState = {
@@ -100,6 +102,7 @@ function formatBrandCallsHistory(
         formatCallLogDate(entry.calledAt),
         entry.agentName ?? entry.userName,
         entry.resultCode,
+        entry.phoneDialled ? formatPhone(entry.phoneDialled) : null,
       ]
         .filter(Boolean)
         .join(" - "),
@@ -151,6 +154,7 @@ function mapHistoryEntry(entry: HistoryEntry): CallHistoryEntry {
     agentName: entry.agentName,
     resultCode: entry.resultCode,
     notes: entry.notes,
+    phoneDialled: entry.phoneDialled,
   };
 }
 
