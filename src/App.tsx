@@ -35,7 +35,6 @@ import { EmailBlocklistDirectory } from "@/features/email-blocklist-directory/_c
 import { DeadMissingEmail } from "@/features/dead-missing-email/_components/DeadMissingEmail";
 import { ClosedContacts } from "@/features/backoffice-closed-contacts/_components/ClosedContacts";
 import { CallFraud } from "@/features/call-fraud/CallFraud";
-import { EmailRotationSettings } from "@/features/email-rotation/EmailRotationSettings";
 
 // SMS / Email pages
 import SmsPage from "@/pages/SmsPage";
@@ -108,7 +107,6 @@ export default function App() {
                 <Route path="/blocked-email" element={<P><BlockedEmail /></P>} />
                 <Route path="/email-blocklist-directory" element={<P><EmailBlocklistDirectory /></P>} />
                 <Route path="/dead-missing-email" element={<P><DeadMissingEmail /></P>} />
-                <Route path="/email-rotation" element={<P><EmailRotationSettings /></P>} />
 
                 {/* Admin / Level 2 */}
                 <Route path="/level-2-update" element={<P><Level2Update /></P>} />

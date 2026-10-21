@@ -5,6 +5,7 @@ import { useLogEmail } from "@/features/agent-email/_lib/hooks";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { isLeadEmailsDisabled, useEmailRecipients } from "../_lib/hooks";
 import type { LeadEmail, RecipientMode } from "../_lib/types";
+import { EmailRotationPanel } from "./EmailRotationPanel";
 
 type Props = {
   leadId: string;
@@ -22,9 +23,20 @@ type Props = {
 
 const MODE_TEXT: Record<RecipientMode, string> = {
   all_confirmed: "All confirmed addresses",
-  all_researched: "Researched addresses (no confirmed address yet)",
-  rotation: "Rotation — the address used least recently",
+  all_researched: "Researched addresses (no verified address yet)",
+  rotation:
+    "Verified address #1 — verified addresses get one email each, in turn",
   manual: "Your selection",
+};
+
+const STAGE_LABEL: Record<string, string> = {
+  "1st": "1st email",
+  "2nd": "2nd email",
+  "3rd": "3rd email",
+  finished: "finished email",
+  send_contract: "Send Contract email",
+  resend_contract: "Resend Contract email",
+  lukewarm: "Lukewarm Reschedule email",
 };
 
 const BLOCK_TEXT: Record<string, string> = {
@@ -57,8 +69,10 @@ const linkButton =
 
 /**
  * "Email all recipients": shows who the backend would send to (it owns the
- * rules — confirmed first, cold cap, suppression), lets the agent drop or add
- * addresses, opens the mail client, and then logs the send.
+ * rules — ONE verified address per email, in turn; cold cap; suppression),
+ * lets the agent drop or add addresses, opens the mail client, and then logs
+ * the send. The lead's rotation (which verified address is next, when) is
+ * shown above it (EmailRotationPanel).
  *
  * Sending is still manual (mailto:) — the CRM can record that the agent logged
  * the action but cannot verify delivery until a sending provider is connected.
@@ -94,6 +108,8 @@ export function EmailRecipientsCard({
 
   const all: LeadEmail[] = [...(data?.recipients ?? []), ...(data?.others ?? [])];
   const chosen = all.filter((a) => a.eligible && isSelected(a.id));
+  // Verified addresses are emailed one at a time (the backend refuses two).
+  const chosenVerified = chosen.find((a) => a.verified);
   const cold = data?.mode === "all_researched";
 
   if (isError && isLeadEmailsDisabled(error)) return null;
@@ -144,110 +160,130 @@ export function EmailRecipientsCard({
   const blocked = data.blockedReason;
 
   return (
-    <div className="space-y-3">
-      {blocked ? (
-        <p className="flex items-start gap-1.5 rounded border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {BLOCK_TEXT[blocked] ?? "This lead cannot be emailed right now."}
-        </p>
-      ) : null}
+    <EmailRotationPanel leadId={leadId} brandCode={brandCode}>
+      <div className="space-y-3">
+        {blocked ? (
+          <p className="flex items-start gap-1.5 rounded border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {BLOCK_TEXT[blocked] ?? "This lead cannot be emailed right now."}
+          </p>
+        ) : null}
 
-      {data.warnings.map((w) => (
-        <p
-          key={w}
-          className="flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
-        >
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {WARNING_TEXT[w] ?? w}
-        </p>
-      ))}
-
-      {!blocked && data.mode ? (
-        <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-gray-500">
-          {MODE_TEXT[data.mode]}
-        </p>
-      ) : null}
-
-      <ul className="space-y-1.5">
-        {all.map((item) => {
-          const isResolved = resolvedIds.has(item.id);
-          return (
-            <li key={item.id}>
-              <label
-                className={clsx(
-                  "flex cursor-pointer items-center gap-2 text-xs",
-                  !item.eligible && "cursor-not-allowed opacity-50",
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected(item.id)}
-                  disabled={!item.eligible || Boolean(blocked)}
-                  onChange={() => toggle(item.id)}
-                />
-                <span className="break-all text-slate-700 dark:text-slate-200">
-                  {item.address}
-                </span>
-                {item.verification === "confirmed" ? (
-                  <span className="rounded bg-emerald-50 px-1 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                    Confirmed
-                  </span>
-                ) : null}
-                {!isResolved && item.eligible ? (
-                  <span className="text-[10px] text-slate-400">not in default set</span>
-                ) : null}
-                {!item.eligible ? (
-                  <span className="text-[10px] text-rose-500">
-                    can't be emailed
-                  </span>
-                ) : null}
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-
-      {!blocked && chosen.length > 0 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {cold ? (
-            // One message per address (decision D6).
-            chosen.map((c) => (
-              <a key={c.id} href={mailtoFor([c.address])} className={linkButton}>
-                <Mail className="h-3.5 w-3.5" />
-                Email {c.address}
-              </a>
-            ))
-          ) : (
-            <a
-              href={mailtoFor(chosen.map((c) => c.address))}
-              className={linkButton}
-            >
-              <Mail className="h-3.5 w-3.5" />
-              Email {chosen.length > 1 ? "all recipients" : "recipient"}
-            </a>
-          )}
-          <button
-            type="button"
-            disabled={logEmail.isPending || alreadyLogged}
-            onClick={() => void log()}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+        {data.warnings.map((w) => (
+          <p
+            key={w}
+            className="flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
           >
-            <MailCheck className="h-3.5 w-3.5" />
-            {alreadyLogged
-              ? "Already logged"
-              : logEmail.isPending
-                ? "Logging…"
-                : `Log as sent (${chosen.length})`}
-          </button>
-        </div>
-      ) : null}
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {WARNING_TEXT[w] ?? w}
+          </p>
+        ))}
 
-      {cold && chosen.length > 1 ? (
-        <p className="text-[11px] text-slate-400 dark:text-gray-500">
-          No address is confirmed yet, so each one gets its own message.
-          Logging records all {chosen.length} as one touch.
-        </p>
-      ) : null}
-    </div>
+        {!blocked && data.rotation ? (
+          <p className="text-[11px] uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
+            Resend of the {STAGE_LABEL[data.rotation.stage] ?? data.rotation.stage} — no
+            reply yet, so it goes to verified address #{data.rotation.step + 1}
+          </p>
+        ) : !blocked && data.mode ? (
+          <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-gray-500">
+            {MODE_TEXT[data.mode]}
+          </p>
+        ) : null}
+
+        <ul className="space-y-1.5">
+          {all.map((item) => {
+            const isResolved = resolvedIds.has(item.id);
+            return (
+              <li key={item.id}>
+                <label
+                  className={clsx(
+                    "flex cursor-pointer items-center gap-2 text-xs",
+                    !item.eligible && "cursor-not-allowed opacity-50",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected(item.id)}
+                    disabled={
+                      !item.eligible ||
+                      Boolean(blocked) ||
+                      (item.verified &&
+                        !isSelected(item.id) &&
+                        Boolean(chosenVerified))
+                    }
+                    onChange={() => toggle(item.id)}
+                  />
+                  <span className="break-all text-slate-700 dark:text-slate-200">
+                    {item.address}
+                  </span>
+                  {item.verified ? (
+                    <span
+                      className="rounded bg-emerald-50 px-1 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                      title={
+                        item.verification === "confirmed"
+                          ? "Verified by an agent"
+                          : "Verified by NeverBounce"
+                      }
+                    >
+                      Verified
+                    </span>
+                  ) : null}
+                  {!isResolved && item.eligible ? (
+                    <span className="text-[10px] text-slate-400">not in default set</span>
+                  ) : null}
+                  {!item.eligible ? (
+                    <span className="text-[10px] text-rose-500">
+                      can't be emailed
+                    </span>
+                  ) : null}
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+
+        {!blocked && chosen.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {cold ? (
+              // One message per address (decision D6).
+              chosen.map((c) => (
+                <a key={c.id} href={mailtoFor([c.address])} className={linkButton}>
+                  <Mail className="h-3.5 w-3.5" />
+                  Email {c.address}
+                </a>
+              ))
+            ) : (
+              <a
+                href={mailtoFor(chosen.map((c) => c.address))}
+                className={linkButton}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Email {chosen.length > 1 ? "all recipients" : "recipient"}
+              </a>
+            )}
+            <button
+              type="button"
+              disabled={logEmail.isPending || alreadyLogged}
+              onClick={() => void log()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              <MailCheck className="h-3.5 w-3.5" />
+              {alreadyLogged
+                ? "Already logged"
+                : logEmail.isPending
+                  ? "Logging…"
+                  : `Log as sent (${chosen.length})`}
+            </button>
+          </div>
+        ) : null}
+
+        {cold && chosen.length > 1 ? (
+          <p className="text-[11px] text-slate-400 dark:text-gray-500">
+            No address is verified yet, so each one gets its own message.
+            Logging records all {chosen.length} as one touch.
+          </p>
+        ) : null}
+      </div>
+    </EmailRotationPanel>
   );
 }

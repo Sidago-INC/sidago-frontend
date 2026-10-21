@@ -424,6 +424,7 @@ export function AgentEmailDrawer({
                 leadId={row.leadId}
                 fallbackEmail={row.email}
                 confirmMethod="agent_promoted"
+                brandCode={row.brandCode}
               />
             </EditableField>
           </DetailCard>

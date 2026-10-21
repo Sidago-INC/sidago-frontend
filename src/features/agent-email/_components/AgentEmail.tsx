@@ -331,8 +331,16 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         type: "select",
         options: EMAIL_PRIORITY_OPTIONS,
         render: (row) => (
-          <div className="px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5">
             <EmailPriorityBadge value={row.emailToBeSent} />
+            {row.resendTo ? (
+              <span
+                className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                title={`No reply in 3 days: send the same email to verified address #${row.resendTo}`}
+              >
+                Resend #{row.resendTo}
+              </span>
+            ) : null}
           </div>
         ),
       },

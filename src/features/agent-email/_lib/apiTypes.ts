@@ -32,6 +32,16 @@ export type EmailQueueItem = {
   recipientMode?: string | null;
   recipientBlockedReason?: string | null;
   recipientWarnings?: string[];
+  // Present while the lead has an active verified-address rotation
+  // (EMAIL_ROTATION_ENABLED on the backend). `retry` = the row is back in the
+  // queue to resend `stage`'s email to the next verified address.
+  rotation?: {
+    id: string;
+    stage: string;
+    step: number;
+    nextDueAt: string | null;
+    retry: boolean;
+  };
 };
 
 export type EmailQueueResponse = {

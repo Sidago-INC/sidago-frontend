@@ -12,6 +12,18 @@ export type Deliverability =
   | "invalid"
   | "complained";
 
+/**
+ * Automated (NeverBounce) result — a separate fact from the agent's
+ * `verification`. An agent-verified address is not thereby "valid" here.
+ */
+export type AutoVerification =
+  | "unchecked"
+  | "valid"
+  | "invalid"
+  | "disposable"
+  | "catchall"
+  | "unknown";
+
 export type LeadEmail = {
   id: string;
   address: string;
@@ -23,6 +35,10 @@ export type LeadEmail = {
   confirmedAt: string | null;
   deliverability: Deliverability;
   softBounceCount: number;
+  autoVerification: AutoVerification;
+  autoVerifiedAt: string | null;
+  /** Agent-verified OR NeverBounce-valid: takes part in the rotation. */
+  verified: boolean;
   sendCount: number;
   lastSentAt: string | null;
   lastOpenedAt: string | null;
@@ -80,7 +96,44 @@ export type EmailRecipientsResponse = {
   recipients: LeadEmail[];
   /** Every other active address, so an agent can add one deliberately. */
   others: LeadEmail[];
+  /**
+   * Set when this send is a resend of `stage`'s email to the next verified
+   * address (no reply after 3 days); null for a new stage email.
+   */
+  rotation?: { id: string; stage: string; step: number } | null;
 };
 
 /** Error code the backend returns while LEAD_EMAILS_* flags are off. */
 export const LEAD_EMAILS_DISABLED = "LEAD_EMAILS_DISABLED";
+
+/**
+ * A verified-address rotation (backend email_rotations). Agents send by hand;
+ * with no reply after 3 days the lead comes back in the queue with the next
+ * verified address pre-selected.
+ */
+export type EmailRotation = {
+  id: string;
+  brandId: string;
+  workflow: "general" | "hot";
+  /** The stage email being resent to each verified address in turn. */
+  stage: string;
+  status: "active" | "replied" | "exhausted" | "cancelled" | "superseded";
+  /** Verified addresses emailed so far. */
+  step: number;
+  /** When the next address is due (null while the resend is in the queue). */
+  nextDueAt: string | null;
+  /** Set while the lead is back in the queue for the next address. */
+  requeuedAt: string | null;
+  lastSentAt: string | null;
+  stopReason: string | null;
+  stoppedAt: string | null;
+  createdAt: string;
+  sends: { toAddress: string | null; leadEmailId: string | null; sentAt: string | null }[];
+};
+
+export type EmailRotationsResponse = {
+  ok: true;
+  /** EMAIL_ROTATION_ENABLED on the server. */
+  enabled: boolean;
+  data: EmailRotation[];
+};

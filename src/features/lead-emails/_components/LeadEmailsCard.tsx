@@ -5,6 +5,8 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  MailCheck,
+  MessageSquareReply,
   Plus,
   RotateCcw,
   ShieldCheck,
@@ -21,13 +23,15 @@ import {
   isLeadEmailsDisabled,
   useAddLeadEmail,
   useArchiveLeadEmail,
+  useAutoVerifyLeadEmail,
   useConfirmLeadEmail,
   useLeadEmailEvents,
   useLeadEmails,
+  useMarkReplied,
   useSetLeadEmailDeliverability,
   useUnconfirmLeadEmail,
 } from "../_lib/hooks";
-import type { Deliverability, LeadEmail } from "../_lib/types";
+import type { AutoVerification, Deliverability, LeadEmail } from "../_lib/types";
 
 type Props = {
   leadId: string | null | undefined;
@@ -38,6 +42,8 @@ type Props = {
   fallbackEmail?: string | null;
   /** How "Confirm" is recorded: the Calls page verifies by phone. */
   confirmMethod?: "phone" | "agent_promoted";
+  /** The brand being worked; a reply also takes the lead out of its email queue. */
+  brandCode?: string;
 };
 
 const DELIVERABILITY_LABEL: Record<Deliverability, string> = {
@@ -62,6 +68,30 @@ const DELIVERABILITY_TONE: Record<Deliverability, string> = {
     "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
 };
 
+// The NeverBounce result, shown next to (never instead of) the agent's own
+// verification. Only "valid" counts as verified for the rotation.
+const AUTO_LABEL: Record<AutoVerification, string> = {
+  unchecked: "Not checked",
+  valid: "NeverBounce: valid",
+  invalid: "NeverBounce: invalid",
+  disposable: "NeverBounce: disposable",
+  catchall: "NeverBounce: catch-all",
+  unknown: "NeverBounce: unknown",
+};
+
+const AUTO_TONE: Record<AutoVerification, string> = {
+  unchecked: "bg-slate-100 text-slate-500 dark:bg-gray-700 dark:text-gray-300",
+  valid:
+    "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  invalid: "bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  disposable:
+    "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  catchall:
+    "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  unknown:
+    "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+};
+
 const EVENT_LABEL: Record<string, string> = {
   added: "Added",
   confirmed: "Confirmed",
@@ -78,6 +108,7 @@ const EVENT_LABEL: Record<string, string> = {
   archived: "Archived",
   restored: "Restored",
   deliverability_reset: "Reset to unknown",
+  auto_verified: "Automated check (NeverBounce)",
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -151,11 +182,15 @@ function EmailRow({
   onMarkInvalid,
   onReset,
   onArchive,
+  onAutoVerify,
+  onReplied,
 }: {
   leadId: string;
   item: LeadEmail;
   confirmMethod: "phone" | "agent_promoted";
   busy: boolean;
+  onAutoVerify: (item: LeadEmail) => void;
+  onReplied: (item: LeadEmail) => void;
   onConfirm: (item: LeadEmail) => void;
   onUnconfirm: (item: LeadEmail) => void;
   onMarkInvalid: (item: LeadEmail) => void;
@@ -179,10 +214,10 @@ function EmailRow({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
-          {confirmed ? (
+          {item.verified ? (
             <ShieldCheck
               className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500"
-              aria-label="Confirmed"
+              aria-label="Verified"
             />
           ) : (
             <CircleHelp
@@ -212,7 +247,20 @@ function EmailRow({
                     : undefined
                 }
               >
-                {confirmed ? "Confirmed" : "Unverified"}
+                {confirmed ? "Agent verified" : "Not agent-verified"}
+              </span>
+              <span
+                className={clsx(
+                  "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  AUTO_TONE[item.autoVerification],
+                )}
+                title={
+                  item.autoVerifiedAt
+                    ? `Checked ${formatDate(item.autoVerifiedAt)}`
+                    : "Not checked by NeverBounce yet"
+                }
+              >
+                {AUTO_LABEL[item.autoVerification]}
               </span>
               {deliverabilityLabel ? (
                 <span
@@ -291,6 +339,26 @@ function EmailRow({
           )}
           <button
             type="button"
+            className={clsx(iconBtn, "hover:text-emerald-600")}
+            title="The lead replied from this address — stop the follow-ups"
+            aria-label={`Mark a reply from ${item.address}`}
+            disabled={busy}
+            onClick={() => onReplied(item)}
+          >
+            <MessageSquareReply className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className={clsx(iconBtn, "hover:text-sky-600")}
+            title="Check deliverability with NeverBounce now"
+            aria-label={`Check ${item.address} with NeverBounce`}
+            disabled={busy}
+            onClick={() => onAutoVerify(item)}
+          >
+            <MailCheck className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             className={clsx(iconBtn, "hover:text-rose-600")}
             title="Archive (history is kept)"
             aria-label={`Archive ${item.address}`}
@@ -343,6 +411,7 @@ export function LeadEmailsCard({
   leadId,
   fallbackEmail,
   confirmMethod = "phone",
+  brandCode,
 }: Props) {
   const { data, isLoading, isError, error, refetch } = useLeadEmails(leadId);
   const add = useAddLeadEmail(leadId ?? "");
@@ -350,6 +419,8 @@ export function LeadEmailsCard({
   const unconfirm = useUnconfirmLeadEmail(leadId ?? "");
   const setDeliverability = useSetLeadEmailDeliverability(leadId ?? "");
   const archive = useArchiveLeadEmail(leadId ?? "");
+  const autoVerify = useAutoVerifyLeadEmail(leadId ?? "");
+  const markReplied = useMarkReplied(leadId ?? "", brandCode);
 
   const [adding, setAdding] = useState(false);
   const [address, setAddress] = useState("");
@@ -362,7 +433,9 @@ export function LeadEmailsCard({
     confirm.isPending ||
     unconfirm.isPending ||
     setDeliverability.isPending ||
-    archive.isPending;
+    archive.isPending ||
+    autoVerify.isPending ||
+    markReplied.isPending;
 
   const run = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -470,6 +543,18 @@ export function LeadEmailsCard({
                 )
               }
               onArchive={setToArchive}
+              onAutoVerify={(row) =>
+                void run(
+                  () => autoVerify.mutateAsync(row.id),
+                  "Checked with NeverBounce.",
+                )
+              }
+              onReplied={(row) =>
+                void run(
+                  () => markReplied.mutateAsync(row.id),
+                  "Reply recorded — follow-up emails stopped for this lead.",
+                )
+              }
             />
           ))}
         </ul>

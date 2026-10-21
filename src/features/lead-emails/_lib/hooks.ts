@@ -4,6 +4,7 @@ import {
   LEAD_EMAILS_DISABLED,
   type AddLeadEmailBody,
   type EmailRecipientsResponse,
+  type EmailRotationsResponse,
   type LeadEmail,
   type LeadEmailEvent,
   type LeadEmailsResponse,
@@ -119,6 +120,19 @@ export function useSetLeadEmailDeliverability(leadId: string) {
   });
 }
 
+/** Runs the automated (NeverBounce) check on one address now. */
+export function useAutoVerifyLeadEmail(leadId: string) {
+  const invalidate = useInvalidateAfterChange(leadId);
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await api.post(`/leads/${leadId}/emails/${id}/auto-verify`, {})) as {
+        ok: true;
+        autoVerification: string;
+      },
+    onSuccess: invalidate,
+  });
+}
+
 export function useArchiveLeadEmail(leadId: string) {
   const invalidate = useInvalidateAfterChange(leadId);
   return useMutation({
@@ -145,5 +159,56 @@ export function useEmailRecipients(
       )) as EmailRecipientsResponse,
     retry: (count, error) => !isLeadEmailsDisabled(error) && count < 2,
     staleTime: 15_000,
+  });
+}
+
+export const leadRotationsKey = (leadId: string, brandCode: string) =>
+  ["email-rotations", leadId, brandCode] as const;
+
+/** Verified-address rotations of a lead for one brand (newest first). */
+export function useLeadRotations(leadId: string, brandCode: string) {
+  return useQuery({
+    queryKey: leadRotationsKey(leadId, brandCode),
+    enabled: Boolean(leadId && brandCode),
+    queryFn: async () =>
+      (await api.get(
+        `/email/rotation/lead/${leadId}?brand=${encodeURIComponent(brandCode)}`,
+      )) as EmailRotationsResponse,
+    staleTime: 15_000,
+  });
+}
+
+export function useStopRotation(leadId: string, brandCode: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await api.post(`/email/rotation/${id}/stop`, {})) as { ok: true },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: leadRotationsKey(leadId, brandCode) });
+      void qc.invalidateQueries({ queryKey: ["email-queue"] });
+    },
+  });
+}
+
+/**
+ * The lead replied from this address: recorded on the address, and every
+ * rotation of the lead stops (it leaves the email queue).
+ */
+export function useMarkReplied(leadId: string, brandCode?: string) {
+  const qc = useQueryClient();
+  const invalidate = useInvalidateAfterChange(leadId);
+  return useMutation({
+    mutationFn: async (leadEmailId: string) =>
+      (await api.post(
+        `/email/rotation/lead/${leadId}/emails/${leadEmailId}/replied${
+          brandCode ? `?brand=${encodeURIComponent(brandCode)}` : ""
+        }`,
+        {},
+      )) as { ok: true; data: { stopped: number } },
+    onSuccess: () => {
+      invalidate();
+      void qc.invalidateQueries({ queryKey: ["email-rotations", leadId] });
+      void qc.invalidateQueries({ queryKey: ["email-queue"] });
+    },
   });
 }
