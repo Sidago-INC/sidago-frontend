@@ -41,7 +41,6 @@ export type LEAD = {
   counter_b?: number;
   counter_f?: number;
   counter_fixes?: number;
-  old_phones?: string;
   last_fixed_date?: string;
   to_be_sent_email?: boolean;
   to_be_logged_email_sidago?: boolean;
