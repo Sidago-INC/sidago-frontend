@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Clock } from "lucide-react";
 import type { QueueLead } from "../_lib/apiTypes";
 
@@ -68,8 +69,18 @@ function currentWindow() {
   return { active, next };
 }
 
-export function QueuePriorityNotice({ leads }: { leads: QueueLead[] }) {
-  if (leads.length === 0) return null;
+export function QueuePriorityNotice({
+  leads,
+  timezone,
+  children,
+}: {
+  leads: QueueLead[];
+  /** Set when the agent has narrowed the queue to one timezone. */
+  timezone?: string | null;
+  /** Trailing controls — the timezone filter. Keeps the bar up when empty. */
+  children?: ReactNode;
+}) {
+  if (leads.length === 0 && !children) return null;
 
   const { active, next } = currentWindow();
 
@@ -81,16 +92,33 @@ export function QueuePriorityNotice({ leads }: { leads: QueueLead[] }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-300">
       <Clock size={13} className="shrink-0 text-slate-400" />
-      <span>
-        Calling <strong className="font-semibold">{active.label}</strong> first.
-      </span>
-      <span className="text-slate-400 dark:text-slate-500">
-        Order changes at {formatBoundary(next.start)}
-        {timezones.size > 1
-          ? ` · ${leads.length} leads across ${timezones.size} timezones`
-          : ` · ${leads.length} leads`}
-        .
-      </span>
+      {timezone ? (
+        // The priority window does not apply while filtered — every row is
+        // already in the chosen timezone. Still say what "All" would do.
+        <>
+          <span>
+            Showing <strong className="font-semibold">{timezone}</strong> only.
+          </span>
+          <span className="text-slate-400 dark:text-slate-500">
+            {leads.length} leads · normally calling {active.label} first.
+          </span>
+        </>
+      ) : (
+        <>
+          <span>
+            Calling <strong className="font-semibold">{active.label}</strong>{" "}
+            first.
+          </span>
+          <span className="text-slate-400 dark:text-slate-500">
+            Order changes at {formatBoundary(next.start)}
+            {timezones.size > 1
+              ? ` · ${leads.length} leads across ${timezones.size} timezones`
+              : ` · ${leads.length} leads`}
+            .
+          </span>
+        </>
+      )}
+      {children ? <div className="ml-auto">{children}</div> : null}
     </div>
   );
 }
