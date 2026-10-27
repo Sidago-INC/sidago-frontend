@@ -90,35 +90,40 @@ export function QueuePriorityNotice({
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-300">
-      <Clock size={13} className="shrink-0 text-slate-400" />
-      {timezone ? (
-        // The priority window does not apply while filtered — every row is
-        // already in the chosen timezone. Still say what "All" would do.
-        <>
-          <span>
-            Showing <strong className="font-semibold">{timezone}</strong> only.
-          </span>
-          <span className="text-slate-400 dark:text-slate-500">
-            {leads.length} leads · normally calling {active.label} first.
-          </span>
-        </>
-      ) : (
-        <>
-          <span>
-            Calling <strong className="font-semibold">{active.label}</strong>{" "}
-            first.
-          </span>
-          <span className="text-slate-400 dark:text-slate-500">
-            Order changes at {formatBoundary(next.start)}
-            {timezones.size > 1
-              ? ` · ${leads.length} leads across ${timezones.size} timezones`
-              : ` · ${leads.length} leads`}
-            .
-          </span>
-        </>
-      )}
-      {children ? <div className="ml-auto">{children}</div> : null}
+    <div className="flex flex-col gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1 sm:py-2 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-300">
+      <div className="flex min-w-0 items-start gap-2 sm:items-center">
+        <Clock size={13} className="mt-0.5 shrink-0 text-slate-400 sm:mt-0" />
+        <div className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2">
+          {timezone ? (
+            // The priority window does not apply while filtered — every row is
+            // already in the chosen timezone. Still say what "All" would do.
+            <>
+              <span>
+                Showing <strong className="font-semibold">{timezone}</strong>{" "}
+                only.
+              </span>
+              <span className="text-slate-400 dark:text-slate-500">
+                {leads.length} leads · normally calling {active.label} first.
+              </span>
+            </>
+          ) : (
+            <>
+              <span>
+                Calling{" "}
+                <strong className="font-semibold">{active.label}</strong> first.
+              </span>
+              <span className="text-slate-400 dark:text-slate-500">
+                Order changes at {formatBoundary(next.start)}
+                {timezones.size > 1
+                  ? ` · ${leads.length} leads across ${timezones.size} timezones`
+                  : ` · ${leads.length} leads`}
+                .
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+      {children ? <div className="sm:ml-auto">{children}</div> : null}
     </div>
   );
 }
