@@ -1,16 +1,21 @@
 import clsx from "clsx";
-import { getTimezoneBadgeStyle } from "@/types/timezone.types";
+import {
+  TIMEZONE_VALUES,
+  getTimezoneBadgeStyle,
+  type TIMEZONE,
+} from "@/types/timezone.types";
 
 /**
  * Narrows the call queue to one timezone.
  *
  * "All" is the normal queue, ordered by compute_timezone_priority(). Picking a
  * timezone lets an agent work it outside its priority window — e.g. PST at
- * 6pm EST, when MST is ranked first. INTL is left out: the queue never
- * returns it.
+ * 6pm EST, when MST is ranked first. The options are the same timezones the
+ * company form offers. INTL is never in "All"; picking it is the only way to
+ * see those leads in the queue.
  */
-export const QUEUE_TIMEZONES = ["EST", "CST", "MST", "PST"] as const;
-export type QueueTimezone = (typeof QUEUE_TIMEZONES)[number];
+export const QUEUE_TIMEZONES = TIMEZONE_VALUES;
+export type QueueTimezone = TIMEZONE;
 
 type Props = {
   value: QueueTimezone | null;
@@ -27,7 +32,9 @@ export function QueueTimezoneFilter({ value, onChange }: Props) {
     <div
       role="radiogroup"
       aria-label="Filter queue by timezone"
-      className="flex shrink-0 items-center gap-1"
+      // Phones: a full-width segmented control, one equal cell per option so
+      // all six fit on one row. sm and up: the compact inline pill row.
+      className="grid w-full grid-cols-6 gap-1 rounded-lg bg-slate-100 p-1 sm:flex sm:w-auto sm:shrink-0 sm:items-center sm:bg-transparent sm:p-0 dark:bg-gray-800 sm:dark:bg-transparent"
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -39,12 +46,15 @@ export function QueueTimezoneFilter({ value, onChange }: Props) {
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={clsx(
-              "min-h-8 cursor-pointer rounded-md border px-2.5 text-xs font-medium transition-colors",
+              "min-h-9 cursor-pointer rounded-md border px-1 text-xs font-medium transition-colors sm:min-h-8 sm:px-2.5",
               selected
-                ? option.value
-                  ? getTimezoneBadgeStyle(option.value)
-                  : "border-slate-700 bg-slate-700 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900"
-                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-400 dark:hover:bg-gray-800",
+                ? clsx(
+                    "shadow-sm sm:shadow-none",
+                    option.value
+                      ? getTimezoneBadgeStyle(option.value)
+                      : "border-slate-700 bg-slate-700 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900",
+                  )
+                : "border-transparent bg-transparent text-slate-500 hover:bg-white sm:border-slate-200 sm:bg-white sm:hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-gray-900 sm:dark:border-slate-700 sm:dark:bg-gray-900 sm:dark:hover:bg-gray-800",
             )}
           >
             {option.label}
