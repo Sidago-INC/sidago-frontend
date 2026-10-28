@@ -160,6 +160,12 @@ export type LeadDetailResponse = {
   phones?: LeadPhone[];
   /** The number the next dial will use. */
   nextPhone?: LeadPhone | null;
+  /**
+   * True while a result just logged for this lead is still being applied in the
+   * background: `phones` and `nextPhone` do not reflect it yet. Refetch until it
+   * is false before trusting `nextPhone` for another call.
+   */
+  numbersUpdating?: boolean;
   /** Some detail payloads surface this at the root instead of under lead. */
   lastActionDate?: string | null;
 };

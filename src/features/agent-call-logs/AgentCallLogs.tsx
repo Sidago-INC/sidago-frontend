@@ -565,11 +565,18 @@ export function AgentCallLogs() {
     [],
   );
 
+  // The next result is recorded against the number marked "Next to dial". While
+  // the last result is still being applied that number is out of date, so wait.
+  const numbersUpdating = Boolean(
+    detail?.numbersUpdating || companyContactDetail?.numbersUpdating,
+  );
+
   const actionPending =
     logResult.isPending ||
     followUp.isPending ||
     markVoid.isPending ||
-    patchLead.isPending;
+    patchLead.isPending ||
+    numbersUpdating;
 
   const updateForm = <Key extends keyof EditableCallLogState>(
     key: Key,
@@ -1406,6 +1413,7 @@ function CallLogDetailContent({
           leadId={lead.leadId}
           phones={detail.phones ?? []}
           nextPhoneId={detail.nextPhone?.id ?? null}
+          updating={detail.numbersUpdating}
           onChanged={() =>
             queryClient.invalidateQueries({
               queryKey: ["call-log-detail", lead.leadId],

@@ -154,6 +154,33 @@ export function AgentCalls() {
     };
   }, [currentLead?.leadId, agentSlug]);
 
+  // A result logged on this lead is applied to its numbers a few seconds later,
+  // in the background, so the refetch that follows a log can still show the
+  // number that was just used up as "next". While the server says the numbers are
+  // updating, ask again, then move the selection to the real next number - unless
+  // the agent has already picked a different one themselves.
+  const numbersUpdating = detail?.numbersUpdating === true;
+  const currentLeadId = currentLead?.leadId;
+  useEffect(() => {
+    if (!numbersUpdating || !currentLeadId) return;
+    const staleNextId = detail?.nextPhone?.id ?? null;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await agentCallsApi.detail(currentLeadId, agentSlug);
+        if (currentLeadIdRef.current !== currentLeadId) return;
+        setDetail(res);
+        if (!res.numbersUpdating) {
+          setSelectedPhoneId((prev) =>
+            prev === staleNextId ? (res.nextPhone?.id ?? null) : prev,
+          );
+        }
+      } catch {
+        // Keep what is on screen; the next log or refresh resyncs it.
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [numbersUpdating, currentLeadId, agentSlug, detail]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.sessionStorage.removeItem(LEGACY_PENDING_OUTCOME_KEY);

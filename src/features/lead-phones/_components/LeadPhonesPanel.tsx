@@ -24,6 +24,8 @@ type Props = {
   phones: LeadPhone[];
   /** The number the next call will use, highlighted in the list. */
   nextPhoneId?: string | null;
+  /** A result was just logged and is still being applied to these numbers. */
+  updating?: boolean;
   /** Called after any change so the owner can refetch its lead detail. */
   onChanged: () => void | Promise<unknown>;
 };
@@ -37,7 +39,7 @@ type Props = {
  * Every role may make a number preferred; the server limits an agent to the
  * leads on their own board.
  */
-export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Props) {
+export function LeadPhonesPanel({ leadId, phones, nextPhoneId, updating = false, onChanged }: Props) {
   const [adding, setAdding] = useState(false);
   const [showRetired, setShowRetired] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -63,6 +65,11 @@ export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Prop
 
   return (
     <div className="space-y-2">
+      {updating ? (
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+          Updating numbers after the last result…
+        </p>
+      ) : null}
       {live.length === 0 ? (
         <p className="text-xs text-slate-500 dark:text-slate-400">
           No phone numbers recorded yet.
