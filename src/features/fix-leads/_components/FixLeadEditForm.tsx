@@ -19,6 +19,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { NewLeadDrawer } from "@/features/leads/_components/NewLeadDrawer";
 import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
+import {
+  PREFERRED_PHONE_HINT,
+  preferredPhoneLabel,
+} from "@/features/lead-phones/_lib/format";
 import { createLead } from "@/features/leads/_lib/hooks";
 import type { LeadCreateFormValues } from "@/lib/validation/lead-create";
 import {
@@ -103,11 +107,10 @@ export function FixLeadEditForm() {
       queryClient.invalidateQueries({ queryKey: ["lead-related", leadId] });
       setNewLeadOpen(false);
     } catch (requestError) {
-      showErrorToast(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not add the lead.",
-      );
+      // `lib/api` throws plain objects, not Errors, and showErrorToast reads
+      // their message - so a 409 naming the lead that owns the number reaches
+      // the user instead of a generic failure.
+      showErrorToast(requestError);
       // Rethrow so the drawer stays open and keeps what was typed.
       throw requestError;
     } finally {
@@ -298,7 +301,8 @@ export function FixLeadEditForm() {
               {/* Replaces the PREFERRED number; the old one is retired, not
                   lost. Every other number is in Phone Numbers below. */}
               <TextInput
-                label="Preferred Phone"
+                label={preferredPhoneLabel(data.phones)}
+                hint={PREFERRED_PHONE_HINT}
                 value={form.phone}
                 onChange={(event) => updateField("phone", event.target.value)}
                 className={inputClassName}
@@ -482,6 +486,9 @@ export function FixLeadEditForm() {
             </p>
           </div>
           <div className="px-5 py-4 sm:px-6">
+            {/* No `nextPhoneId`, so no "Next to dial" tag, on purpose: a lead is
+                in Fix because every number is used up, so there is no number
+                worth pointing at, and GET /leads/:id carries no nextPhone. */}
             <LeadPhonesPanel
               leadId={lead.id}
               phones={data.phones ?? []}

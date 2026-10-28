@@ -1,3 +1,4 @@
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { useLeadStatsDetail, type LeadStatsFlagType } from "../_lib/hooks";
 
 type Props = {
@@ -52,7 +53,7 @@ export function LeadStatsDrilldown({ flagType, from, to }: Props) {
           <div className="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span>{item.companySymbol || "—"}</span>
             <span>·</span>
-            <span>{item.phone || "—"}</span>
+            <span>{formatPhone(item.phone) || "—"}</span>
           </div>
         </div>
       ))}

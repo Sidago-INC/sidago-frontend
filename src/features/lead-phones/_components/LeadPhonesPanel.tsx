@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { Archive, Phone, Plus, Star } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { EXTENSION_MAX_LENGTH, validateExtension } from "@/lib/validation/phone";
 import { leadPhonesApi } from "../_lib/api";
 import {
   formatPhoneWithExtension,
@@ -88,6 +89,13 @@ export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Prop
                 "Number status updated.",
               )
             }
+            onExtensionChange={(extension) =>
+              run(
+                phone.id,
+                () => leadPhonesApi.update(phone.id, { extension }),
+                "Extension updated.",
+              )
+            }
             onRetireRequest={() => setConfirmRetireId(phone.id)}
             onRetireCancel={() => setConfirmRetireId(null)}
             onRetireConfirm={() =>
@@ -147,6 +155,7 @@ function PhoneRow({
   canManagePreferred = false,
   onMakePreferred,
   onStatusChange,
+  onExtensionChange,
   onRetireRequest,
   onRetireCancel,
   onRetireConfirm,
@@ -158,6 +167,7 @@ function PhoneRow({
   canManagePreferred?: boolean;
   onMakePreferred?: () => void;
   onStatusChange?: (status: LeadPhoneStatus) => void;
+  onExtensionChange?: (extension: string) => void;
   onRetireRequest?: () => void;
   onRetireCancel?: () => void;
   onRetireConfirm?: () => void;
@@ -262,6 +272,14 @@ function PhoneRow({
             ))}
           </select>
 
+          {/* Keyed on the stored value so the draft resets once a save lands. */}
+          <ExtensionField
+            key={`${phone.id}:${phone.extension ?? ""}`}
+            phoneId={phone.id}
+            value={phone.extension ?? ""}
+            onSave={onExtensionChange}
+          />
+
           {confirmingRetire ? (
             <span className="flex items-center gap-2 text-[11px]">
               <span className="text-slate-600 dark:text-slate-300">
@@ -286,6 +304,72 @@ function PhoneRow({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The extension of one number, saved when the field loses focus (Enter blurs
+ * it). Same rule as Add Lead and Add Number; clearing it removes the extension.
+ */
+function ExtensionField({
+  phoneId,
+  value,
+  onSave,
+}: {
+  phoneId: string;
+  value: string;
+  onSave?: (extension: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string>();
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next === value) {
+      setError(undefined);
+      return;
+    }
+    const message = validateExtension(next, "Extension");
+    if (message) {
+      setError(message);
+      return;
+    }
+    setError(undefined);
+    onSave?.(next);
+  };
+
+  return (
+    <>
+      <label
+        className="text-[11px] text-slate-500 dark:text-slate-400"
+        htmlFor={`ext-${phoneId}`}
+      >
+        Ext.
+      </label>
+      <input
+        id={`ext-${phoneId}`}
+        value={draft}
+        inputMode="numeric"
+        maxLength={EXTENSION_MAX_LENGTH}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+        }}
+        className={clsx(
+          "w-16 rounded border bg-white px-1.5 py-0.5 text-[11px] text-slate-700 dark:bg-gray-900 dark:text-slate-200",
+          error
+            ? "border-red-400 dark:border-red-500"
+            : "border-slate-200 dark:border-slate-700",
+        )}
+      />
+      {error ? (
+        <span className="text-[11px] text-red-600 dark:text-red-400">{error}</span>
+      ) : null}
+    </>
   );
 }
 

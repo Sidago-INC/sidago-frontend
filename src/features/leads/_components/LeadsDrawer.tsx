@@ -14,6 +14,7 @@ import type { Column } from "@/components/ui/Table";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { openPrintFrame } from "@/lib/print-html";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { validateExtension } from "@/lib/validation/phone";
 import Revisions from "@/features/backoffice-shared/Revisions";
 import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
@@ -44,6 +45,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { AssociatedContactsSection } from "./AssociatedContacts";
 import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
+import { preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
 import {
   directoryRowToFormState,
   leadDetailToDirectoryRow,
@@ -410,6 +413,34 @@ export function LeadsDrawer({
     setNestedContact(null);
   }, [rowKey]);
 
+  // The phone fields mirror the PREFERRED number, which the Phone Numbers card
+  // changes on its own (star, status, retire). Once an edit or a save has put a
+  // snapshot in formState it stops following the detail, so the field would keep
+  // the old number and the next Save would send it back - retiring the number
+  // the card just made preferred and reviving the old one. Follow the server's
+  // value whenever it changes. After a save this also swaps what was typed
+  // ("(604) 602-0002") for the stored form ("+16046020002").
+  const serverPhone = initialForm?.phone;
+  const serverPhoneExtension = initialForm?.phoneExtension;
+  useEffect(() => {
+    if (serverPhone === undefined || serverPhoneExtension === undefined) return;
+    setFormState((current) =>
+      current &&
+      current.key === rowKey &&
+      (current.value.phone !== serverPhone ||
+        current.value.phoneExtension !== serverPhoneExtension)
+        ? {
+            ...current,
+            value: {
+              ...current.value,
+              phone: serverPhone,
+              phoneExtension: serverPhoneExtension,
+            },
+          }
+        : current,
+    );
+  }, [rowKey, serverPhone, serverPhoneExtension]);
+
   if (!row || selectedIndex === null || !form || !displayRow) return null;
 
   const handleCopyUrl = async () => {
@@ -546,6 +577,11 @@ export function LeadsDrawer({
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
     if (form.phoneExtension !== initialForm.phoneExtension) {
+      const extensionError = validateExtension(form.phoneExtension);
+      if (extensionError) {
+        showErrorToast(new Error(extensionError));
+        return;
+      }
       leadDiff.phone_extension = form.phoneExtension;
     }
     if (form.role !== initialForm.role) leadDiff.role = form.role;
@@ -822,13 +858,14 @@ export function LeadsDrawer({
           {/* Typing a new number here replaces the PREFERRED number: the old
               one is retired, not lost. Other numbers are managed in the
               Phone Numbers card below. */}
-          <EditableField label="Preferred Phone">
+          <EditableField label={preferredPhoneLabel(detailQuery.data?.phones)}>
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>
+          <PreferredPhoneHint />
           <EditableField label="Phone Extension">
             <TextInput
               value={form.phoneExtension}

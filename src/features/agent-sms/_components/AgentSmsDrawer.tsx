@@ -20,6 +20,7 @@ import {
   leadTypeOptions,
 } from "@/features/backoffice-closed-contacts/_lib/data";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import {
   Ban,
   Check,
@@ -233,7 +234,7 @@ export function AgentSmsDrawer({
       ["Lead", row.lead],
       ["Company Name", row.companyName],
       ["Full Name", row.fullName],
-      ["Phone", row.phone],
+      ["Phone", formatPhone(row.phone)],
       ["Email", row.email],
       ["Time zone", row.timezone],
       ["Contact Type", row.contactType],
@@ -376,11 +377,14 @@ export function AgentSmsDrawer({
                 className="text-xs font-semibold"
               />
             </EditableField>
+            {/* Read-only: the SMS screen saves only the SMS-logged flag, and a
+                lead can hold several numbers (managed in the Leads drawer). */}
             <EditableField label="Phone">
               <TextInput
-                value={row.phone}
-                onChange={(event) => onChange("phone", event.target.value)}
-                className="text-xs font-semibold"
+                value={formatPhone(row.phone)}
+                readOnly
+                tabIndex={-1}
+                className="cursor-default text-xs font-semibold"
               />
             </EditableField>
             <EditableField label="Email">

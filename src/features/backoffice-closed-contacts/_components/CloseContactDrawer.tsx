@@ -48,6 +48,7 @@ import {
 import { useAuth } from "@/providers/AuthProvider";
 import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
 import {
   useUpdateLead,
   type LeadPatchBody,
@@ -506,13 +507,14 @@ export function ClosedContactDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Phone">
+          <EditableField label="Preferred Phone">
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>
+          <PreferredPhoneHint />
           <EditableField label="Email">
             <EmailInput
               value={form.email}

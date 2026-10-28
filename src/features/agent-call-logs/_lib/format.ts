@@ -50,7 +50,7 @@ export function formatRelatedContacts(
     .map((contact) =>
       [
         contact.role ? `${contact.role}: ${contact.fullName}` : contact.fullName,
-        contact.phone,
+        formatPhone(contact.phone),
         contact.email,
       ]
         .filter(Boolean)

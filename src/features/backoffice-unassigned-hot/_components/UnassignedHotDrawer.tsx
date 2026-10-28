@@ -20,6 +20,7 @@ import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
 import {
@@ -516,13 +517,14 @@ export function UnassignedHotDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Phone">
+          <EditableField label="Preferred Phone">
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>
+          <PreferredPhoneHint />
           <EditableField label="Email">
             <EmailInput
               value={form.email}

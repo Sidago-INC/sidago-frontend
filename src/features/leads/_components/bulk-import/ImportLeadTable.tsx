@@ -222,7 +222,9 @@ function LeadRow({
                 ))}
                 <p className="text-[11px] text-slate-500 sm:col-span-2 lg:col-span-3 dark:text-slate-400">
                   Phone and email are tidied on save — several numbers in one box
-                  are split, and <code>+1</code> is added where missing.
+                  are split (the first is the preferred number, the rest are added
+                  as additional numbers), and <code>+1</code> is added where
+                  missing.
                 </p>
               </div>
             ) : (

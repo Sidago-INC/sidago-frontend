@@ -22,6 +22,23 @@ export function formatPhoneWithExtension(
   return extension ? `${number} ext. ${extension}` : number;
 }
 
+/** Under every field that edits a lead's main number, so the effect is visible. */
+export const PREFERRED_PHONE_HINT =
+  "A new number here replaces the preferred one; the old number is kept as retired.";
+
+/**
+ * Label for that field. The API's `phone` is the preferred number or, when none
+ * is flagged (the preferred one was marked wrong, say), the best live one - so
+ * "Preferred" is only true while a live number carries the flag. `phones`
+ * undefined means the list has not loaded; nothing contradicts the plain label.
+ */
+export function preferredPhoneLabel(phones: LeadPhone[] | undefined): string {
+  if (!phones) return "Preferred Phone";
+  const live = phones.filter((p) => p.retiredAt === null);
+  if (live.length === 0 || live.some((p) => p.isPreferred)) return "Preferred Phone";
+  return "Phone (none preferred)";
+}
+
 export const STATUS_LABELS: Record<LeadPhoneStatus, string> = {
   active: "Active",
   unknown: "Unknown",

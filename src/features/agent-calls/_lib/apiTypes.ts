@@ -4,7 +4,9 @@ export type QueueLead = {
   leadId: string;
   leadIdExternal: string;
   fullName: string;
-  phone: string;
+  // The lead's primary number; null when it has no live number (every number is
+  // retired), which the API sends as-is.
+  phone: string | null;
   phoneExtension: string | null;
   email: string;
   role: string;
@@ -89,7 +91,7 @@ export type RelatedContact = {
   id: string;
   fullName: string;
   role: string;
-  phone: string;
+  phone: string | null;
   email: string;
   // Served by the detail endpoint so the "All Company Contacts" card no longer
   // has to be stitched together from whichever rows the page happens to hold.
@@ -123,7 +125,8 @@ export type LeadDetailResponse = {
     id: string;
     leadIdExternal: string;
     fullName: string;
-    phone: string;
+    /** Primary number; null when the lead has no live number. */
+    phone: string | null;
     phoneExtension: string | null;
     email: string;
     role: string;

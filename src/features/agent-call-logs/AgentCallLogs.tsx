@@ -76,6 +76,8 @@ import {
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useQueryClient } from "@tanstack/react-query";
 import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
+import { preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
 
 // A co-worker at the same company, as served by the detail endpoint. Only the
 // fields the "All Company Contacts" card renders — clicking one loads its own
@@ -1382,13 +1384,14 @@ function CallLogDetailContent({
         </EditableField>
         {/* A new number here replaces the PREFERRED one (the old one is
             retired, not lost). Other numbers live in Phone Numbers below. */}
-        <EditableField label="Preferred Phone">
+        <EditableField label={preferredPhoneLabel(detail.phones)}>
           <TextInput
             value={form.phone}
             onChange={(event) => onUpdateForm("phone", event.target.value)}
             className="text-xs font-semibold"
           />
         </EditableField>
+        <PreferredPhoneHint />
         <EditableField label="Email">
           <EmailInput
             value={form.email}

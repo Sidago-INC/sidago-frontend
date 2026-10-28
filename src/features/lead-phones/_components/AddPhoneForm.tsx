@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getErrorMessage, showErrorToast, showSuccessToast } from "@/lib/toast";
+import { validateExtension } from "@/lib/validation/phone";
 import { leadPhonesApi } from "../_lib/api";
 import { formatPhone } from "../_lib/format";
 import type { LeadPhone } from "../_lib/types";
@@ -26,6 +27,13 @@ export function AddPhoneForm({ leadId, onCancel, onAdded }: Props) {
       setError("Enter a phone number.");
       return;
     }
+    // The number itself is checked by the server, which accepts any common
+    // format ("(604) 602-0001"); the extension rule is the same one Add Lead uses.
+    const extensionError = validateExtension(extension, "Extension");
+    if (extensionError) {
+      setError(extensionError);
+      return;
+    }
     setSaving(true);
     setError(undefined);
     try {
@@ -41,8 +49,9 @@ export function AddPhoneForm({ leadId, onCancel, onAdded }: Props) {
       await onAdded(res.item);
     } catch (err) {
       const status = (err as { status?: number })?.status;
-      if (status === 409) setError("This lead already has that number.");
-      else if (status === 400) setError(getErrorMessage(err));
+      // 409 has two causes - this lead already has the number, or another lead
+      // holds it live - and the server's message says which (and names the lead).
+      if (status === 409 || status === 400) setError(getErrorMessage(err));
       else showErrorToast(err);
     } finally {
       setSaving(false);

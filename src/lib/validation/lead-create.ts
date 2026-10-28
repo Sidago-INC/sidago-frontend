@@ -1,41 +1,13 @@
 import type { Rule } from "./index";
-import { emailList, maxLength, pattern, required } from "./index";
+import { emailList, maxLength, required } from "./index";
+import { digitCount, validateExtension, validatePhoneNumber } from "./phone";
 
-/**
- * A number the dialler can actually call.
- *
- * Bulk import already enforces this shape — `applyUsCountryCode` in the
- * backend's import-normalize prefixes "+1" to anything that lacks a country
- * code, so every imported lead carries one. Leads typed into the New Lead
- * drawer bypassed that entirely and could be saved with any text at all, which
- * is how numbers that MightyCall cannot dial reached the queue.
- *
- * Deliberately permissive about punctuation — "+1 (202) 360-7147",
- * "+1 202-360-7147" and "+12023607147" are all the same number to the dialler.
- * What it insists on is a country code and 10-15 digits, matching E.164.
- */
-const PHONE_RULE = /^\+\d[\d\s().-]{8,20}$/;
-
-/** Digits only, so the length check ignores formatting. */
-function digitCount(value: string): number {
-  return value.replace(/\D/g, "").length;
-}
-
-const phoneShape = (): Rule => (value) => {
-  const v = value.trim();
-  if (!v) return null; // `required` owns emptiness
-  if (!v.startsWith("+")) {
-    return "Include the country code, for example +1 (202) 360-7147.";
-  }
-  if (!PHONE_RULE.test(v)) {
-    return "Use digits, spaces, brackets or dashes only, for example +1 (202) 360-7147.";
-  }
-  const digits = digitCount(v);
-  if (digits < 10 || digits > 15) {
-    return "A phone number needs between 10 and 15 digits.";
-  }
-  return null;
-};
+// A number the dialler can actually call. Bulk import already enforces this
+// shape (the backend prefixes "+1" to anything without a country code); leads
+// typed into the New Lead drawer used to bypass it and could be saved with any
+// text, which is how numbers MightyCall cannot dial reached the queue. `required`
+// owns emptiness, so an empty value passes here.
+const phoneShape = (): Rule => (value) => validatePhoneNumber(value);
 
 export type PhoneEntry = {
   phone: string;
@@ -72,15 +44,11 @@ export function validatePhonesList(phones: PhoneEntry[]): string | null {
       }
       if (pureDigits) seenDigits.add(pureDigits);
     }
-    const ext = item?.phoneExtension?.trim() ?? "";
-    if (ext) {
-      if (!/^\d*$/.test(ext)) {
-        return `Phone ${i + 1} extension must be digits only.`;
-      }
-      if (ext.length > 12) {
-        return `Phone ${i + 1} extension must be 12 characters or fewer.`;
-      }
-    }
+    const extError = validateExtension(
+      item?.phoneExtension ?? "",
+      `Phone ${i + 1} extension`,
+    );
+    if (extError) return extError;
   }
   return null;
 }
@@ -102,10 +70,7 @@ export const leadCreateValidationSchema: Record<
     phoneShape(),
     maxLength(30, "Phone must be 30 characters or fewer."),
   ],
-  phoneExtension: [
-    maxLength(12, "Phone extension must be 12 characters or fewer."),
-    pattern(/^\d*$/, "Phone extension must be digits only."),
-  ],
+  phoneExtension: [(value) => validateExtension(value)],
   // A lead may carry several addresses. `emailList` checks each one and names
   // the offending address, and the length cap is generous because the column is
   // `text` and the longest list in the migrated data is 316 characters.

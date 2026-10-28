@@ -21,6 +21,7 @@ import {
   getRowCompanySymbol,
 } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import React, { useEffect, useMemo, useState } from "react";
 import { UnassignedHotDrawer } from "./UnassignedHotDrawer";
 import {
@@ -95,7 +96,7 @@ export function UnassignedHotTable({
       },
       { title: "Company Name", key: "companyName" },
       { title: "Full Name", key: "fullName" },
-      { title: "Phone", key: "phone" },
+      { title: "Phone", key: "phone", render: (row) => formatPhone(row.phone) },
       { title: "Email", key: "email" },
       {
         title: "Time zone",

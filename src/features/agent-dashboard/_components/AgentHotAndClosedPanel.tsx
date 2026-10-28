@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Flame } from "lucide-react";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+import { formatPhoneWithExtension } from "@/features/lead-phones/_lib/format";
 import { Panel } from "./Panel";
 import { useAgentHotAndClosed } from "../_lib/hooks";
 
@@ -87,7 +88,7 @@ export function AgentHotAndClosedPanel({
                     </p>
                     {row.phone && (
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {row.phone}
+                        {formatPhoneWithExtension(row.phone, row.phoneExtension)}
                       </p>
                     )}
                   </td>

@@ -17,6 +17,7 @@ import {
 } from "@/features/backoffice-shared/constants";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { useSearchParams } from "react-router-dom";
 import React, { useEffect, useMemo, useState } from "react";
 import { RecentInterestDrawer } from "./RecentInterestDrawer";
@@ -133,7 +134,7 @@ export function RecentInterestTable({
         render: (row) => <TypeBadge value={row.leadType} kind="lead" />,
       },
       { title: "Notes", key: "notes" },
-      { title: "Phone", key: "phone" },
+      { title: "Phone", key: "phone", render: (row) => formatPhone(row.phone) },
     ],
     [agentsQuery.options, data],
   );

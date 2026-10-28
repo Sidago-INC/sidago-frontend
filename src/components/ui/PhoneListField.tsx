@@ -3,6 +3,11 @@ import { Plus, X } from "lucide-react";
 import { useMemo, useState, useEffect, useRef } from "react";
 import PhoneInput from "react-phone-input-2";
 import { useTheme } from "@/providers/ThemeProvider";
+import {
+  digitsOnly,
+  validateExtension,
+  validatePhoneNumber,
+} from "@/lib/validation/phone";
 
 export type PhoneEntry = {
   phone: string;
@@ -20,16 +25,6 @@ export type PhoneListFieldProps = {
   className?: string;
   inputClassName?: string;
 };
-
-const PHONE_RULE = /^\+\d[\d\s().-]{8,20}$/;
-
-function digitCount(value: string): number {
-  return value.replace(/\D/g, "").length;
-}
-
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, "");
-}
 
 function getPhoneInputStyles(isDark: boolean, hasError?: boolean) {
   const borderColor = hasError ? "#ef4444" : isDark ? "#4b5563" : "#d1d5db";
@@ -150,16 +145,7 @@ export function PhoneListField({
     if (index === 0 && required && !trimmedPhone) {
       phoneError = "Phone is required.";
     } else if (trimmedPhone) {
-      if (!trimmedPhone.startsWith("+")) {
-        phoneError = "Include the country code, for example +1 (202) 360-7147.";
-      } else if (!PHONE_RULE.test(trimmedPhone)) {
-        phoneError = "Use valid phone digits and punctuation.";
-      } else {
-        const count = digitCount(trimmedPhone);
-        if (count < 10 || count > 15) {
-          phoneError = "A phone number needs between 10 and 15 digits.";
-        }
-      }
+      phoneError = validatePhoneNumber(trimmedPhone);
 
       // Check for duplicate digits across other rows
       const thisDigits = digitsOnly(trimmedPhone);
@@ -175,14 +161,7 @@ export function PhoneListField({
       }
     }
 
-    const trimmedExt = row.phoneExtension.trim();
-    if (trimmedExt) {
-      if (!/^\d*$/.test(trimmedExt)) {
-        extError = "Digits only.";
-      } else if (trimmedExt.length > 12) {
-        extError = "Max 12 digits.";
-      }
-    }
+    extError = validateExtension(row.phoneExtension, "Extension");
 
     return { phoneError, extError };
   };
@@ -199,7 +178,7 @@ export function PhoneListField({
           </label>
           {rows.length > 1 && (
             <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-              (First number is primary)
+              (First number is preferred)
             </span>
           )}
         </div>

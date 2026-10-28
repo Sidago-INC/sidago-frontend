@@ -13,6 +13,7 @@ import {
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
 import {
   type CompanyRow,
 } from "@/features/companies/_lib/hooks";
@@ -583,13 +584,14 @@ export function CurrentlyHotDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Phone">
+          <EditableField label="Preferred Phone">
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>
+          <PreferredPhoneHint />
           <EditableField label="Email">
             <EmailInput
               value={form.email}

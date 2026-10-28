@@ -188,8 +188,9 @@ export function ImportUploadPanel({ isStarting, expired, onStart }: Props) {
           </li>
           <li>
             A cell holding several phone numbers keeps the first as the lead’s
-            phone; the rest move to Other Contacts. <code>+1</code> is added
-            where it is missing.
+            preferred phone; every other number is added to the lead as an
+            additional number and is also listed in Other Contacts.{" "}
+            <code>+1</code> is added where it is missing.
           </li>
           <li>All email addresses in a cell are kept together in one field.</li>
           <li>

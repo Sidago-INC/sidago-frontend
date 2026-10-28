@@ -20,8 +20,9 @@ type Props = {
   /** The number the agent is about to dial; its id is sent with the result. */
   selectedId: string | null;
   onSelect: (phoneId: string) => void;
-  /** leads.phone, shown while the detail loads or for a lead with no rows. */
-  fallbackPhone: string;
+  /** The lead's primary number from the queue row, shown while the detail loads
+   *  or for a lead with no number rows. Null when it has no live number at all. */
+  fallbackPhone: string | null;
   fallbackExtension?: string | null;
   onAdded: () => void | Promise<unknown>;
 };
@@ -45,18 +46,23 @@ export function PhoneCard({
   const [adding, setAdding] = useState(false);
   const selected = phones.find((p) => p.id === selectedId) ?? null;
   const others = sortPhones(phones).filter((p) => p.id !== selectedId && isDialable(p));
+  // Counted the way the grids and the phones panel count them: every live
+  // number. The ones that cannot be dialled are not listed above, so say so.
+  const live = phones.filter((p) => p.retiredAt === null);
+  const notDialable = live.filter((p) => !isDialable(p)).length;
 
   const shown = selected
     ? formatPhoneWithExtension(selected.phoneE164, selected.extension)
-    : formatPhoneWithExtension(fallbackPhone, fallbackExtension) || fallbackPhone;
+    : formatPhoneWithExtension(fallbackPhone, fallbackExtension) || fallbackPhone || "";
 
   return (
     <CardShell>
       <SectionLabel className="mb-2 sm:mb-3">
         Phone
-        {phones.filter(isDialable).length > 1 ? (
+        {live.length > 1 ? (
           <span className="normal-case tracking-normal text-slate-400">
-            · {phones.filter(isDialable).length} numbers
+            · {live.length} numbers
+            {notDialable > 0 ? ` (${notDialable} not dialable)` : ""}
           </span>
         ) : null}
       </SectionLabel>

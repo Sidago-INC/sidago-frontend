@@ -9,6 +9,7 @@ import {
 } from "@/components/ui";
 import { useEffect, useState } from "react";
 import { openPrintFrame } from "@/lib/print-html";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import {
   formatCallHistoryCallsText,
   formatCallHistoryDate,
@@ -194,7 +195,7 @@ export function EmailBlocklistDirectoryDrawer({
                     onClick={(event) => event.stopPropagation()}
                     className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-300"
                   >
-                    {row.phone}
+                    {formatPhone(row.phone)}
                   </a>
                 ) : (
                   "-"
