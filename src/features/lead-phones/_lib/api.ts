@@ -21,4 +21,11 @@ export const leadPhonesApi = {
   /** Out of rotation, kept on the record. Numbers are never deleted. */
   retire: (phoneId: string): Promise<ItemResponse> =>
     api.post(`/lead-phones/${phoneId}/retire`, {}),
+
+  /**
+   * Bring a retired number back - the same row, counters reset. 409 when another
+   * lead has taken the number live since.
+   */
+  restore: (phoneId: string): Promise<ItemResponse> =>
+    api.post(`/lead-phones/${phoneId}/restore`, {}),
 };

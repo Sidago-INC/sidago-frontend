@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
-import { Archive, Phone, Plus, Star } from "lucide-react";
-import { useAuth } from "@/providers/AuthProvider";
+import { Archive, Phone, Plus, RotateCcw, Star } from "lucide-react";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { EXTENSION_MAX_LENGTH, validateExtension } from "@/lib/validation/phone";
 import { leadPhonesApi } from "../_lib/api";
@@ -31,12 +30,14 @@ type Props = {
 
 /**
  * Every number a lead has, with its status, attempts and history, and the
- * actions on it: add, make preferred, change status, retire. Numbers are never
- * deleted - a retired number stays listed, folded away under "retired".
+ * actions on it: add, make preferred, change status, retire, restore. Numbers
+ * are never deleted - a retired number stays listed, folded away under
+ * "retired", with a Restore action to bring it back.
+ *
+ * Every role may make a number preferred; the server limits an agent to the
+ * leads on their own board.
  */
 export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Props) {
-  const { hasRole } = useAuth();
-  const canManagePreferred = hasRole(["admin", "backoffice"]);
   const [adding, setAdding] = useState(false);
   const [showRetired, setShowRetired] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -74,7 +75,6 @@ export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Prop
             isNext={phone.id === nextPhoneId}
             busy={busyId === phone.id}
             confirmingRetire={confirmRetireId === phone.id}
-            canManagePreferred={canManagePreferred}
             onMakePreferred={() =>
               run(
                 phone.id,
@@ -137,7 +137,15 @@ export function LeadPhonesPanel({ leadId, phones, nextPhoneId, onChanged }: Prop
           {showRetired ? (
             <div className="mt-2 space-y-2">
               {retired.map((phone) => (
-                <PhoneRow key={phone.id} phone={phone} isNext={false} busy={false} />
+                <PhoneRow
+                  key={phone.id}
+                  phone={phone}
+                  isNext={false}
+                  busy={busyId === phone.id}
+                  onRestore={() =>
+                    run(phone.id, () => leadPhonesApi.restore(phone.id), "Number restored.")
+                  }
+                />
               ))}
             </div>
           ) : null}
@@ -152,29 +160,28 @@ function PhoneRow({
   isNext,
   busy,
   confirmingRetire = false,
-  canManagePreferred = false,
   onMakePreferred,
   onStatusChange,
   onExtensionChange,
   onRetireRequest,
   onRetireCancel,
   onRetireConfirm,
+  onRestore,
 }: {
   phone: LeadPhone;
   isNext: boolean;
   busy: boolean;
   confirmingRetire?: boolean;
-  canManagePreferred?: boolean;
   onMakePreferred?: () => void;
   onStatusChange?: (status: LeadPhoneStatus) => void;
   onExtensionChange?: (extension: string) => void;
   onRetireRequest?: () => void;
   onRetireCancel?: () => void;
   onRetireConfirm?: () => void;
+  onRestore?: () => void;
 }) {
   const retired = phone.retiredAt !== null;
-  const canPrefer =
-    canManagePreferred && !retired && !phone.isPreferred && isDialable(phone);
+  const canPrefer = !retired && !phone.isPreferred && isDialable(phone);
 
   return (
     <div
@@ -232,11 +239,9 @@ function PhoneRow({
               title={
                 phone.isPreferred
                   ? "This is the preferred number"
-                  : !canManagePreferred
-                    ? "Only a manager can set the preferred number"
-                    : canPrefer
-                      ? "Make preferred"
-                      : "Only an active number can be preferred"
+                  : canPrefer
+                    ? "Make preferred"
+                    : "Only an active number can be preferred"
               }
               className="flex h-7 w-7 cursor-pointer items-center justify-center rounded border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-default disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             >
@@ -251,7 +256,17 @@ function PhoneRow({
               <Archive className="h-3.5 w-3.5" />
             </button>
           </div>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            onClick={onRestore}
+            title="Bring this number back into rotation - its attempt counters start again from zero"
+            className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded border border-slate-200 bg-white px-2 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 dark:border-slate-700 dark:bg-gray-900 dark:text-sky-400 dark:hover:bg-slate-800"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Restore
+          </button>
+        )}
       </div>
 
       {!retired ? (
