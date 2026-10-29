@@ -6,6 +6,7 @@ import { EXTENSION_MAX_LENGTH, validateExtension } from "@/lib/validation/phone"
 import { leadPhonesApi } from "../_lib/api";
 import {
   formatPhoneWithExtension,
+  hasCarriedOverCounts,
   phoneActivity,
   sortPhones,
   STATUS_LABELS,
@@ -229,10 +230,19 @@ function PhoneRow({
               </Tag>
             ) : null}
           </div>
-          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <p
+            className="mt-1 text-[11px] text-slate-500 dark:text-slate-400"
+            title={
+              hasCarriedOverCounts(phone)
+                ? "These counts come from this lead's earlier history, not from calls to this number. They still count toward its limit, so rotation may skip the number while others have attempts left."
+                : undefined
+            }
+          >
             {phoneActivity(phone)}
             {!retired && (phone.counterF > 0 || phone.counterB > 0)
-              ? ` · no answers ${phone.counterF}, bad ${phone.counterB}`
+              ? ` · no answers ${phone.counterF}, bad ${phone.counterB}${
+                  hasCarriedOverCounts(phone) ? " from before its first call" : ""
+                }`
               : ""}
           </p>
         </div>

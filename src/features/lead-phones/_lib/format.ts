@@ -81,6 +81,21 @@ export function phoneActivity(phone: LeadPhone): string {
   return parts.join(" · ");
 }
 
+/**
+ * A live number that has never been dialled but already has No Answer / Bad
+ * Number counts. They were carried over from the lead's earlier history, not
+ * earned by calling this number - and they count toward its limit, which is why
+ * rotation can skip a number that still reads "not tried yet".
+ */
+export function hasCarriedOverCounts(phone: LeadPhone): boolean {
+  return (
+    phone.retiredAt === null &&
+    phone.attemptCount === 0 &&
+    phone.lastAttemptedAt === null &&
+    (phone.counterF > 0 || phone.counterB > 0)
+  );
+}
+
 /** Order for display: live before retired, preferred first, then oldest first. */
 export function sortPhones(phones: LeadPhone[]): LeadPhone[] {
   return [...phones].sort((a, b) => {
