@@ -4,6 +4,7 @@ import type { LeadDirectoryRow } from "@/features/leads/_lib/data";
 import { createLeadDirectoryRow } from "@/features/leads/_lib/data";
 import type { HotLeadRow } from "@/features/backoffice-shared/types";
 import { normalizeHotLeadRow } from "@/features/backoffice-shared/normalize-hot-lead-row";
+import type { NumberCheck } from "@/features/lead-phones/_lib/types";
 import { api } from "@/lib/api";
 import {
   buildPaginationParams,
@@ -214,6 +215,8 @@ type CreateLeadResponse = {
   id: string;
   fullName: string;
   email: string;
+  /** What Numverify made of each number saved with the lead. */
+  numberChecks?: NumberCheck[];
 };
 
 export async function createLead(body: CreateLeadBody) {

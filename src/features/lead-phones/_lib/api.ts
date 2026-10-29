@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import type { LeadPhone, LeadPhoneStatus } from "./types";
+import type { LeadPhone, LeadPhoneStatus, NumberCheck } from "./types";
 
 type ItemResponse = { ok: true; item: LeadPhone };
 
@@ -10,7 +10,7 @@ export const leadPhonesApi = {
   add: (
     leadId: string,
     body: { value: string; extension?: string },
-  ): Promise<{ ok: true; revived: boolean; item: LeadPhone }> =>
+  ): Promise<{ ok: true; revived: boolean; item: LeadPhone; verification?: NumberCheck }> =>
     api.post(`/leads/${leadId}/phones`, body),
 
   update: (

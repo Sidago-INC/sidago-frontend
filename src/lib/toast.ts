@@ -76,6 +76,10 @@ export const showInfoToast = (message: string) => {
   toast.info(message, { style: { whiteSpace: "pre-line" } });
 };
 
+export const showWarningToast = (message: string) => {
+  toast.warning(message, { style: { whiteSpace: "pre-line" } });
+};
+
 export const showPromiseToast = async <T>(
   promise: Promise<T>,
   messages?: {

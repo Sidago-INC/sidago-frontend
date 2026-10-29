@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { getErrorMessage, showErrorToast, showSuccessToast } from "@/lib/toast";
+import { getErrorMessage, showErrorToast, showSuccessToast, showWarningToast } from "@/lib/toast";
 import { validateExtension } from "@/lib/validation/phone";
 import { leadPhonesApi } from "../_lib/api";
 import { formatPhone } from "../_lib/format";
 import type { LeadPhone } from "../_lib/types";
+import { announceNumberChecks, numberCheckNotice } from "../_lib/verification";
 
 type Props = {
   leadId: string;
@@ -41,11 +42,20 @@ export function AddPhoneForm({ leadId, onCancel, onAdded }: Props) {
         value: value.trim(),
         extension: extension.trim() || undefined,
       });
-      showSuccessToast(
-        res.revived
-          ? `${formatPhone(res.item.phoneE164)} was retired before - it is back in rotation.`
-          : `${formatPhone(res.item.phoneE164)} added.`,
-      );
+      // The number is saved either way. When Numverify says it is not valid the
+      // warning replaces the success message - "added" and "invalid" back to back
+      // would read as a contradiction.
+      const notice = numberCheckNotice(res.verification);
+      if (notice?.kind === "warning") {
+        showWarningToast(notice.message);
+      } else {
+        showSuccessToast(
+          res.revived
+            ? `${formatPhone(res.item.phoneE164)} was retired before - it is back in rotation.`
+            : `${formatPhone(res.item.phoneE164)} added.`,
+        );
+        announceNumberChecks(res.verification ? [res.verification] : undefined);
+      }
       await onAdded(res.item);
     } catch (err) {
       const status = (err as { status?: number })?.status;

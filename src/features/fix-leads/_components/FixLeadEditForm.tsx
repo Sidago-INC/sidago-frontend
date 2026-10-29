@@ -23,6 +23,7 @@ import {
   PREFERRED_PHONE_HINT,
   preferredPhoneLabel,
 } from "@/features/lead-phones/_lib/format";
+import { announceNumberChecks } from "@/features/lead-phones/_lib/verification";
 import { createLead } from "@/features/leads/_lib/hooks";
 import type { LeadCreateFormValues } from "@/lib/validation/lead-create";
 import {
@@ -103,6 +104,7 @@ export function FixLeadEditForm() {
         otherContacts: values.otherContacts || undefined,
       });
       showSuccessToast(`Lead "${response.fullName}" added.`);
+      announceNumberChecks(response.numberChecks);
       // The new person belongs in Other Contacts straight away.
       queryClient.invalidateQueries({ queryKey: ["lead-related", leadId] });
       setNewLeadOpen(false);

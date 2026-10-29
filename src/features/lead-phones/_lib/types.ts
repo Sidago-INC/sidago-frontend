@@ -12,6 +12,22 @@ export const LEAD_PHONE_STATUSES = [
 
 export type LeadPhoneStatus = (typeof LEAD_PHONE_STATUSES)[number];
 
+/**
+ * What Numverify said about a number. 'unverified' = never checked (or
+ * verification is off); 'pending' = queued, the answer is not in yet.
+ */
+export type VerificationStatus = "unverified" | "pending" | "valid" | "invalid";
+
+/** What the backend reports about one number it just saved. */
+export type NumberCheck = {
+  phoneE164: string;
+  verification: VerificationStatus;
+  /** Why it could not be checked right now; absent when it was answered. */
+  reason?: "disabled" | "quota" | "unavailable";
+  lineType?: string | null;
+  carrier?: string | null;
+};
+
 export type LeadPhone = {
   id: string;
   leadId: string;
@@ -32,6 +48,12 @@ export type LeadPhone = {
   lastSuccessAt: string | null;
   attemptCount: number;
   retiredAt: string | null;
+  /** Numverify's verdict on the number; 'invalid' also sets status invalid_number. */
+  verificationStatus: VerificationStatus;
+  verifiedAt: string | null;
+  /** mobile, landline, ... - as reported by Numverify. */
+  lineType: string | null;
+  carrier: string | null;
 };
 
 /** Statuses that keep a number in rotation. */

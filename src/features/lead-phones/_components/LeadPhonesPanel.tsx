@@ -224,6 +224,7 @@ function PhoneRow({
               </Tag>
             ) : null}
             <Tag className={STATUS_STYLES[phone.status]}>{STATUS_LABELS[phone.status]}</Tag>
+            <VerificationTag phone={phone} />
             {phone.contactType === "Validated" ? (
               <Tag className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
                 Validated
@@ -411,4 +412,47 @@ function Tag({ className, children }: { className: string; children: React.React
       {children}
     </span>
   );
+}
+
+/**
+ * What Numverify said about the number. Nothing is shown until it has been (or
+ * is being) checked, and not for a retired number. Worded "Numverify", not
+ * "Verified", so it is not mistaken for the Validated tag (a number that was
+ * reached on a call).
+ */
+function VerificationTag({ phone }: { phone: LeadPhone }) {
+  if (phone.retiredAt !== null) return null;
+  const detail = [phone.lineType, phone.carrier].filter(Boolean).join(" · ");
+  const base = "rounded border px-1.5 py-px text-[10px] font-semibold";
+  switch (phone.verificationStatus) {
+    case "valid":
+      return (
+        <span
+          title={`Numverify: valid number${detail ? ` (${detail})` : ""}`}
+          className={clsx(base, "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300")}
+        >
+          Numverify ✓
+        </span>
+      );
+    case "invalid":
+      return (
+        <span
+          title="Numverify says this is not a valid number"
+          className={clsx(base, "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300")}
+        >
+          Numverify ✗
+        </span>
+      );
+    case "pending":
+      return (
+        <span
+          title="Waiting for Numverify to check this number"
+          className={clsx(base, "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400")}
+        >
+          Checking…
+        </span>
+      );
+    default:
+      return null;
+  }
 }

@@ -19,6 +19,7 @@ import {
   type LeadCreateFormValues,
 } from "@/lib/validation/lead-create";
 import { useCompanyIdSelectSource } from "@/features/companies/_lib/hooks";
+import { announceNumberChecks } from "@/features/lead-phones/_lib/verification";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 
@@ -137,6 +138,7 @@ export function AddLeadForm() {
       setPhones([{ phone: "", phoneExtension: "" }]);
       setErrors({});
       showSuccessToast(`Lead "${response.fullName}" saved.`);
+      announceNumberChecks(response.numberChecks);
       navigate(`/leads?lead=${encodeURIComponent(response.id)}`);
     } catch (err) {
       showErrorToast(err);
