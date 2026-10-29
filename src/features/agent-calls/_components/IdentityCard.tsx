@@ -1,14 +1,17 @@
-import { EmailLink } from "@/components/ui/EmailLink";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { Mail, UserRound } from "lucide-react";
+import { LeadEmailsCard } from "@/features/lead-emails/_components/LeadEmailsCard";
+import { UserRound } from "lucide-react";
 import type { CallsFormState } from "@/types";
 
 type Props = {
   form: CallsFormState;
   leadName: string;
+  /** Needed for the per-address email records; the card falls back to the
+   *  legacy comma-joined value when it is missing or the feature is off. */
+  leadId?: string | null;
 };
 
-export function IdentityCard({ form, leadName }: Props) {
+export function IdentityCard({ form, leadName, leadId }: Props) {
   return (
     <div className="space-y-3">
       <SectionLabel>Identity</SectionLabel>
@@ -39,17 +42,15 @@ export function IdentityCard({ form, leadName }: Props) {
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             Email
           </label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-gray-500" />
-            <div className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm leading-5 break-words text-slate-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
-              {String(form.email ?? "").trim() ? (
-                <EmailLink value={form.email} wrap />
-              ) : (
-                <span className="text-slate-400 dark:text-gray-500">
-                  No email on record
-                </span>
-              )}
-            </div>
+          {/* The Calls page is where a phone call verifies an address, so each
+              email is its own record here: confirm it, mark it invalid, add
+              the one the contact just gave you. */}
+          <div className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2 text-sm leading-5 break-words text-slate-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+            <LeadEmailsCard
+              leadId={leadId}
+              fallbackEmail={form.email}
+              confirmMethod="phone"
+            />
           </div>
         </div>
 
