@@ -63,11 +63,6 @@ export type AgentEmailRow = {
   missingDeadEmail: boolean;
   additionalEmails: string;
   brandCode: string;
-  /**
-   * Back in the queue to resend a stage email to the next verified address
-   * (no reply in 3 days): that address's number in the rotation, else null.
-   */
-  resendTo: number | null;
 };
 
 /** Keep API status values as-is; never collapse Hot stages to "1st". */
@@ -109,7 +104,6 @@ export function mapEmailQueueItem(
     missingDeadEmail: item.isMissingDeadEmail,
     additionalEmails: "",
     brandCode,
-    resendTo: item.rotation?.retry ? item.rotation.step + 1 : null,
   };
 }
 
