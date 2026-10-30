@@ -10,7 +10,6 @@ import {
 import type {
   EmailHistoryResponse,
   EmailLogBody,
-  EmailLogResponse,
   EmailQueueItem,
   EmailQueueResponse,
   EmailStatePatchBody,
@@ -101,15 +100,10 @@ export function useLogEmail() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: EmailLogBody) =>
-      api.post("/email/log", body) as Promise<EmailLogResponse>,
+      api.post("/email/log", body) as Promise<{ ok: true }>,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["email-queue"] });
       qc.invalidateQueries({ queryKey: ["email-history"] });
-      // A send changes per-address counts/last activity and who is next.
-      qc.invalidateQueries({ queryKey: ["lead-emails"] });
-      qc.invalidateQueries({ queryKey: ["email-recipients"] });
-      // A send starts or advances the lead's verified-address rotation.
-      qc.invalidateQueries({ queryKey: ["email-rotations"] });
     },
   });
 }
