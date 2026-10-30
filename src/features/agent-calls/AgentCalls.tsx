@@ -311,7 +311,6 @@ export function AgentCalls() {
               <IdentityCard
                 form={form}
                 leadName={currentLead.fullName}
-                leadId={currentLead.leadId}
               />
               <WorkToggleRow
                 value={form.notWorkAnymore}
