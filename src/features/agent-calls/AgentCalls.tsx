@@ -350,6 +350,7 @@ export function AgentCalls() {
                   : currentLead.phoneExtension
               }
               onAdded={refreshPhones}
+              onPreferredChanged={refreshPhones}
             />
             <CardShell>
               <IdentityCard

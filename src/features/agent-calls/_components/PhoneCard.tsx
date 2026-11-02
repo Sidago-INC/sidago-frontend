@@ -1,9 +1,11 @@
 import { useState } from "react";
 import clsx from "clsx";
-import { Phone, Plus } from "lucide-react";
+import { Phone, Plus, Star } from "lucide-react";
 import { CardShell } from "@/components/ui/CardShell";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { AddPhoneForm } from "@/features/lead-phones/_components/AddPhoneForm";
+import { leadPhonesApi } from "@/features/lead-phones/_lib/api";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import {
   formatPhone,
   formatPhoneWithExtension,
@@ -25,6 +27,9 @@ type Props = {
   fallbackPhone: string | null;
   fallbackExtension?: string | null;
   onAdded: () => void | Promise<unknown>;
+  /** Called after the agent made a number preferred, so the owner reloads the
+   *  numbers (the star moves from the old preferred number to the new one). */
+  onPreferredChanged: () => void | Promise<unknown>;
 };
 
 // Display only. Deliberately NOT a tel: link — the CRM no longer initiates
@@ -33,7 +38,8 @@ type Props = {
 //
 // The number shown is the one rotation picked for this attempt. The agent can
 // switch to another live number; whichever is selected is the one the call
-// result is recorded against.
+// result is recorded against. The selected number can also be made the lead's
+// preferred one: rotation then dials it first, until it runs out of attempts.
 export function PhoneCard({
   leadId,
   phones,
@@ -42,9 +48,28 @@ export function PhoneCard({
   fallbackPhone,
   fallbackExtension,
   onAdded,
+  onPreferredChanged,
 }: Props) {
   const [adding, setAdding] = useState(false);
+  const [savingPreferred, setSavingPreferred] = useState(false);
   const selected = phones.find((p) => p.id === selectedId) ?? null;
+  // Same rule as the server: a retired number, or one that is wrong / invalid /
+  // disconnected, can never be the preferred one.
+  const canMakePreferred = selected !== null && !selected.isPreferred && isDialable(selected);
+
+  const makePreferred = async () => {
+    if (!selected || savingPreferred) return;
+    setSavingPreferred(true);
+    try {
+      await leadPhonesApi.update(selected.id, { isPreferred: true });
+      showSuccessToast(`${formatPhone(selected.phoneE164)} is now the preferred number.`);
+      await onPreferredChanged();
+    } catch (err) {
+      showErrorToast(err);
+    } finally {
+      setSavingPreferred(false);
+    }
+  };
   const others = sortPhones(phones).filter((p) => p.id !== selectedId && isDialable(p));
   // Counted the way the grids and the phones panel count them: every live
   // number. The ones that cannot be dialled are not listed above, so say so.
@@ -71,12 +96,31 @@ export function PhoneCard({
           <Phone className="h-4 w-4 text-slate-500 dark:text-gray-400" />
         </span>
         <span className="select-all">{shown || "—"}</span>
+        {selected?.isPreferred ? (
+          <span
+            title="Rotation dials this number first, until it runs out of attempts"
+            className="ml-auto flex shrink-0 items-center gap-1 rounded border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+          >
+            <Star className="h-3 w-3 fill-sky-500 text-sky-500" />
+            Preferred
+          </span>
+        ) : canMakePreferred ? (
+          <button
+            type="button"
+            onClick={() => void makePreferred()}
+            disabled={savingPreferred}
+            title="Dial this number first from now on. It stays the first choice until it runs out of attempts."
+            className="ml-auto flex shrink-0 cursor-pointer items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-default disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-sky-700 dark:hover:bg-sky-950/40 dark:hover:text-sky-300"
+          >
+            <Star className="h-3 w-3" />
+            {savingPreferred ? "Saving…" : "Make preferred"}
+          </button>
+        ) : null}
       </div>
 
       {selected ? (
         <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">
           {[
-            selected.isPreferred ? "Preferred" : null,
             selected.status !== "active" ? STATUS_LABELS[selected.status] : null,
             selected.contactType === "Validated" ? "Validated" : null,
             phoneActivity(selected),
