@@ -226,7 +226,10 @@ function PhoneRow({
             <Tag className={STATUS_STYLES[phone.status]}>{STATUS_LABELS[phone.status]}</Tag>
             <VerificationTag phone={phone} />
             {phone.contactType === "Validated" ? (
-              <Tag className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <Tag
+                title="A call reached a person on this number, so it gets the longer attempt limits. This is not the Numverify check."
+                className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+              >
                 Validated
               </Tag>
             ) : null}
@@ -406,9 +409,20 @@ function ExtensionField({
   );
 }
 
-function Tag({ className, children }: { className: string; children: React.ReactNode }) {
+function Tag({
+  className,
+  title,
+  children,
+}: {
+  className: string;
+  title?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <span className={clsx("rounded border px-1.5 py-px text-[10px] font-semibold", className)}>
+    <span
+      title={title}
+      className={clsx("rounded border px-1.5 py-px text-[10px] font-semibold", className)}
+    >
       {children}
     </span>
   );
