@@ -17,11 +17,7 @@ import {
   type LeadCreateFormValues,
 } from "@/lib/validation/lead-create";
 import { useCompanyIdSelectSource } from "@/features/companies/_lib/hooks";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  repeatedAddresses,
-  useEmailAvailability,
-} from "../_lib/email-availability";
+import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 
 const blankForm: LeadCreateFormValues = {
@@ -56,9 +52,6 @@ export function AddLeadForm() {
   const [isSaving, setIsSaving] = useState(false);
 
   const companySelectSource = useCompanyIdSelectSource();
-  // One address, one lead: checked as the user types, and again on save.
-  const emailCheck = useEmailAvailability(form.email);
-  const repeated = repeatedAddresses(form.email);
 
   const normalizedForm = useMemo(
     () => ({
@@ -86,13 +79,6 @@ export function AddLeadForm() {
   const handleSave = async () => {
     const nextErrors = validateForm(normalizedForm, leadCreateValidationSchema);
 
-    if (!nextErrors.email && repeated.length > 0) {
-      nextErrors.email = `Each address can be entered once: ${repeated.join(", ")}`;
-    }
-    if (!nextErrors.email && emailCheck.conflicts.length > 0) {
-      nextErrors.email =
-        "This email address already belongs to another lead (see below).";
-    }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -115,15 +101,6 @@ export function AddLeadForm() {
       showSuccessToast(`Lead "${response.fullName}" saved.`);
       navigate(`/leads?lead=${encodeURIComponent(response.id)}`);
     } catch (err) {
-      // The backend re-checks every address against every lead; show its
-      // answer on the field, not only in a toast.
-      const e = err as { code?: string; message?: string[] };
-      if (e?.code === "EMAIL_IN_USE" || e?.code === "EMAIL_REPEATED") {
-        setErrors((current) => ({
-          ...current,
-          email: e.message?.join(" ") ?? "This email address is already in use.",
-        }));
-      }
       showErrorToast(err);
     } finally {
       setIsSaving(false);
@@ -198,39 +175,12 @@ export function AddLeadForm() {
                 error={errors.phoneExtension}
                 className={inputClassName}
               />
-              <div>
-                <EmailListField
-                  value={form.email}
-                  onChange={(value) => updateField("email", value)}
-                  error={errors.email}
-                  inputClassName={inputClassName}
-                />
-                {emailCheck.conflicts.length > 0 ? (
-                  <ul
-                    role="alert"
-                    className="mt-2 space-y-1 rounded border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300"
-                  >
-                    {emailCheck.conflicts.map((c) => (
-                      <li key={`${c.address}-${c.leadId}`}>
-                        <span className="font-medium">{c.address}</span> is
-                        already used by{" "}
-                        <Link
-                          to={`/leads?lead=${encodeURIComponent(c.leadId)}`}
-                          className="underline"
-                        >
-                          {c.leadName ?? "another lead"}
-                        </Link>
-                        {c.companyName ? ` (${c.companyName})` : ""}. The
-                        same address cannot be on two leads.
-                      </li>
-                    ))}
-                  </ul>
-                ) : repeated.length > 0 ? (
-                  <p className="mt-2 text-xs text-rose-600 dark:text-rose-300">
-                    {repeated.join(", ")} is entered more than once.
-                  </p>
-                ) : null}
-              </div>
+              <EmailListField
+                value={form.email}
+                onChange={(value) => updateField("email", value)}
+                error={errors.email}
+                inputClassName={inputClassName}
+              />
               <TextInput
                 label="Role"
                 value={form.role}
@@ -265,12 +215,7 @@ export function AddLeadForm() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving || emailCheck.conflicts.length > 0}
-              title={
-                emailCheck.conflicts.length > 0
-                  ? "An email address already belongs to another lead"
-                  : undefined
-              }
+              disabled={isSaving}
               className="inline-flex h-10 cursor-pointer items-center justify-center rounded bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? "Saving..." : "Save Lead"}
