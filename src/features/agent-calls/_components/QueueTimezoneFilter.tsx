@@ -1,21 +1,17 @@
 import clsx from "clsx";
-import {
-  TIMEZONE_VALUES,
-  getTimezoneBadgeStyle,
-  type TIMEZONE,
-} from "@/types/timezone.types";
+import { getTimezoneBadgeStyle } from "@/types/timezone.types";
 
 /**
  * Narrows the call queue to one timezone.
  *
  * "All" is the normal queue, ordered by compute_timezone_priority(). Picking a
  * timezone lets an agent work it outside its priority window — e.g. PST at
- * 6pm EST, when MST is ranked first. The options are the same timezones the
- * company form offers. INTL is never in "All"; picking it is the only way to
- * see those leads in the queue.
+ * 6pm EST, when MST is ranked first. INTL is deliberately absent: those leads
+ * are opted out and must never be shown to agents, and the backend rejects
+ * timezone=INTL.
  */
-export const QUEUE_TIMEZONES = TIMEZONE_VALUES;
-export type QueueTimezone = TIMEZONE;
+export const QUEUE_TIMEZONES = ["EST", "CST", "MST", "PST"] as const;
+export type QueueTimezone = (typeof QUEUE_TIMEZONES)[number];
 
 type Props = {
   value: QueueTimezone | null;
@@ -33,8 +29,8 @@ export function QueueTimezoneFilter({ value, onChange }: Props) {
       role="radiogroup"
       aria-label="Filter queue by timezone"
       // Phones: a full-width segmented control, one equal cell per option so
-      // all six fit on one row. sm and up: the compact inline pill row.
-      className="grid w-full grid-cols-6 gap-1 rounded-lg bg-slate-100 p-1 sm:flex sm:w-auto sm:shrink-0 sm:items-center sm:bg-transparent sm:p-0 dark:bg-gray-800 sm:dark:bg-transparent"
+      // all five fit on one row. sm and up: the compact inline pill row.
+      className="grid w-full grid-cols-5 gap-1 rounded-lg bg-slate-100 p-1 sm:flex sm:w-auto sm:shrink-0 sm:items-center sm:bg-transparent sm:p-0 dark:bg-gray-800 sm:dark:bg-transparent"
     >
       {options.map((option) => {
         const selected = option.value === value;

@@ -59,7 +59,6 @@ function formatEmailHistory(
     status: string | null;
     subject: string | null;
     body: string | null;
-    toAddress?: string | null;
   }>,
 ) {
   return history
@@ -68,7 +67,6 @@ function formatEmailHistory(
         formatHistoryDate(entry.sentAt),
         entry.userName,
         entry.status,
-        entry.toAddress ? `to ${entry.toAddress}` : null,
         entry.subject || entry.body,
       ]
         .filter(Boolean)
@@ -331,16 +329,8 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         type: "select",
         options: EMAIL_PRIORITY_OPTIONS,
         render: (row) => (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+          <div className="px-2.5 py-1.5">
             <EmailPriorityBadge value={row.emailToBeSent} />
-            {row.resendTo ? (
-              <span
-                className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
-                title={`No reply in 3 days: send the same email to verified address #${row.resendTo}`}
-              >
-                Resend #{row.resendTo}
-              </span>
-            ) : null}
           </div>
         ),
       },
@@ -505,24 +495,6 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     }
   };
 
-  // The drawer's "Log as sent" logged the email for the selected recipients.
-  // Mirror what the table's Check To Log does: tick it on the row and the draft.
-  const handleEmailLogged = () => {
-    const rowId = drawerState.draft?.id;
-    if (!rowId) return;
-    updateRow(rowId, (current) => ({ ...current, checkToLog: true }));
-    setDrawerState((current) =>
-      current.draft
-        ? {
-            original: current.original
-              ? { ...current.original, checkToLog: true }
-              : current.original,
-            draft: { ...current.draft, checkToLog: true },
-          }
-        : current,
-    );
-  };
-
   const saveDraft = async () => {
     if (!drawerState.draft) {
       return;
@@ -603,7 +575,6 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
         onSave={saveDraft}
         onOutcomeSelect={handleOutcome}
         outcomeLoading={logCallResult.isPending}
-        onEmailLogged={handleEmailLogged}
       />
     </div>
   );
