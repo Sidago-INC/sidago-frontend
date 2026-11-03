@@ -18,6 +18,10 @@ import { resolveAgentSlug, agentCallsApi } from "./_lib/agentCallsApi";
 import type { QueueLead, LeadDetailResponse } from "./_lib/apiTypes";
 import { QueuePriorityNotice } from "./_components/QueuePriorityNotice";
 import {
+  QueueTimezoneFilter,
+  type QueueTimezone,
+} from "./_components/QueueTimezoneFilter";
+import {
   formatCallsHistory,
   formatNotesHistory,
 } from "@/features/agent-call-logs/_lib/format";
@@ -73,14 +77,16 @@ export function AgentCalls() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
   const [callBackDateError, setCallBackDateError] = useState<string>();
+  // null = every timezone, in the normal priority order.
+  const [timezone, setTimezone] = useState<QueueTimezone | null>(null);
   const currentLeadIdRef = useRef<string | null>(null);
 
-  // Queue: load on mount + refetch every 90s
+  // Queue: load on mount + refetch every 90s, and again when the filter changes
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await agentCallsApi.queue(agentSlug);
+        const res = await agentCallsApi.queue(agentSlug, timezone ?? undefined);
         if (cancelled) return;
         setLeads(res.data);
         const currentLeadId = currentLeadIdRef.current;
@@ -105,7 +111,7 @@ export function AgentCalls() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [agentSlug]);
+  }, [agentSlug, timezone]);
 
   const currentLead: QueueLead | null = leads[currentIndex] ?? null;
 
@@ -194,7 +200,7 @@ export function AgentCalls() {
 
       const [detailRes, queueRes] = await Promise.all([
         agentCallsApi.detail(currentLead.leadId, agentSlug),
-        agentCallsApi.queue(agentSlug),
+        agentCallsApi.queue(agentSlug, timezone ?? undefined),
       ]);
       setDetail(detailRes);
       const nextForm = formFromDetail(detailRes);
@@ -262,8 +268,24 @@ export function AgentCalls() {
     );
   }
 
+  const timezoneFilter = (
+    <QueueTimezoneFilter value={timezone} onChange={setTimezone} />
+  );
+
   if (!currentLead) {
-    return <EmptyState message="No leads in the queue right now." />;
+    if (!timezone) {
+      return <EmptyState message="No leads in the queue right now." />;
+    }
+    // Filtered to an empty timezone: keep the filter reachable so the agent
+    // can switch back instead of being stranded on a blank page.
+    return (
+      <div className="min-h-full space-y-3 bg-slate-50 px-4 py-4 sm:py-6 dark:bg-gray-950">
+        <QueuePriorityNotice leads={leads} timezone={timezone}>
+          {timezoneFilter}
+        </QueuePriorityNotice>
+        <EmptyState message={`No ${timezone} leads in the queue right now.`} />
+      </div>
+    );
   }
 
   return (
@@ -276,7 +298,9 @@ export function AgentCalls() {
       />
 
       <main className="space-y-3 px-4 py-4 sm:space-y-4 sm:px-4 sm:py-6">
-        <QueuePriorityNotice leads={leads} />
+        <QueuePriorityNotice leads={leads} timezone={timezone}>
+          {timezoneFilter}
+        </QueuePriorityNotice>
 
         <HeroCard currentLead={currentLead} />
 
