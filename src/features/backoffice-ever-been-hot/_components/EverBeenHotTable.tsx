@@ -17,6 +17,12 @@ import {
 } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  buildBrandReportColumns,
+  buildExtraBrandColumns,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import { isLegacyBrandCode } from "@/lib/brands";
 import { EverBeenHotDrawer } from "./EverBeenHotDrawer";
 import {
   contactTypeOptions,
@@ -28,7 +34,7 @@ import {
 type EverBeenHotTableProps = {
   data: EverBeenHotRow[];
   title: string;
-  variant: "svg" | "95rm" | "benton";
+  variant: string;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
   serverGrid?: ServerGridConfig;
@@ -56,6 +62,7 @@ export function EverBeenHotTable({
   const svgAgentsQuery = useAgentSelectOptions("svg");
   const bentonAgentsQuery = useAgentSelectOptions("benton");
   const rm95AgentsQuery = useAgentSelectOptions("95rm");
+  const extraBrands = useExtraBrands();
 
   const columns = useMemo<Column<EverBeenHotRow>[]>(() => {
     const baseColumns: Column<EverBeenHotRow>[] = [
@@ -109,6 +116,15 @@ export function EverBeenHotTable({
         render: (row) => <TypeBadge value={row.contactType} kind="contact" />,
       },
     ];
+
+    if (!isLegacyBrandCode(variant)) {
+      return [
+        ...baseColumns,
+        ...buildBrandReportColumns<EverBeenHotRow>(variant, extraBrands),
+      ];
+    }
+
+    const extraColumns = buildExtraBrandColumns<EverBeenHotRow>(extraBrands);
 
     if (variant === "svg") {
       return [
@@ -171,6 +187,7 @@ export function EverBeenHotTable({
           sortable: false,
           groupable: false,
         },
+        ...extraColumns,
       ];
     }
 
@@ -209,6 +226,7 @@ export function EverBeenHotTable({
           sortable: false,
           groupable: false,
         },
+        ...extraColumns,
       ];
     }
 
@@ -268,8 +286,9 @@ export function EverBeenHotTable({
         sortable: false,
         groupable: false,
       },
+      ...extraColumns,
     ];
-  }, [bentonAgentsQuery.options, data, rm95AgentsQuery.options, svgAgentsQuery.options, variant]);
+  }, [bentonAgentsQuery.options, data, extraBrands, rm95AgentsQuery.options, svgAgentsQuery.options, variant]);
 
   return (
     <div className="min-h-full">

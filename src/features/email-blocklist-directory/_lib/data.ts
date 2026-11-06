@@ -1,4 +1,5 @@
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
@@ -21,6 +22,7 @@ export type CallHistoryByBrand = {
   svg: CallHistoryEntry[];
   "95rm": CallHistoryEntry[];
   benton: CallHistoryEntry[];
+  [brandCode: string]: CallHistoryEntry[];
 };
 
 export type EmailBlocklistDirectoryRow = {
@@ -37,6 +39,7 @@ export type EmailBlocklistDirectoryRow = {
   leadTypeBenton: string | null;
   blacklistedBrands: string[];
   callHistory: CallHistoryByBrand;
+  extraBrandStates?: ExtraBrandStates;
 };
 
 type EmailBlacklistResponse = {

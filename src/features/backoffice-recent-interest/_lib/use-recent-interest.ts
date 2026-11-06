@@ -10,7 +10,7 @@ import {
 import { resolveLeadTimezone, stripTimezonePrefix } from "@/types/timezone.types";
 import type { RecentInterestRow } from "./data";
 
-type Brand = "svg" | "95rm" | "benton";
+type Brand = string;
 
 type ApiRecentInterestRow = RecentInterestRow & {
   company_symbol?: string | null;

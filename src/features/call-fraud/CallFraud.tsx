@@ -6,6 +6,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { ensureAbsoluteUrl } from "@/lib/url";
 import { useGridPage } from "@/lib/use-grid-page";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   useSuspiciousCalls,
   useResolveFraudFlag,
@@ -90,6 +91,7 @@ export function CallFraud() {
     setSearchInput,
   } = useGridPage({ initialPerPage: DEFAULT_PAGE_SIZE });
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const extraBrands = useExtraBrands();
 
 
 
@@ -152,7 +154,8 @@ export function CallFraud() {
       title: "Brand",
       render: (row) => (
         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono dark:bg-slate-800">
-          {row.brandCode}
+          {extraBrands.find((brand) => brand.code === row.brandCode)
+            ?.displayName ?? row.brandCode}
         </span>
       ),
     },

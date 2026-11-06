@@ -1,5 +1,6 @@
 import { BRAND_OPTIONS, type BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
+import type { CatalogBrand } from "@/hooks/useBrandCatalog";
 import type { Level2BoardRow } from "./board";
 
 /**
@@ -39,6 +40,8 @@ export type Level2UpdateRow = {
   lead_type_sidago: LEAD_TYPE | "";
   lead_type_benton: LEAD_TYPE | "";
   lead_type_95rm: LEAD_TYPE | "";
+  /** Same, for brands added after svg, 95rm and benton. Keyed by brand code. */
+  extra_lead_types?: Record<string, string>;
   /** Who put the row on the board. Blank for local rows. */
   submitted_by: string;
 };
@@ -88,6 +91,16 @@ export const level2UpdateCampaignOptions = BRAND_OPTIONS.map((option) => ({
   label: option.value === "BENTON" ? "Benton" : option.label,
 }));
 
+export function buildLevel2CampaignOptions(extraBrands: CatalogBrand[]) {
+  return [
+    ...level2UpdateCampaignOptions,
+    ...extraBrands.map((brand) => ({
+      value: brand.code.toUpperCase(),
+      label: brand.displayName,
+    })),
+  ];
+}
+
 // The user's own date, not UTC. `toISOString()` would stamp a row added after
 // ~7pm Eastern with tomorrow's date.
 function todayLocal(): string {
@@ -121,15 +134,15 @@ export function brandFromCode(code: string | null): BRAND | "" {
   if (code === "svg") return "SVG";
   if (code === "benton") return "BENTON";
   if (code === "95rm") return "95RM";
-  return "";
+  return code ? code.toUpperCase() : "";
 }
 
 /** The reverse — what the API expects in a request body. */
-export function brandCodeFor(brand: BRAND | ""): "svg" | "95rm" | "benton" | null {
+export function brandCodeFor(brand: BRAND | ""): string | null {
   if (brand === "SVG") return "svg";
   if (brand === "BENTON") return "benton";
   if (brand === "95RM") return "95rm";
-  return null;
+  return brand ? brand.toLowerCase() : null;
 }
 
 export function boardRowToUpdateRow(row: Level2BoardRow): Level2UpdateRow {
@@ -148,6 +161,12 @@ export function boardRowToUpdateRow(row: Level2BoardRow): Level2UpdateRow {
     lead_type_sidago: (row.leadTypeSvg ?? "") as LEAD_TYPE | "",
     lead_type_benton: (row.leadTypeBenton ?? "") as LEAD_TYPE | "",
     lead_type_95rm: (row.leadType95rm ?? "") as LEAD_TYPE | "",
+    extra_lead_types: Object.fromEntries(
+      Object.entries(row.extraBrandStates ?? {}).map(([code, state]) => [
+        code,
+        state.leadType ?? "",
+      ]),
+    ),
     submitted_by: row.submittedByName ?? "",
   };
 }

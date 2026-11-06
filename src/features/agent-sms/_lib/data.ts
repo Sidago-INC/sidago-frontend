@@ -1,7 +1,7 @@
 import { getCompanySymbol } from "@/features/backoffice-shared/constants";
 import type { SmsQueueItem } from "./apiTypes";
 
-export type SmsBrand = "Sidago" | "Benton" | "95RM";
+export type SmsBrand = string;
 export const SMS_STATUS_VALUES = [
   "1st",
   "2nd",

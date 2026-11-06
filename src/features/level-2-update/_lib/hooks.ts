@@ -30,6 +30,7 @@ export type BrandStatesResponse = {
     svg: { leadType: string | null };
     benton: { leadType: string | null };
     "95rm": { leadType: string | null };
+    [brandCode: string]: { leadType: string | null };
   };
 };
 
@@ -147,7 +148,7 @@ export function useLeadBrandStates(leadId: string | null | undefined) {
 
 type Level2PostBody = {
   leadId: string;
-  brand: "svg" | "95rm" | "benton";
+  brand: string;
   level2AgentName: string | null;
   resultUpdate: string;
   updatedNotes: string;
@@ -170,6 +171,7 @@ type Level2PostResponse = {
     svg: string | null;
     benton: string | null;
     "95rm": string | null;
+    [brandCode: string]: string | null;
   };
 };
 
@@ -194,7 +196,12 @@ type Level2StatusResponse = {
   ok: true;
   status: string;
   processed: boolean;
-  leadTypes: { svg: string | null; benton: string | null; "95rm": string | null };
+  leadTypes: {
+    svg: string | null;
+    benton: string | null;
+    "95rm": string | null;
+    [brandCode: string]: string | null;
+  };
 };
 
 /**

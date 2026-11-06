@@ -9,6 +9,8 @@ import {
 } from "@/components/ui";
 import { useEffect, useState } from "react";
 import { openPrintFrame } from "@/lib/print-html";
+import { resolveBrandLabel } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   formatCallHistoryCallsText,
   formatCallHistoryDate,
@@ -45,6 +47,9 @@ export function EmailBlocklistDirectoryDrawer({
   onNavigate,
 }: EmailBlocklistDirectoryDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const extraBrands = useExtraBrands();
+  const brandLabel = (brand: string) =>
+    resolveBrandLabel(brand, extraBrands, getBrandLabel);
 
   useEffect(() => {
     if (!copied) return;
@@ -79,7 +84,7 @@ export function EmailBlocklistDirectoryDrawer({
       ["95RM Lead Type", row.leadType95rm ?? ""],
       [
         "Blacklisted Brands",
-        row.blacklistedBrands.map(getBrandLabel).join(", "),
+        row.blacklistedBrands.map(brandLabel).join(", "),
       ],
       ["SVG History Calls", formatCallHistoryCallsText(row.callHistory.svg)],
       ["SVG History Notes", formatCallHistoryNotesText(row.callHistory.svg)],
@@ -93,6 +98,20 @@ export function EmailBlocklistDirectoryDrawer({
       ],
       ["95RM History Calls", formatCallHistoryCallsText(row.callHistory["95rm"])],
       ["95RM History Notes", formatCallHistoryNotesText(row.callHistory["95rm"])],
+      ...extraBrands.flatMap((brand) => [
+        [
+          `${brand.displayName} Lead Type`,
+          row.extraBrandStates?.[brand.code]?.leadType ?? "",
+        ],
+        [
+          `${brand.displayName} History Calls`,
+          formatCallHistoryCallsText(row.callHistory[brand.code] ?? []),
+        ],
+        [
+          `${brand.displayName} History Notes`,
+          formatCallHistoryNotesText(row.callHistory[brand.code] ?? []),
+        ],
+      ]),
     ]
       .map(
         ([label, value]) => `
@@ -177,7 +196,7 @@ export function EmailBlocklistDirectoryDrawer({
               </div>
               <div className="flex flex-wrap justify-end gap-1.5">
                 {row.blacklistedBrands.map((brand) => (
-                  <Badge key={brand}>{getBrandLabel(brand)}</Badge>
+                  <Badge key={brand}>{brandLabel(brand)}</Badge>
                 ))}
               </div>
             </div>
@@ -248,6 +267,18 @@ export function EmailBlocklistDirectoryDrawer({
                 )
               }
             />
+            {extraBrands.map((brand) => {
+              const leadType = row.extraBrandStates?.[brand.code]?.leadType;
+              return (
+                <AssociationDetail
+                  key={brand.code}
+                  label={`Lead Type ${brand.displayName}`}
+                  value={
+                    leadType ? <TypeBadge value={leadType} kind="lead" /> : "-"
+                  }
+                />
+              );
+            })}
           </DetailCard>
 
           <DetailCard label="SVG Details">
@@ -264,6 +295,13 @@ export function EmailBlocklistDirectoryDrawer({
             <HistoryCallsField entries={row.callHistory["95rm"]} />
             <HistoryNotesField entries={row.callHistory["95rm"]} />
           </DetailCard>
+
+          {extraBrands.map((brand) => (
+            <DetailCard key={brand.code} label={`${brand.displayName} Details`}>
+              <HistoryCallsField entries={row.callHistory[brand.code] ?? []} />
+              <HistoryNotesField entries={row.callHistory[brand.code] ?? []} />
+            </DetailCard>
+          ))}
         </div>
       )}
     </Drawer>

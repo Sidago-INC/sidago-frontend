@@ -27,7 +27,7 @@ import {
 type RecentInterestTableProps = {
   data: RecentInterestRow[];
   title: string;
-  brand: "svg" | "95rm" | "benton";
+  brand: string;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
   serverGrid?: ServerGridConfig;

@@ -13,6 +13,7 @@ import {
   TextInput,
   TimezoneBadge,
 } from "@/components/ui";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
@@ -203,6 +204,13 @@ export function AgentEmailDrawer({
   outcomeLoading = false,
 }: AgentEmailDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const extraBrands = useExtraBrands();
+  const extraBrandName = extraBrands.find(
+    (brand) => brand.code === row?.brandCode,
+  )?.displayName;
+  const leadTypeLabel = extraBrandName
+    ? `Lead Type ${extraBrandName}`
+    : "Lead Type Benton";
   const [callBackDateError, setCallBackDateError] = useState<string>();
 
   useEffect(() => {
@@ -263,7 +271,7 @@ export function AgentEmailDrawer({
       ["Email", row.email],
       ["Time zone", row.timezone],
       ["Contact Type", row.contactType],
-      ["Lead Type Benton", row.bentonLeadType],
+      [leadTypeLabel, row.bentonLeadType],
       ["Email To Be Sent", formatEmailStatusLabel(row.emailToBeSent) || row.emailToBeSent],
       ["History", row.history],
       ["Check To Log", row.checkToLog ? "Yes" : "No"],
@@ -433,7 +441,7 @@ export function AgentEmailDrawer({
                 {row.contactType || "—"}
               </span>
             </EditableField>
-            <EditableField label="Lead Type Benton">
+            <EditableField label={leadTypeLabel}>
               <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
                 {row.bentonLeadType || "—"}
               </span>

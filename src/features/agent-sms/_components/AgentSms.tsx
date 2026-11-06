@@ -7,6 +7,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   AgentSmsEditableTrigger,
   AgentSmsInlineTextCell,
@@ -97,7 +98,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
   const [searchParams] = useSearchParams();
   const profile = smsAgentProfiles[agentSlug] ?? {
     agentName: agentSlug,
-    brand: "Sidago" as const,
+    brand: "Sidago",
   };
   const {
     page,
@@ -123,14 +124,20 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         onPerPageChange: setPerPage,
       }
     : undefined;
+  const extraBrands = useExtraBrands();
   const updateSmsState = useUpdateSmsState();
   const logSms = useLogSms();
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
-        mapSmsQueueItem(item, queueData?.brandCode ?? "svg", profile.brand),
+        mapSmsQueueItem(
+          item,
+          queueData?.brandCode ?? "svg",
+          extraBrands.find((brand) => brand.code === queueData?.brandCode)
+            ?.displayName ?? profile.brand,
+        ),
       ),
-    [queueData, profile.brand],
+    [queueData, profile.brand, extraBrands],
   );
   const [rows, setRows] = useState<AgentSmsRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);

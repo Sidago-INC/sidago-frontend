@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { isLegacyBrandCode } from "@/lib/brands";
+import { normalizeBrandCode } from "@/lib/navigation-agents";
 import {
   Ban,
   ChevronDown,
@@ -186,11 +188,8 @@ const callOutcomes = [
 
 type BrandKey = "svg" | "95rm" | "benton";
 
-function toBrandKey(brandCode: string): BrandKey {
-  const code = brandCode.toLowerCase();
-  if (code === "95rm") return "95rm";
-  if (code === "benton") return "benton";
-  return "svg";
+function isBrandKey(code: string): code is BrandKey {
+  return isLegacyBrandCode(code);
 }
 
 function formFromDetail(detail: LeadDetailResponse): EditableCallLogState {
@@ -219,7 +218,7 @@ function formFromDetail(detail: LeadDetailResponse): EditableCallLogState {
 function buildLeadPatchBody(
   form: EditableCallLogState,
   detail: LeadDetailResponse,
-  brandKey: BrandKey,
+  summaryBrandCode: string | undefined,
 ): LeadPatchBody | null {
   const body: LeadPatchBody = {};
   const leadPatch: NonNullable<LeadPatchBody["lead"]> = {};
@@ -241,7 +240,19 @@ function buildLeadPatchBody(
   }
   const brandPatch: NonNullable<LeadPatchBody["brandStates"]> = {};
   if (form.svgLeadType !== detail.brandState.leadType) {
-    brandPatch[brandKey] = { lead_type: form.svgLeadType };
+    // Before the summary loads, a save goes to svg as it always has, unless
+    // the lead's own brand is one added later.
+    const detailBrandCode = normalizeBrandCode(detail.brandState.brandCode);
+    const code =
+      normalizeBrandCode(summaryBrandCode) ??
+      (detailBrandCode && !isLegacyBrandCode(detailBrandCode)
+        ? detailBrandCode
+        : "svg");
+    if (isBrandKey(code)) {
+      brandPatch[code] = { lead_type: form.svgLeadType };
+    } else {
+      brandPatch.others = [{ brandCode: code, lead_type: form.svgLeadType }];
+    }
   }
 
   if (Object.keys(leadPatch).length > 0) {
@@ -305,8 +316,7 @@ export function AgentCallLogs() {
   } = useCallsLogSummary(agentSlug, search);
 
   const groups = useMemo(() => summary?.groups ?? [], [summary]);
-  const brandCode = summary?.brandCode ?? "svg";
-  const brandKey = toBrandKey(brandCode);
+  const summaryBrandCode = summary?.brandCode;
 
   // Two independent things, which used to be one.
   //
@@ -606,7 +616,7 @@ export function AgentCallLogs() {
     formValue: EditableCallLogState,
     detailValue: LeadDetailResponse,
   ) => {
-    const body = buildLeadPatchBody(formValue, detailValue, brandKey);
+    const body = buildLeadPatchBody(formValue, detailValue, summaryBrandCode);
     if (body) {
       await patchLead.mutateAsync({ leadId, body });
     }
@@ -645,7 +655,7 @@ export function AgentCallLogs() {
       return;
     }
 
-    const body = buildLeadPatchBody(form, detail, brandKey);
+    const body = buildLeadPatchBody(form, detail, summaryBrandCode);
     const callbackChanged =
       form.callBackDate !== (detail.brandState.followUpDate ?? "");
 
