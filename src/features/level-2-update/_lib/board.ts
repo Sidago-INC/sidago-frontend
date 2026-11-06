@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 
 /**
  * The shared Level 2 Update board.
@@ -39,6 +40,7 @@ export type Level2BoardRow = {
   leadTypeSvg: string | null;
   leadTypeBenton: string | null;
   leadType95rm: string | null;
+  extraBrandStates?: ExtraBrandStates;
 };
 
 type BoardResponse = { ok: true; count: number; data: Level2BoardRow[] };

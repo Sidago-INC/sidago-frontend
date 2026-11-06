@@ -21,13 +21,18 @@ export function isBrandAgentSlug(value: string | null | undefined): value is Bra
 export function resolveClosedContactsBrandCode(
   tabKey: ClosedContactsTabKey,
   rowBrand?: string,
-): BrandAgentSlug | null {
+  catalogCodes: string[] = [],
+): string | null {
   const tab = closedContactsTabs.find((entry) => entry.key === tabKey);
   const fromTab = normalizeBrandCode(tab?.brand);
   if (fromTab && isBrandAgentSlug(fromTab)) return fromTab;
 
+  const fromTabKey = tabKey.replace(/-(current|historical)$/, "");
+  if (catalogCodes.includes(fromTabKey)) return fromTabKey;
+
   const fromRow = normalizeBrandCode(rowBrand);
   if (fromRow && isBrandAgentSlug(fromRow)) return fromRow;
+  if (fromRow && catalogCodes.includes(fromRow)) return fromRow;
 
   return null;
 }
@@ -44,7 +49,7 @@ export function resolveMarkVoidAgentSlug(
 export function resolveAgentSlugForClosedContacts(
   tabKey: ClosedContactsTabKey,
   rowBrand?: string,
-): BrandAgentSlug | null {
+): string | null {
   return resolveClosedContactsBrandCode(tabKey, rowBrand);
 }
 

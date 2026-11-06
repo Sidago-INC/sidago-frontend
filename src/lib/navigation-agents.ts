@@ -31,10 +31,7 @@ export function normalizeBrandCode(
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return null;
   if (normalized === "rm95") return "95rm";
-  if (normalized === "svg" || normalized === "benton" || normalized === "95rm") {
-    return normalized;
-  }
-  return null;
+  return normalized;
 }
 
 export function resolveAgentSlugForBrand(
@@ -158,12 +155,13 @@ export function findNavAgentWithBrand(
 /** Map API brandCode → Lead Manual Update campaign label. */
 export function brandCodeToCampaignLabel(
   brandCode: string | null | undefined,
+  brandName?: string | null,
 ): string | null {
   const code = normalizeBrandCode(brandCode);
   if (code === "svg") return "SVG";
   if (code === "benton") return "Benton";
   if (code === "95rm") return "95RM";
-  return null;
+  return brandName?.trim() || null;
 }
 
 export const ADMIN_AGENT_ROUTE_PATHS = [

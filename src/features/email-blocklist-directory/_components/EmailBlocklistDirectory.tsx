@@ -4,6 +4,11 @@ import { Badge, EmailLink, ErrorState, Table, TypeBadge } from "@/components/ui"
 import { Select } from "@/components/ui/Select";
 import type { Column } from "@/components/ui/Table";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  buildExtraBrandLeadTypeColumns,
+  resolveBrandLabel,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { useSearchParams } from "react-router-dom";
 import { Filter } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -109,8 +114,14 @@ export function EmailBlocklistDirectory() {
     [],
   );
 
+  const extraBrands = useExtraBrands();
+
   const columns = useMemo<Column<EmailBlocklistDirectoryRow>[]>(
-    () => [
+    () => {
+      const brandLabel = (brand: string) =>
+        resolveBrandLabel(brand, extraBrands, getBrandLabel);
+
+      return [
       {
         title: "Lead ID",
         key: "lead",
@@ -170,14 +181,14 @@ export function EmailBlocklistDirectory() {
         // Not a backend grid field for this report — display only.
         title: "Blacklisted Brands",
         key: "blacklistedBrands",
-        getValue: (row) => row.blacklistedBrands.map(getBrandLabel).join(", "),
+        getValue: (row) => row.blacklistedBrands.map(brandLabel).join(", "),
         filterable: false,
         sortable: false,
         groupable: false,
         render: (row) => (
           <div className="flex flex-wrap gap-1.5">
             {row.blacklistedBrands.map((brand) => (
-              <Badge key={brand}>{getBrandLabel(brand)}</Badge>
+              <Badge key={brand}>{brandLabel(brand)}</Badge>
             ))}
           </div>
         ),
@@ -209,8 +220,23 @@ export function EmailBlocklistDirectory() {
         groupable: false,
         render: (row) => <HistoryCell count={row.callHistory["95rm"].length} />,
       },
-    ],
-    [],
+      ...buildExtraBrandLeadTypeColumns<EmailBlocklistDirectoryRow>(extraBrands),
+      ...extraBrands.map(
+        (brand): Column<EmailBlocklistDirectoryRow> => ({
+          title: `${brand.displayName} History`,
+          key: `extra-${brand.code}-history`,
+          getValue: (row) => String(row.callHistory[brand.code]?.length ?? 0),
+          filterable: false,
+          sortable: false,
+          groupable: false,
+          render: (row) => (
+            <HistoryCell count={row.callHistory[brand.code]?.length ?? 0} />
+          ),
+        }),
+      ),
+      ];
+    },
+    [extraBrands],
   );
 
   if (isError) {

@@ -12,6 +12,7 @@ import {
   TextInput,
   TimezoneBadge,
 } from "@/components/ui";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
@@ -191,6 +192,13 @@ export function AgentSmsDrawer({
   onSave,
 }: AgentSmsDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const extraBrands = useExtraBrands();
+  const extraBrandName = extraBrands.find(
+    (brand) => brand.code === row?.brandCode,
+  )?.displayName;
+  const leadTypeLabel = extraBrandName
+    ? `Lead Type ${extraBrandName}`
+    : "Lead Type Benton";
 
   useEffect(() => {
     if (!copied) {
@@ -237,7 +245,7 @@ export function AgentSmsDrawer({
       ["Email", row.email],
       ["Time zone", row.timezone],
       ["Contact Type", row.contactType],
-      ["Lead Type Benton", row.bentonLeadType],
+      [leadTypeLabel, row.bentonLeadType],
       ["SMS Status", row.smsStatus],
       ["Call Back Date", row.callBackDate],
       ["Notes", row.notes],
@@ -404,7 +412,7 @@ export function AgentSmsDrawer({
                 className="text-xs font-semibold"
               />
             </EditableField>
-            <EditableField label="Lead Type Benton">
+            <EditableField label={leadTypeLabel}>
               <Select
                 value={row.bentonLeadType}
                 onChange={(value) => onChange("bentonLeadType", String(value))}
