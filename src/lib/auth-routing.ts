@@ -2,6 +2,7 @@ import {
   adminOnlyNavigation,
   agentNavigation,
   backofficeNavigation,
+  BRAND_MANAGEMENT_PATH,
   flattenNavigationHrefs,
   type UserRole,
 } from "./navigation";
@@ -9,16 +10,27 @@ import { ADMIN_AGENT_ROUTE_PATHS } from "./navigation-agents";
 
 export const AUTH_NOTICE_KEY = "sidago_auth_notice";
 
+// Report pages for brands added later, reached as /<report>/<brandCode>.
+const EXTRA_BRAND_REPORT_ROUTES = [
+  "/currently-hot-leads",
+  "/recent-interest",
+  "/ever-been-hot",
+  "/unassigned-hot-leads",
+];
+
 const agentRoutes = new Set(flattenNavigationHrefs(agentNavigation));
 
 const backofficeRoutes = new Set([
   ...flattenNavigationHrefs(backofficeNavigation),
   ...ADMIN_AGENT_ROUTE_PATHS,
+  ...EXTRA_BRAND_REPORT_ROUTES,
 ]);
 
 const adminRoutes = new Set([
   ...flattenNavigationHrefs(adminOnlyNavigation),
   ...ADMIN_AGENT_ROUTE_PATHS,
+  ...EXTRA_BRAND_REPORT_ROUTES,
+  BRAND_MANAGEMENT_PATH,
 ]);
 
 const allProtectedRoutes = new Set([

@@ -6,6 +6,8 @@ import {
   TypeBadge,
 } from "@/components/ui";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import { resolveBrandLabel } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   BlockedEmailRow,
   getBlockedBrandLabel,
@@ -43,6 +45,8 @@ export function BlockedEmailDrawer({
   isUnblocking,
   onUnblock,
 }: BlockedEmailDrawerProps) {
+  const extraBrands = useExtraBrands();
+
   return (
     <Drawer
       isOpen={Boolean(row)}
@@ -130,12 +134,26 @@ export function BlockedEmailDrawer({
               )
             }
           />
+          {extraBrands.map((brand) => {
+            const leadType = row.extraBrandStates?.[brand.code]?.leadType;
+            return (
+              <DetailRow
+                key={brand.code}
+                label={`${brand.displayName} Lead Type`}
+                value={
+                  leadType ? <TypeBadge value={leadType} kind="lead" /> : "-"
+                }
+              />
+            );
+          })}
           <DetailRow
             label="Blocked Brands"
             value={
               <div className="flex flex-wrap gap-1.5">
                 {row.blockedBrands.map((brand) => (
-                  <Badge key={brand}>{getBlockedBrandLabel(brand)}</Badge>
+                  <Badge key={brand}>
+                    {resolveBrandLabel(brand, extraBrands, getBlockedBrandLabel)}
+                  </Badge>
                 ))}
               </div>
             }

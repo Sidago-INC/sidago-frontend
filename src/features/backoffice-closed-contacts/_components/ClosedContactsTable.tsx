@@ -11,6 +11,8 @@ import {
 import React, { useMemo } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { buildExtraBrandColumns } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   ClosedContactRow,
   contactTypeOptions,
@@ -54,6 +56,18 @@ export function ClosedContactsTable({
 
   const svgAgents = useAgentSelectOptions("svg");
   const bentonAgents = useAgentSelectOptions("benton");
+  const extraBrands = useExtraBrands();
+  const columnBrands = useMemo(
+    () =>
+      tabKey === "all-closed-contracts"
+        ? extraBrands
+        : extraBrands.filter(
+            (brand) =>
+              tabKey === `${brand.code}-current` ||
+              tabKey === `${brand.code}-historical`,
+          ),
+    [extraBrands, tabKey],
+  );
 
   const columns = useMemo<Column<ClosedContactRow>[]>(
     () => [
@@ -140,8 +154,9 @@ export function ClosedContactsTable({
         groupable: false,
       },
       { title: "Last Action Date", key: "lastActionDate", type: "date" },
+      ...buildExtraBrandColumns<ClosedContactRow>(columnBrands),
     ],
-    [data, svgAgents.options, bentonAgents.options],
+    [data, svgAgents.options, bentonAgents.options, columnBrands],
   );
 
   return (

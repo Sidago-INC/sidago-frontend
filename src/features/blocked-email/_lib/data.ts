@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 import {
   buildPaginationParams,
   DEFAULT_PAGE_SIZE,
@@ -18,6 +19,7 @@ export type BlockedEmailRow = {
   leadType95rm: string | null;
   leadTypeBenton: string | null;
   blockedBrands: string[];
+  extraBrandStates?: ExtraBrandStates;
 };
 
 type BlockedEmailResponse = {

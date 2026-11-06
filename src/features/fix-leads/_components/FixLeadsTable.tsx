@@ -21,6 +21,8 @@ import {
   getLeadGridLabel,
   timezoneOptions,
 } from "@/features/backoffice-shared/constants";
+import { buildExtraBrandColumns } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   type FixQueueRow,
   getFixQueueTimezone,
@@ -62,6 +64,7 @@ export function FixLeadsTable({
   serverGrid,
 }: FixLeadsTableProps) {
   const navigate = useNavigate();
+  const extraBrands = useExtraBrands();
   const [contactsModalRow, setContactsModalRow] = useState<FixQueueRow | null>(
     null,
   );
@@ -241,8 +244,9 @@ export function FixLeadsTable({
           </Button>
         ),
       },
+      ...buildExtraBrandColumns<FixQueueRow>(extraBrands),
     ],
-    [data, navigate],
+    [data, navigate, extraBrands],
   );
 
   return (
