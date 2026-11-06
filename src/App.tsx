@@ -43,16 +43,21 @@ import { AgentSms } from "@/features/agent-sms/_components/AgentSms";
 import { AgentEmail } from "@/features/agent-email/_components/AgentEmail";
 
 // Backoffice reports
+import { BrandManagement } from "@/features/brand-management/_components/BrandManagement";
 import { CurrentlyHotSvg } from "@/features/backoffice-currently-hot/_components/CurrentlyHotSvg";
+import { CurrentlyHotBrand } from "@/features/backoffice-currently-hot/_components/CurrentlyHotBrand";
 import { CurrentlyHot95rm } from "@/features/backoffice-currently-hot/_components/CurrentlyHot95rm";
 import { CurrentlyHotBenton } from "@/features/backoffice-currently-hot/_components/CurrentlyHotBenton";
 import { RecentInterestSvg } from "@/features/backoffice-recent-interest/_components/RecentInterestSvg";
+import { RecentInterestBrand } from "@/features/backoffice-recent-interest/_components/RecentInterestBrand";
 import { RecentInterest95rm } from "@/features/backoffice-recent-interest/_components/RecentInterest95rm";
 import { RecentInterestBenton } from "@/features/backoffice-recent-interest/_components/RecentInterestBenton";
 import { EverBeenHotSvg } from "@/features/backoffice-ever-been-hot/_components/EverBeenHotSvg";
+import { EverBeenHotBrand } from "@/features/backoffice-ever-been-hot/_components/EverBeenHotBrand";
 import { EverBeenHot95rm } from "@/features/backoffice-ever-been-hot/_components/EverBeenHot95rm";
 import { EverBeenHotBenton } from "@/features/backoffice-ever-been-hot/_components/EverBeenHotBenton";
 import { UnassignedHotSvg } from "@/features/backoffice-unassigned-hot/_components/UnassignedHotSvg";
+import { UnassignedHotBrand } from "@/features/backoffice-unassigned-hot/_components/UnassignedHotBrand";
 import { UnassignedHot95rm } from "@/features/backoffice-unassigned-hot/_components/UnassignedHot95rm";
 import { UnassignedHotBenton } from "@/features/backoffice-unassigned-hot/_components/UnassignedHotBenton";
 
@@ -127,21 +132,28 @@ export default function App() {
                 <Route path="/currently-hot-leads-svg" element={<P><CurrentlyHotSvg /></P>} />
                 <Route path="/currently-hot-leads-95rm" element={<P><CurrentlyHot95rm /></P>} />
                 <Route path="/currently-hot-leads-benton" element={<P><CurrentlyHotBenton /></P>} />
+                <Route path="/currently-hot-leads/:brandCode" element={<P><CurrentlyHotBrand /></P>} />
 
                 {/* Recent Interest */}
                 <Route path="/recent-interest-svg" element={<P><RecentInterestSvg /></P>} />
                 <Route path="/recent-interest-95rm" element={<P><RecentInterest95rm /></P>} />
                 <Route path="/recent-interest-benton" element={<P><RecentInterestBenton /></P>} />
+                <Route path="/recent-interest/:brandCode" element={<P><RecentInterestBrand /></P>} />
 
                 {/* Ever Been Hot */}
                 <Route path="/ever-been-hot-svg" element={<P><EverBeenHotSvg /></P>} />
                 <Route path="/ever-been-hot-95rm" element={<P><EverBeenHot95rm /></P>} />
                 <Route path="/ever-been-hot-benton" element={<P><EverBeenHotBenton /></P>} />
+                <Route path="/ever-been-hot/:brandCode" element={<P><EverBeenHotBrand /></P>} />
 
                 {/* Unassigned Hot */}
                 <Route path="/unassigned-hot-leads-svg" element={<P><UnassignedHotSvg /></P>} />
                 <Route path="/unassigned-hot-leads-95rm" element={<P><UnassignedHot95rm /></P>} />
                 <Route path="/unassigned-hot-leads-benton" element={<P><UnassignedHotBenton /></P>} />
+                <Route path="/unassigned-hot-leads/:brandCode" element={<P><UnassignedHotBrand /></P>} />
+
+                {/* Super Owner */}
+                <Route path="/brand-management" element={<P><BrandManagement /></P>} />
 
                 {/* Fallback */}
                 <Route path="/403" element={<Forbidden />} />

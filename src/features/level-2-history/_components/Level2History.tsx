@@ -3,6 +3,7 @@ import { type Column } from "@/components/ui/Table";
 import { useGridPage } from "@/lib/use-grid-page";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useAuth } from "@/providers/AuthProvider";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   buildRevertMessage,
   useRevertLevel2Result,
@@ -35,6 +36,7 @@ export function Level2History() {
   } = useGridPage();
 
   const { hasRole } = useAuth();
+  const extraBrands = useExtraBrands();
   // Mirrors the backend gate: level2.revert is granted to manager (which the
   // frontend calls backoffice) and admin.
   const canRevert = hasRole(["admin", "backoffice"]);
@@ -71,7 +73,15 @@ export function Level2History() {
       {
         title: "Campaign",
         key: "campaign",
-        render: (row) => <CampaignBadge value={row.campaign} />,
+        render: (row) => (
+          <CampaignBadge
+            value={
+              extraBrands.find(
+                (brand) => brand.code === row.campaign?.toLowerCase(),
+              )?.displayName ?? row.campaign
+            }
+          />
+        ),
       },
       { title: "level 2 Agent", key: "level_2_agent" },
       { title: "Level 2 Result Update", key: "level_2_result_update" },
@@ -93,6 +103,19 @@ export function Level2History() {
         key: "lead_type_95rm",
         render: (row) => <LeadTypeCell value={row.lead_type_95rm} />,
       },
+      ...extraBrands.map(
+        (brand): Column<Level2HistoryRow> => ({
+          title: `Lead Type ${brand.displayName}`,
+          key: `extra-${brand.code}-leadType`,
+          getValue: (row) => row.extraLeadTypes?.[brand.code] ?? "",
+          filterable: false,
+          sortable: false,
+          groupable: false,
+          render: (row) => (
+            <LeadTypeCell value={row.extraLeadTypes?.[brand.code] ?? ""} />
+          ),
+        }),
+      ),
     ];
 
     if (!canRevert) return base;
@@ -130,7 +153,7 @@ export function Level2History() {
         },
       },
     ];
-  }, [canRevert, pendingRevert?.id, revertResult.isPending]);
+  }, [canRevert, extraBrands, pendingRevert?.id, revertResult.isPending]);
 
   return (
     <div className="min-h-full">

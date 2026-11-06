@@ -13,6 +13,8 @@ import { resolveLeadTimezone } from "@/types/timezone.types";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { useUpdateLead } from "@/features/backoffice-shared/use-update-lead";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import { isLegacyBrandCode } from "@/lib/brands";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -69,6 +71,7 @@ export function FixLeadEditForm() {
   const backToQueue =
     (location.state as { from?: string } | null)?.from ?? "/fix-leads";
   const queryClient = useQueryClient();
+  const extraBrands = useExtraBrands();
   const { leadId } = useParams<{ leadId: string }>();
   const { data, isLoading, isError, error } = useLeadFull(leadId);
   // The company's other people. Operations fix one contact and need to see
@@ -422,6 +425,20 @@ export function FixLeadEditForm() {
                   readOnly
                   className={readOnlyInputClassName}
                 />
+                {Object.entries(data.brandStates)
+                  .filter(([code]) => !isLegacyBrandCode(code))
+                  .map(([code, state]) => (
+                    <TextInput
+                      key={code}
+                      label={`${
+                        extraBrands.find((brand) => brand.code === code)
+                          ?.displayName ?? code
+                      } Lead Type`}
+                      value={state.leadType ?? ""}
+                      readOnly
+                      className={readOnlyInputClassName}
+                    />
+                  ))}
               </div>
             </section>
 

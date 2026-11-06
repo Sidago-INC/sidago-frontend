@@ -36,7 +36,7 @@ import { LEAD_TYPE_OPTIONS } from "@/types/lead-type.types";
 type RecentInterestDrawerProps = {
   data: RecentInterestRow[];
   columns?: Column<RecentInterestRow>[];
-  brand: "svg" | "95rm" | "benton";
+  brand: string;
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;

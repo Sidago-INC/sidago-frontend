@@ -1,10 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { agentCallsApi } from "@/features/agent-calls/_lib/agentCallsApi";
+import type { CatalogBrand } from "@/hooks/useBrandCatalog";
 import { api } from "@/lib/api";
 
 export type ManualUpdateBody = {
   leadId: string;
   agentId: string;
-  brandCode: "svg" | "95rm" | "benton";
+  brandCode: string;
   resultCode: string;
   notes?: string;
   followUpDate?: string;
@@ -27,15 +29,41 @@ export function useCreateManualUpdate() {
   });
 }
 
+// Null when the label matches no brand. Callers must not post in that case.
 export function campaignLabelToBrandCode(
   label: string,
-): ManualUpdateBody["brandCode"] {
-  switch (label.trim().toLowerCase()) {
+  extraBrands: CatalogBrand[] = [],
+): ManualUpdateBody["brandCode"] | null {
+  const normalized = label.trim().toLowerCase();
+  switch (normalized) {
     case "benton":
       return "benton";
     case "95rm":
       return "95rm";
-    default:
+    case "svg":
+    case "":
       return "svg";
+    default:
+      return (
+        extraBrands.find(
+          (brand) =>
+            brand.displayName.trim().toLowerCase() === normalized ||
+            brand.code === normalized,
+        )?.code ?? null
+      );
   }
+}
+
+// /auth/me carries no brand, so an agent's own brand comes from their calls log
+// summary. Same key as useCallsLogSummary, so the cache is shared.
+export function useAgentOwnBrandCode(
+  agentSlug: string | null | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["calls-log", agentSlug, "summary", ""],
+    queryFn: () => agentCallsApi.callsLogSummary(agentSlug ?? "", ""),
+    enabled: enabled && Boolean(agentSlug),
+    select: (summary) => summary.brandCode?.toLowerCase() ?? null,
+  });
 }

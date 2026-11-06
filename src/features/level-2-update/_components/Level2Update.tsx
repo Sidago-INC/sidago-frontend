@@ -15,6 +15,8 @@ import type { BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUsers } from "@/features/backoffice-shared/use-users";
+import { useExtraBrandAgents } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   getCallBackDateError,
   getMinCallBackDate,
@@ -22,11 +24,11 @@ import {
 import {
   boardRowToUpdateRow,
   brandCodeFor,
+  buildLevel2CampaignOptions,
   createEmptyLevel2UpdateRow,
   isLoggedRow,
   isPendingRow,
   level2ResultUpdateOptions,
-  level2UpdateCampaignOptions,
   type Level2UpdateRow,
 } from "../_lib/data";
 import {
@@ -265,6 +267,14 @@ export function Level2Update() {
   const svgAgents = useUsers("svg");
   const rm95Agents = useUsers("95rm");
   const bentonAgents = useUsers("benton");
+  const extraBrands = useExtraBrands();
+  const extraAgents = useExtraBrandAgents(
+    extraBrands.map((brand) => brand.code),
+  );
+  const campaignOptions = useMemo(
+    () => buildLevel2CampaignOptions(extraBrands),
+    [extraBrands],
+  );
 
   const getLeadLabel = (leadId: string) =>
     leadSelectSource.options.find((option) => String(option.value) === leadId)
@@ -285,14 +295,16 @@ export function Level2Update() {
         label: a.name,
       }));
     }
-    return [];
+    const code = brandCodeFor(campaign);
+    return code ? (extraAgents[code]?.options ?? []) : [];
   };
 
   const isAgentsLoadingFor = (campaign: BRAND | "") => {
     if (campaign === "SVG") return svgAgents.isLoading;
     if (campaign === "95RM") return rm95Agents.isLoading;
     if (campaign === "BENTON") return bentonAgents.isLoading;
-    return false;
+    const code = brandCodeFor(campaign);
+    return code ? (extraAgents[code]?.isLoading ?? false) : false;
   };
 
   const findRow = (rowId: string) => rows.find((row) => row.id === rowId);
@@ -649,7 +661,7 @@ export function Level2Update() {
           <div onClick={(event) => event.stopPropagation()}>
             <Select
               value={row.campaign}
-              options={level2UpdateCampaignOptions}
+              options={campaignOptions}
               placeholder="Select campaign"
               searchable
               searchPlaceholder="Search campaign"
@@ -661,7 +673,13 @@ export function Level2Update() {
             />
           </div>
         ) : (
-          <CampaignBadge value={row.campaign} />
+          <CampaignBadge
+            value={
+              extraBrands.find(
+                (brand) => brand.code.toUpperCase() === row.campaign,
+              )?.displayName ?? row.campaign
+            }
+          />
         ),
     },
     {
@@ -790,6 +808,21 @@ export function Level2Update() {
         <LeadTypeCell value={row.lead_type_95rm} pending={isPendingRow(row)} />
       ),
     },
+    ...extraBrands.map(
+      (brand): Column<Level2UpdateRow> => ({
+        title: `Lead Type ${brand.displayName}`,
+        key: `extra-${brand.code}-leadType`,
+        filterable: false,
+        sortable: false,
+        groupable: false,
+        render: (row) => (
+          <LeadTypeCell
+            value={row.extra_lead_types?.[brand.code] ?? ""}
+            pending={isPendingRow(row)}
+          />
+        ),
+      }),
+    ),
     {
       title: "Log Result",
       key: "log_result",

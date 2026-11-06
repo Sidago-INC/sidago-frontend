@@ -15,9 +15,13 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useLeadSelectSource } from "@/features/level-2-update/_lib/hooks";
 import { useUsers } from "@/features/backoffice-shared/use-users";
 import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import { useExtraBrandAgents } from "@/features/backoffice-shared/extra-brand-columns";
+import { isLegacyBrandCode } from "@/lib/brands";
 import {
   brandCodeToCampaignLabel,
   findNavAgentWithBrand,
+  normalizeBrandCode,
 } from "@/lib/navigation-agents";
 import {
   getCallBackDateError,
@@ -25,6 +29,7 @@ import {
 } from "@/features/agent-calls/_lib/utils";
 import {
   campaignLabelToBrandCode,
+  useAgentOwnBrandCode,
   useCreateManualUpdate,
 } from "./_lib/hooks";
 
@@ -98,11 +103,23 @@ export function LeadManualUpdateForm() {
   const svgAgents = useUsers("svg");
   const rm95Agents = useUsers("95rm");
   const bentonAgents = useUsers("benton");
+  const extraBrands = useExtraBrands();
 
   const isAdmin = user?.role === "admin";
   const canSelectFixed =
     user?.role === "admin" || user?.role === "backoffice";
   const currentAgentName = user?.name?.trim() || "Current Agent";
+
+  // Only an agent can be on an added brand, and only once one exists.
+  const isAgentRole = user?.role === "agent";
+  const ownBrandQuery = useAgentOwnBrandCode(
+    user?.slug,
+    isAgentRole && extraBrands.length > 0,
+  );
+  const ownExtraBrandCode =
+    ownBrandQuery.data && !isLegacyBrandCode(ownBrandQuery.data)
+      ? ownBrandQuery.data
+      : null;
 
   // When opened from Agents > SVG|Benton|95RM > Agent nav, lock campaign
   // to that brand and prefill the agent from the query string.
@@ -113,10 +130,14 @@ export function LeadManualUpdateForm() {
       searchParams.get("agentId"),
     );
     if (!match) return null;
-    const campaignType = brandCodeToCampaignLabel(match.brand.brandCode);
+    const campaignType = brandCodeToCampaignLabel(
+      match.brand.brandCode,
+      match.brand.brandName,
+    );
     if (!campaignType) return null;
     return {
       campaignType,
+      brandCode: normalizeBrandCode(match.brand.brandCode),
       agentName: match.agent.name,
       agentId: match.agent.agentId,
     };
@@ -146,18 +167,37 @@ export function LeadManualUpdateForm() {
   const agentFieldValue = isAdmin ? form.agent : currentAgentName;
   const campaignTypeValue = isAdmin
     ? (lockedCampaignType ?? form.campaignType)
-    : "SVG";
+    : ownExtraBrandCode
+      ? (extraBrands.find((brand) => brand.code === ownExtraBrandCode)
+          ?.displayName ?? ownExtraBrandCode.toUpperCase())
+      : "SVG";
   const toBeLoggedValue = true;
-  const brandCode = campaignLabelToBrandCode(campaignTypeValue);
+  const navExtraBrandCode =
+    isAdmin && navContext?.brandCode && !isLegacyBrandCode(navContext.brandCode)
+      ? navContext.brandCode
+      : null;
+  const brandCode =
+    navExtraBrandCode ??
+    (isAdmin ? null : ownExtraBrandCode) ??
+    campaignLabelToBrandCode(campaignTypeValue, extraBrands);
+  const extraAgents = useExtraBrandAgents(
+    brandCode && !isLegacyBrandCode(brandCode) ? [brandCode] : [],
+  );
+  const selectedExtraAgents = brandCode ? extraAgents[brandCode] : undefined;
 
   const campaignOptions = useMemo(() => {
+    const options = [
+      ...CAMPAIGN_TYPE_OPTIONS,
+      ...extraBrands.map((brand) => ({
+        label: brand.displayName,
+        value: brand.displayName,
+      })),
+    ];
     if (lockedCampaignType) {
-      return CAMPAIGN_TYPE_OPTIONS.filter(
-        (option) => option.value === lockedCampaignType,
-      );
+      return options.filter((option) => option.value === lockedCampaignType);
     }
-    return CAMPAIGN_TYPE_OPTIONS;
-  }, [lockedCampaignType]);
+    return options;
+  }, [lockedCampaignType, extraBrands]);
 
   const resultUpdateOptions = useMemo(
     () => getResultUpdateOptions(user?.role),
@@ -168,8 +208,14 @@ export function LeadManualUpdateForm() {
     if (brandCode === "svg") return svgAgents.data ?? [];
     if (brandCode === "95rm") return rm95Agents.data ?? [];
     if (brandCode === "benton") return bentonAgents.data ?? [];
-    return [];
-  }, [brandCode, svgAgents.data, rm95Agents.data, bentonAgents.data]);
+    return selectedExtraAgents?.agents ?? [];
+  }, [
+    brandCode,
+    svgAgents.data,
+    rm95Agents.data,
+    bentonAgents.data,
+    selectedExtraAgents,
+  ]);
 
   const agentsLoading =
     brandCode === "svg"
@@ -178,7 +224,7 @@ export function LeadManualUpdateForm() {
         ? rm95Agents.isLoading
         : brandCode === "benton"
           ? bentonAgents.isLoading
-          : false;
+          : (selectedExtraAgents?.isLoading ?? false);
 
   const agentOptions = useMemo(() => {
     return brandAgents.map((agent) => ({
@@ -223,6 +269,13 @@ export function LeadManualUpdateForm() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (!brandCode) {
+      showErrorToast(
+        new Error(`Unknown campaign type "${campaignTypeValue}".`),
+      );
+      return;
+    }
 
     if (!form.lead || !form.resultUpdate) {
       showErrorToast(new Error("Lead and result update are required."));

@@ -14,6 +14,11 @@ import {
   showSuccessToast,
 } from "@/lib/toast";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  buildExtraBrandLeadTypeColumns,
+  resolveBrandLabel,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
 import { BlockedEmailDrawer } from "./BlockedEmailDrawer";
@@ -77,8 +82,14 @@ export function BlockedEmail() {
     }
   };
 
+  const extraBrands = useExtraBrands();
+
   const columns = useMemo<Column<BlockedEmailRow>[]>(
-    () => [
+    () => {
+      const brandLabel = (brand: string) =>
+        resolveBrandLabel(brand, extraBrands, getBlockedBrandLabel);
+
+      return [
       {
         title: "Lead ID",
         key: "lead",
@@ -150,20 +161,22 @@ export function BlockedEmail() {
         // Not a backend grid field for this report — display only.
         title: "Blocked Brands",
         key: "blockedBrands",
-        getValue: (row) => row.blockedBrands.map(getBlockedBrandLabel).join(", "),
+        getValue: (row) => row.blockedBrands.map(brandLabel).join(", "),
         filterable: false,
         sortable: false,
         groupable: false,
         render: (row) => (
           <div className="flex flex-wrap gap-1.5">
             {row.blockedBrands.map((brand) => (
-              <Badge key={brand}>{getBlockedBrandLabel(brand)}</Badge>
+              <Badge key={brand}>{brandLabel(brand)}</Badge>
             ))}
           </div>
         ),
       },
-    ],
-    [],
+      ...buildExtraBrandLeadTypeColumns<BlockedEmailRow>(extraBrands),
+      ];
+    },
+    [extraBrands],
   );
 
   if (isError) {

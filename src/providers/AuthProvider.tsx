@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { useMe } from "@/hooks/useMe";
+import { useExtraBrands, useSuperOwner } from "@/hooks/useBrandCatalog";
 import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
 import {
   getNavigationsForRole,
@@ -32,7 +33,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading, isError } = useMe();
   const user = data?.user;
   const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
-  const navigations = user ? getNavigationsForRole(user, brandsWithAgents) : [];
+  const extraBrands = useExtraBrands(Boolean(user));
+  const { isSuperOwner } = useSuperOwner(user?.role === "admin");
+  const navigations = user
+    ? getNavigationsForRole(user, brandsWithAgents, { extraBrands, isSuperOwner })
+    : [];
 
   const hasRole = (role: UserRole | UserRole[]) => {
     if (!user) return false;

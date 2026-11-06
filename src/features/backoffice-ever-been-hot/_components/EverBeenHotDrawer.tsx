@@ -23,7 +23,22 @@ import {
   getCallBackDateError,
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
-import { toggleMarkVoid, jsonEqualIgnoringKeys } from "@/features/agent-calls/_lib/markVoid";
+import {
+  jsonEqualIgnoringKeys,
+  resolveMarkVoidAgentSlug,
+  toggleMarkVoid,
+} from "@/features/agent-calls/_lib/markVoid";
+import {
+  EMPTY_EXTRA_BRAND_FORM,
+  extraBrandStateToForm,
+  getExtraBrandPatch,
+  useExtraBrandAgents,
+  type ExtraBrandFormState,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useBrandName } from "@/hooks/useBrandCatalog";
+import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
+import { isLegacyBrandCode } from "@/lib/brands";
+import { useAuth } from "@/providers/AuthProvider";
 import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
@@ -35,7 +50,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 type EverBeenHotDrawerProps = {
   data: EverBeenHotRow[];
   columns?: Column<EverBeenHotRow>[];
-  variant: "svg" | "95rm" | "benton";
+  variant: string;
   selectedIndex: number | null;
   onSelectedIndexChange: (index: number) => void;
   onClose: () => void;
@@ -68,9 +83,13 @@ type EditableDrawerState = {
   bentonHistoryCalls: string;
   bentonHistoryNotes: string;
   bentonToBeCalledOn: string;
+  extraBrand: ExtraBrandFormState;
 };
 
-function getEditableState(row: EverBeenHotRow): EditableDrawerState {
+function getEditableState(
+  row: EverBeenHotRow,
+  variant: string,
+): EditableDrawerState {
   return {
     companyName: row.companyName,
     contactType: row.contactType,
@@ -90,6 +109,9 @@ function getEditableState(row: EverBeenHotRow): EditableDrawerState {
     bentonHistoryCalls: defaultHistoryCalls,
     bentonHistoryNotes: defaultHistoryNotes,
     bentonToBeCalledOn: row.bentonLastCallDate,
+    extraBrand: isLegacyBrandCode(variant)
+      ? EMPTY_EXTRA_BRAND_FORM
+      : extraBrandStateToForm(row.extraBrandStates?.[variant]),
   };
 }
 
@@ -146,6 +168,15 @@ export function EverBeenHotDrawer({
   const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
   const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
     useState<string>();
+  const [extraToBeCalledOnError, setExtraToBeCalledOnError] =
+    useState<string>();
+  const { user } = useAuth();
+  const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
+  const isExtraVariant = !isLegacyBrandCode(variant);
+  const brandName = useBrandName(variant);
+  const variantAgents = useExtraBrandAgents(isExtraVariant ? [variant] : [])[
+    variant
+  ];
   const [formState, setFormState] = useState<{
     key: string;
     value: EditableDrawerState;
@@ -155,8 +186,8 @@ export function EverBeenHotDrawer({
   const rowKey = row?.email ?? "";
   const drawerOpen = row !== null && selectedIndex !== null;
   const initialForm = useMemo(
-    () => (row ? getEditableState(row) : null),
-    [row],
+    () => (row ? getEditableState(row, variant) : null),
+    [row, variant],
   );
   const form = formState?.key === rowKey ? formState.value : initialForm;
   const updateLead = useUpdateLead();
@@ -191,7 +222,24 @@ export function EverBeenHotDrawer({
     updateForm("notWorked", checked);
     if (!checked) return;
 
-    const ok = await toggleMarkVoid(variant, row.leadId, checked, {
+    const voidAgentSlug = isExtraVariant
+      ? resolveMarkVoidAgentSlug(
+          brandsWithAgents,
+          variant,
+          form?.extraBrand.toBeCalledBy,
+        )
+      : variant;
+    if (!voidAgentSlug) {
+      updateForm("notWorked", false);
+      showErrorToast(
+        new Error(
+          `Cannot mark void: no agent is configured for the ${brandName} brand.`,
+        ),
+      );
+      return;
+    }
+
+    const ok = await toggleMarkVoid(voidAgentSlug, row.leadId, checked, {
       successMessage: "Lead marked as no longer working at the company.",
     });
     if (!ok) {
@@ -255,6 +303,7 @@ export function EverBeenHotDrawer({
   useEffect(() => {
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
+    setExtraToBeCalledOnError(undefined);
   }, [rowKey]);
 
   if (!row || selectedIndex === null || !form) return null;
@@ -265,6 +314,7 @@ export function EverBeenHotDrawer({
     setFormState(null);
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
+    setExtraToBeCalledOnError(undefined);
   };
 
   const handleSvgToBeCalledOnChange = (value: string) => {
@@ -279,6 +329,16 @@ export function EverBeenHotDrawer({
     setBentonToBeCalledOnError(error);
     if (error) return;
     updateForm("bentonToBeCalledOn", value);
+  };
+
+  const variantLastCalledDate =
+    row.extraBrandStates?.[variant]?.lastCalledDate?.slice(0, 10) ?? "";
+
+  const handleExtraToBeCalledOnChange = (value: string) => {
+    const error = getCallBackDateError(value, variantLastCalledDate);
+    setExtraToBeCalledOnError(error);
+    if (error) return;
+    updateForm("extraBrand", { ...form.extraBrand, toBeCalledOn: value });
   };
 
   const handleSave = async () => {
@@ -335,6 +395,15 @@ export function EverBeenHotDrawer({
       bentonDiff.last_called_date = form.bentonToBeCalledOn || null;
     }
     if (Object.keys(bentonDiff).length > 0) brandStates.benton = bentonDiff;
+
+    if (isExtraVariant) {
+      const extraDiff = getExtraBrandPatch(
+        variant,
+        form.extraBrand,
+        initialForm.extraBrand,
+      );
+      if (extraDiff) brandStates.others = [extraDiff];
+    }
 
     if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
 
@@ -560,6 +629,62 @@ export function EverBeenHotDrawer({
           </EditableField>
         </DetailCard>
 
+        {isExtraVariant ? (
+          <DetailCard label={`${brandName} Details`}>
+            <EditableField label="Lead Type">
+              <Select
+                value={form.extraBrand.leadType}
+                onChange={(value) =>
+                  updateForm("extraBrand", {
+                    ...form.extraBrand,
+                    leadType: String(value),
+                  })
+                }
+                options={leadTypeOptions}
+                placeholder="Select lead type"
+                className="py-1.5 text-xs"
+              />
+            </EditableField>
+            <EditableField label="To Be Called By">
+              <Select
+                value={form.extraBrand.toBeCalledBy}
+                onChange={(value) =>
+                  updateForm("extraBrand", {
+                    ...form.extraBrand,
+                    toBeCalledBy: String(value),
+                  })
+                }
+                options={variantAgents?.options ?? []}
+                placeholder={
+                  variantAgents?.isLoading
+                    ? "Loading agents..."
+                    : "Select assignee"
+                }
+                disabled={variantAgents?.isLoading}
+                searchable
+                searchPlaceholder="Search agent"
+                className="py-1.5 text-xs"
+              />
+            </EditableField>
+            <EditableField label="To Be Called On">
+              <DatePickerField
+                value={form.extraBrand.toBeCalledOn}
+                onChange={handleExtraToBeCalledOnChange}
+                minDate={getMinCallBackDate(variantLastCalledDate)}
+                error={extraToBeCalledOnError}
+                className="text-xs font-semibold"
+              />
+            </EditableField>
+            <EditableField label="Last Called Date">
+              <TextInput
+                value={variantLastCalledDate || "-"}
+                readOnly
+                className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
+              />
+            </EditableField>
+          </DetailCard>
+        ) : (
+          <>
         <DetailCard label="SVG Details">
           <EditableField label="Lead Type">
             <Select
@@ -665,6 +790,8 @@ export function EverBeenHotDrawer({
             />
           </EditableField>
         </DetailCard>
+          </>
+        )}
 
         <DetailCard label="Associated Contacts">
           <DetailCard label={form.companyName}>
@@ -672,6 +799,15 @@ export function EverBeenHotDrawer({
               label="Contact Type"
               value={<TypeBadge value={form.contactType} kind="contact" />}
             />
+            {isExtraVariant ? (
+              <AssociationDetail
+                label={`${brandName} Lead Type`}
+                value={
+                  <TypeBadge value={form.extraBrand.leadType} kind="lead" />
+                }
+              />
+            ) : (
+              <>
             <AssociationDetail
               label="SVG Lead Type"
               value={<TypeBadge value={form.svgLeadType} kind="lead" />}
@@ -680,6 +816,8 @@ export function EverBeenHotDrawer({
               label="Benton Lead Type"
               value={<TypeBadge value={form.bentonLeadType} kind="lead" />}
             />
+              </>
+            )}
           </DetailCard>
         </DetailCard>
       </div>

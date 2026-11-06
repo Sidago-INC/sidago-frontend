@@ -3,7 +3,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-type Brand = "svg" | "95rm" | "benton";
+type LegacyBrand = "svg" | "95rm" | "benton";
+
+export type BrandStatePatch = {
+  lead_type?: string;
+  to_be_called_by?: string | null;
+  last_called_date?: string | null;
+  // The call-back date: lead_brand_state.follow_up_date.
+  follow_up_date?: string | null;
+};
+
+export type ExtraBrandStatePatch = BrandStatePatch & { brandCode: string };
 
 export type LeadPatchBody = {
   fix_submit?: boolean;
@@ -22,18 +32,10 @@ export type LeadPatchBody = {
     // failed the whole PATCH with "property first_name should not exist".
     // The drawer's First/Last Name fields were removed rather than faked.
   };
-  brandStates?: Partial<
-    Record<
-      Brand,
-      {
-        lead_type?: string;
-        to_be_called_by?: string | null;
-        last_called_date?: string | null;
-        // The call-back date: lead_brand_state.follow_up_date.
-        follow_up_date?: string | null;
-      }
-    >
-  >;
+  // The DTO rejects unknown keys, so any other brand goes in `others`.
+  brandStates?: Partial<Record<LegacyBrand, BrandStatePatch>> & {
+    others?: ExtraBrandStatePatch[];
+  };
 };
 
 type PatchSuccess = {
