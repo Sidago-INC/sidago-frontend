@@ -10,6 +10,7 @@ import {
   PlusCircle,
   RefreshCcw,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import {
   useLeadStatsSocket,
@@ -154,6 +155,21 @@ export function FixLeads() {
     debouncedSearch,
     url.grid,
   );
+  // The Fix Queue box always counts the WHOLE queue. The table's request carries
+  // the page's filters, and those are restored from the URL / session memory on
+  // arrival, so its total_count is often a filtered number. This one-row,
+  // unfiltered request shares the "fix-queue" key prefix, so every save that
+  // invalidates the queue refreshes the count too.
+  const { data: queueTotalResult } = useFixQueue(1, 1);
+  const queueTotal = queueTotalResult?.meta.total_count;
+  const filteredTotal = result?.meta.total_count;
+  const filtersActive = Boolean(
+    contactsFilter ||
+      hasOtherContacts ||
+      timezone ||
+      debouncedSearch?.trim() ||
+      url.grid.filters,
+  );
   const serverPagination = result?.meta
     ? {
         meta: result.meta,
@@ -205,14 +221,41 @@ export function FixLeads() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <div className="shrink-0 space-y-4 px-4 pt-2">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-          <div className="min-w-0 shrink-0">
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              Fix Queue
-            </h1>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Today ({todayStr})
-            </p>
+        {/* lg:flex-wrap: with the count box beside the title, the title group
+            and the filters no longer fit one row at every lg width; the
+            filters drop to their own line instead of squeezing the box. */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="min-w-0 shrink-0">
+              <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                Fix Queue
+              </h1>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Today ({todayStr})
+              </p>
+            </div>
+
+            <section
+              aria-label="Leads in the fix queue"
+              className="flex w-fit items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 shadow-sm dark:border-indigo-800/60 dark:bg-indigo-950/40"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white dark:bg-indigo-500">
+                <Wrench className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+                  Leads in Fix Queue
+                </p>
+                <p className="text-2xl font-bold leading-tight tabular-nums text-indigo-950 dark:text-white">
+                  {queueTotal === undefined ? "—" : queueTotal.toLocaleString()}
+                </p>
+                {filtersActive && filteredTotal !== undefined ? (
+                  <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
+                    {filteredTotal.toLocaleString()} match the current filters
+                  </p>
+                ) : null}
+              </div>
+            </section>
           </div>
 
           <div className="grid w-full grid-cols-2 items-end gap-3 lg:w-auto lg:flex lg:flex-wrap">

@@ -18,8 +18,13 @@ export function resolveAgentSlug(cookieKey: string): string {
 }
 
 export const agentCallsApi = {
-  queue: (agentSlug: string): Promise<QueueResponse> =>
-    api.get(`/agent-calls/queue?agentSlug=${agentSlug}&limit=500`),
+  // `timezone` narrows the queue to one timezone server-side, before the
+  // per-category cuts. Omit it for the normal priority-ordered queue.
+  queue: (agentSlug: string, timezone?: string): Promise<QueueResponse> => {
+    const params = new URLSearchParams({ agentSlug, limit: "500" });
+    if (timezone !== undefined) params.set("timezone", timezone);
+    return api.get(`/agent-calls/queue?${params.toString()}`);
+  },
 
   // Bucket counts for the sidebar. Cheap enough to refetch on every search
   // keystroke (debounced) — it is a single GROUP BY over the agent's row-set.
