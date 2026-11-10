@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:staging": "vite --mode staging",
-    "build": "tsc -b && vite build",
-    "build:staging": "tsc -b && vite build --mode staging",
+    "dev": "node init && vite",
+    "dev:staging": "node init && vite --mode staging",
+    "build": "node init && tsc -b && vite build",
+    "build:staging": "node init && tsc -b && vite build --mode staging",
     "preview": "vite preview",
     "lint": "eslint"
   },
