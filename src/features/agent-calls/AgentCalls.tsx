@@ -275,15 +275,17 @@ export function AgentCalls() {
         onSkip={handleSkip}
       />
 
-      <main className="space-y-3 px-4 py-4 sm:space-y-4 sm:px-4 sm:py-6">
+      <main className="space-y-3 px-3 py-3 sm:space-y-4 sm:px-4 sm:py-6">
         <QueuePriorityNotice leads={leads} />
 
         <HeroCard currentLead={currentLead} />
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="space-y-4 lg:col-span-1">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {/* Below xl the side column sits above the main one; on tablets its
+              cards pair up two-across instead of stretching full width. */}
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:col-span-1 xl:grid-cols-1">
             <PhoneCard phone={currentLead.phone} />
-            <CardShell>
+            <CardShell className="md:row-span-2 xl:row-span-1">
               <IdentityCard
                 form={form}
                 leadName={currentLead.fullName}
@@ -303,7 +305,7 @@ export function AgentCalls() {
             />
           </div>
 
-          <div className="space-y-4 lg:col-span-2">
+          <div className="min-w-0 space-y-4 xl:col-span-2">
             <CallNotesCard
               notes={form.notes}
               onChange={(value) =>

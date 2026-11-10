@@ -24,8 +24,10 @@ export function useLeadEmails(leadId: string | null | undefined) {
     queryKey: leadEmailsKey(leadId),
     enabled: Boolean(leadId),
     queryFn: async () => {
+      // Deleted (archived) addresses come too, after the active ones, so the
+      // card can offer to restore them.
       const json = (await api.get(
-        `/leads/${leadId}/emails`,
+        `/leads/${leadId}/emails?includeArchived=true`,
       )) as LeadEmailsResponse;
       return json.data;
     },
@@ -127,7 +129,7 @@ export function useAutoVerifyLeadEmail(leadId: string) {
     mutationFn: async (id: string) =>
       (await api.post(`/leads/${leadId}/emails/${id}/auto-verify`, {})) as {
         ok: true;
-        autoVerification: string;
+        neverbounceResult: string;
       },
     onSuccess: invalidate,
   });
@@ -140,6 +142,32 @@ export function useArchiveLeadEmail(leadId: string) {
       (await api.delete(`/leads/${leadId}/emails/${id}`)) as {
         ok: true;
         id: string;
+      },
+    onSuccess: invalidate,
+  });
+}
+
+/** Correct an address in place; its history records the old and new value. */
+export function useChangeLeadEmailAddress(leadId: string) {
+  const invalidate = useInvalidateAfterChange(leadId);
+  return useMutation({
+    mutationFn: async (vars: { id: string; address: string; note?: string }) =>
+      (await api.patch(`/leads/${leadId}/emails/${vars.id}/address`, {
+        address: vars.address,
+        note: vars.note,
+      })) as { ok: true; data: LeadEmail },
+    onSuccess: invalidate,
+  });
+}
+
+/** Bring a deleted (archived) address back, verification as it was. */
+export function useRestoreLeadEmail(leadId: string) {
+  const invalidate = useInvalidateAfterChange(leadId);
+  return useMutation({
+    mutationFn: async (id: string) =>
+      (await api.post(`/leads/${leadId}/emails/${id}/restore`, {})) as {
+        ok: true;
+        data: LeadEmail;
       },
     onSuccess: invalidate,
   });

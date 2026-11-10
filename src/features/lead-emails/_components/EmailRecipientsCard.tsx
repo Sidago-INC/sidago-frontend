@@ -220,7 +220,7 @@ export function EmailRecipientsCard({
                     <span
                       className="rounded bg-emerald-50 px-1 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
                       title={
-                        item.verification === "confirmed"
+                        item.confirmedByAgent
                           ? "Verified by an agent"
                           : "Verified by NeverBounce"
                       }

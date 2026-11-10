@@ -1,8 +1,7 @@
 // Mirrors Sidago-backend src/lead-emails (LeadEmailView, resolver output).
-// Verification and deliverability are independent: a confirmed address that
-// later bounces stays "confirmed" and is flagged for re-verification.
-
-export type Verification = "unverified" | "confirmed";
+// Agent verification, NeverBounce verification and deliverability are
+// independent: a confirmed address that later bounces stays confirmed by the
+// agent and is flagged for re-verification.
 
 export type Deliverability =
   | "unknown"
@@ -13,10 +12,10 @@ export type Deliverability =
   | "complained";
 
 /**
- * Automated (NeverBounce) result — a separate fact from the agent's
- * `verification`. An agent-verified address is not thereby "valid" here.
+ * Automated (NeverBounce) result: a separate fact from the agent's
+ * confirmation. An agent-verified address is not thereby "valid" here.
  */
-export type AutoVerification =
+export type NeverbounceResult =
   | "unchecked"
   | "valid"
   | "invalid"
@@ -27,16 +26,19 @@ export type AutoVerification =
 export type LeadEmail = {
   id: string;
   address: string;
-  position: number;
+  /** The order addresses are tried in: #1 is 0. */
+  rotationOrder: number;
   source: string;
-  verification: Verification;
-  confirmationMethod: string | null;
-  confirmedByUserId: string | null;
-  confirmedAt: string | null;
+  confirmedByAgent: boolean;
+  agentId: string | null;
+  agentName: string | null;
+  agentConfirmedAt: string | null;
+  agentConfirmationMethod: string | null;
   deliverability: Deliverability;
   softBounceCount: number;
-  autoVerification: AutoVerification;
-  autoVerifiedAt: string | null;
+  confirmedByNeverbounce: boolean;
+  neverbounceResult: NeverbounceResult;
+  neverbounceCheckedAt: string | null;
   /** Agent-verified OR NeverBounce-valid: takes part in the rotation. */
   verified: boolean;
   sendCount: number;
@@ -49,6 +51,7 @@ export type LeadEmail = {
   eligible: boolean;
   /** Confirmed, but delivery says it no longer works. */
   needsReverification: boolean;
+  /** Deleted from the lead (soft): history kept, can be restored. */
   isArchived: boolean;
   createdAt: string;
 };
