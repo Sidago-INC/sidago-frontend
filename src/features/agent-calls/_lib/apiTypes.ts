@@ -1,3 +1,4 @@
+import type { BrandEmailProgress } from "@/features/lead-emails/_lib/progress";
 export type QueueLead = {
   leadId: string;
   leadIdExternal: string;
@@ -105,6 +106,8 @@ export type BrandState = {
   /** Preferred display-name field from lead detail / brand-state APIs. */
   toBeCalledByName?: string | null;
   lastFixedDate: string | null;
+  /** Stage + "Sent n/3" for this brand. */
+  email?: BrandEmailProgress | null;
 };
 
 export type LeadDetailResponse = {

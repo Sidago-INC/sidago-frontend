@@ -54,6 +54,9 @@ import {
 import { createLeadDirectoryRow, type LeadDirectoryRow } from "../_lib/data";
 import type { RelatedLead } from "@/features/fix-leads/_lib/data";
 import { useRelatedLeads } from "@/features/fix-leads/_lib/data";
+import { LeadEmailsCard } from "@/features/lead-emails/_components/LeadEmailsCard";
+import { EmailProgressBadge } from "@/features/lead-emails/_components/EmailProgressBadge";
+import type { BrandEmailProgress } from "@/features/lead-emails/_lib/progress";
 
 const NESTED_DRAWER_Z = 210;
 
@@ -834,11 +837,19 @@ export function LeadsDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Email">
-            <EmailInput
-              value={form.email}
-              onChange={(event) => updateForm("email", event.target.value)}
-              className="text-xs font-semibold"
+          <EditableField label="Email" align="stack">
+            {/* Each address is its own record (verify, archive, unarchive); the
+                old single input only while the feature is off on the server. */}
+            <LeadEmailsCard
+              leadId={detailPayload?.lead.id ?? row.leadId}
+              confirmMethod="agent_promoted"
+              fallback={
+                <EmailInput
+                  value={form.email}
+                  onChange={(event) => updateForm("email", event.target.value)}
+                  className="text-xs font-semibold"
+                />
+              }
             />
           </EditableField>
           <EditableField label="Last action date (all brands)">
@@ -905,6 +916,7 @@ export function LeadsDrawer({
           historyCalls={form.svgHistoryCalls}
           historyNotes={form.svgHistoryNotes}
           leadTypeOptions={leadTypeOptions}
+          email={detailPayload?.brandStates.svg?.email}
           agentOptions={svgAgentsQuery.options}
           agentsLoading={svgAgentsQuery.isLoading}
         />
@@ -927,6 +939,7 @@ export function LeadsDrawer({
           historyCalls={form.bentonHistoryCalls}
           historyNotes={form.bentonHistoryNotes}
           leadTypeOptions={leadTypeOptions}
+          email={detailPayload?.brandStates.benton?.email}
           agentOptions={bentonAgentsQuery.options}
           agentsLoading={bentonAgentsQuery.isLoading}
         />
@@ -949,6 +962,7 @@ export function LeadsDrawer({
           historyCalls={form.rm95HistoryCalls}
           historyNotes={form.rm95HistoryNotes}
           leadTypeOptions={leadTypeOptions}
+          email={detailPayload?.brandStates["95rm"]?.email}
           agentOptions={rm95AgentsQuery.options}
           agentsLoading={rm95AgentsQuery.isLoading}
         />
@@ -999,6 +1013,7 @@ function LeadDetailsCard({
   leadTypeOptions,
   agentOptions,
   agentsLoading,
+  email,
 }: {
   title: string;
   leadType: string;
@@ -1015,6 +1030,8 @@ function LeadDetailsCard({
   leadTypeOptions: Array<{ label: string; value: string }>;
   agentOptions: Array<{ label: string; value: string }>;
   agentsLoading: boolean;
+  /** Stage + "Sent n/3" for this brand (from the lead detail). */
+  email?: BrandEmailProgress | null;
 }) {
   return (
     <DetailCard label={title}>
@@ -1054,6 +1071,9 @@ function LeadDetailsCard({
           readOnly
           className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
         />
+      </EditableField>
+      <EditableField label="Email Status">
+        <EmailProgressBadge email={email} />
       </EditableField>
       <EditableField label="History Calls" align="stack">
         <Textarea

@@ -1,3 +1,5 @@
+import { LeadEmailsCard } from "@/features/lead-emails/_components/LeadEmailsCard";
+import { EmailProgressBadge } from "@/features/lead-emails/_components/EmailProgressBadge";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -1381,12 +1383,23 @@ function CallLogDetailContent({
             className="text-xs font-semibold"
           />
         </EditableField>
-        <EditableField label="Email">
-          <EmailInput
-            value={form.email}
-            onChange={(event) => onUpdateForm("email", event.target.value)}
-            className="text-xs font-semibold"
+        <EditableField label="Email" align="stack">
+          {/* The same email card as the Calls page and All Leads; the plain
+              input only while the feature is off on the server. */}
+          <LeadEmailsCard
+            leadId={detail.lead.id}
+            brandCode={detail.brandState?.brandCode}
+            fallback={
+              <EmailInput
+                value={form.email}
+                onChange={(event) => onUpdateForm("email", event.target.value)}
+                className="text-xs font-semibold"
+              />
+            }
           />
+        </EditableField>
+        <EditableField label="Email Status">
+          <EmailProgressBadge email={detail.brandState?.email} />
         </EditableField>
       </DetailCard>
 

@@ -1,3 +1,5 @@
+import { loggedSendMessage } from "../_lib/progress";
+import type { EmailLogResponse } from "@/features/agent-email/_lib/apiTypes";
 import clsx from "clsx";
 import { Mail, MailCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
@@ -144,12 +146,13 @@ export function EmailRecipientsCard({
         body: logBody,
         status,
         recipientIds: chosen.map((c) => c.id),
-      })) as { recipients?: { address: string }[] };
+      })) as EmailLogResponse;
       const n = res.recipients?.length ?? chosen.length;
+      // Say where the lead went, not only that it left the list.
       showSuccessToast(
         n > 1
-          ? `Email logged for ${n} recipients (counted as one touch).`
-          : "Email logged.",
+          ? `${loggedSendMessage(res)} — ${n} recipients, counted as one touch.`
+          : loggedSendMessage(res),
       );
       onLogged();
     } catch (err) {
@@ -221,7 +224,7 @@ export function EmailRecipientsCard({
                       className="rounded bg-emerald-50 px-1 text-[10px] font-semibold uppercase text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
                       title={
                         item.confirmedByAgent
-                          ? "Verified by an agent"
+                          ? `Verified by ${item.agentName ?? "an agent"}`
                           : "Verified by NeverBounce"
                       }
                     >

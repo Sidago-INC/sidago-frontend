@@ -1,3 +1,5 @@
+import type { EmailProgress } from "@/features/lead-emails/_lib/progress";
+
 export type EmailQueueItem = {
   id: string;
   leadId: string;
@@ -26,7 +28,8 @@ export type EmailQueueItem = {
   recipients?: {
     id: string;
     address: string;
-    verification: string;
+    confirmedByAgent: boolean;
+    confirmedByNeverbounce: boolean;
     deliverability: string;
   }[];
   recipientMode?: string | null;
@@ -99,7 +102,12 @@ export type EmailLogBody = {
 export type EmailLogResponse = {
   ok: true;
   id: string;
+  /** The stage the lead is at now (the next email). */
   emailStatus?: string;
+  /** The stage of the email just logged. */
+  previousStatus?: string;
+  /** "Sent n/3" after this send. */
+  progress?: EmailProgress | null;
   /** Present when the send was attributed to specific addresses. */
   ids?: string[];
   sendGroupId?: string;

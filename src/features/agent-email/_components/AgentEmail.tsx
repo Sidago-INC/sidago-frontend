@@ -1,5 +1,6 @@
 
 
+import { loggedSendMessage } from "@/features/lead-emails/_lib/progress";
 import { EmailPriorityBadge, Table } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
@@ -236,7 +237,7 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
     }));
 
     try {
-      await logEmail.mutateAsync({
+      const res = await logEmail.mutateAsync({
         leadId: row.leadId,
         brandCode: row.brandCode,
         subject: `Email log for ${row.fullName || row.companyName || row.leadId}`,
@@ -246,7 +247,8 @@ export function AgentEmail({ agentName, agentSlug }: AgentEmailProps) {
           `Email log recorded for ${row.fullName || row.companyName || row.leadId}`,
         status: row.emailToBeSent,
       });
-      showSuccessToast("Email log recorded successfully.");
+      // Say where the lead went, not only that it left the list.
+      showSuccessToast(loggedSendMessage(res));
     } catch (error) {
       updateRow(row.id, (currentRow) => ({
         ...currentRow,

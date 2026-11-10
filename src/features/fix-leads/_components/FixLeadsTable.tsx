@@ -1,3 +1,5 @@
+import { EmailProgressBadge } from "@/features/lead-emails/_components/EmailProgressBadge";
+import { progressLabel } from "@/features/lead-emails/_lib/progress";
 import {
   Button,
   CompanySymbolBadge,
@@ -27,6 +29,12 @@ import {
   getFixQueueTimezoneLabel,
   useRelatedLeads,
 } from "../_lib/data";
+
+const EMAIL_BRANDS = [
+  ["svg", "SVG"],
+  ["benton", "Benton"],
+  ["95rm", "95RM"],
+] as const;
 
 type FixLeadsTableProps = {
   data: FixQueueRow[];
@@ -121,6 +129,38 @@ export function FixLeadsTable({
         groupable: false,
       },
       { title: "Email", key: "email" },
+      {
+        // Per brand "Sent n/3" — the same badge the lead detail shows.
+        title: "Email Status",
+        key: "emailProgress",
+        getValue: (row) =>
+          EMAIL_BRANDS.map(([code, label]) => {
+            const progress = row.emailProgress?.[code]?.progress;
+            return progress ? `${label} ${progressLabel(progress)}` : null;
+          })
+            .filter(Boolean)
+            .join(", "),
+        filterable: false,
+        sortable: false,
+        groupable: false,
+        render: (row) => {
+          const shown = EMAIL_BRANDS.filter(([code]) => row.emailProgress?.[code]);
+          return shown.length ? (
+            <div className="flex flex-wrap gap-1">
+              {shown.map(([code, label]) => (
+                <EmailProgressBadge
+                  key={code}
+                  brandLabel={label}
+                  email={row.emailProgress?.[code]}
+                  compact
+                />
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-slate-400">—</span>
+          );
+        },
+      },
       {
         title: "SVG - Lead Type",
         key: "svgLeadType",

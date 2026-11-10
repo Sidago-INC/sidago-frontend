@@ -1,3 +1,4 @@
+import type { BrandEmailProgress } from "@/features/lead-emails/_lib/progress";
 import type {
   BrandState,
   HistoryEntry,
@@ -34,6 +35,7 @@ type ExtendedBrandState = {
   to_be_called_by?: string | null;
   callHistory?: CallHistoryEntry[];
   history?: CallHistoryEntry[];
+  email?: BrandEmailProgress | null;
 };
 
 type ExtendedBrandStates = {
@@ -173,6 +175,7 @@ function mapBrandState(
     lastCalledDate: state.lastCalledDate,
     toBeCalledBy: resolveToBeCalledByName(state),
     toBeCalledByName: resolveToBeCalledByName(state),
+    email: state.email ?? null,
     callHistory: getHistoryEntries(history, state.brandCode).map(mapHistoryEntry),
   };
 }

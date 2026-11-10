@@ -1,3 +1,4 @@
+import type { BrandEmailProgress } from "@/features/lead-emails/_lib/progress";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
@@ -64,6 +65,8 @@ export type FixQueueRow = {
   otherContacts: string | null;
   contactsFilter: ContactsFilter;
   hasOtherContacts: boolean;
+  /** Per brand: stage + "Sent n/3" (null when the lead has no row there). */
+  emailProgress?: Record<"svg" | "benton" | "95rm", BrandEmailProgress | null>;
 };
 
 export type FullLead = {
@@ -92,18 +95,21 @@ export type BrandStates = {
     followUpDate: string | null;
     lastCalledDate: string | null;
     toBeCalledBy?: string | null;
+    email?: BrandEmailProgress | null;
   };
   benton: {
     leadType: string | null;
     followUpDate: string | null;
     lastCalledDate: string | null;
     toBeCalledBy?: string | null;
+    email?: BrandEmailProgress | null;
   };
   "95rm": {
     leadType: string | null;
     followUpDate: string | null;
     lastCalledDate: string | null;
     toBeCalledBy?: string | null;
+    email?: BrandEmailProgress | null;
   };
 };
 

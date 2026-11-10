@@ -18,6 +18,8 @@ import { ArrowLeft, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { NewLeadDrawer } from "@/features/leads/_components/NewLeadDrawer";
+import { LeadEmailsCard } from "@/features/lead-emails/_components/LeadEmailsCard";
+import { EmailProgressBadge } from "@/features/lead-emails/_components/EmailProgressBadge";
 import { createLead } from "@/features/leads/_lib/hooks";
 import type { LeadCreateFormValues } from "@/lib/validation/lead-create";
 import {
@@ -280,15 +282,23 @@ export function FixLeadEditForm() {
                 onChange={(event) => updateField("role", event.target.value)}
                 className={inputClassName}
               />
-              {/* A lead's email is a comma-joined LIST, so a single
-                  `type="email"` input is wrong twice over: the browser rejects
-                  a value containing commas, and there was no way to add a
-                  second address while fixing a lead. */}
-              <EmailListField
-                value={form.email}
-                onChange={(value) => updateField("email", value)}
-                inputClassName={inputClassName}
-              />
+              {/* Each address is its own record: the same card, badges and
+                  actions as the Calls page and All Leads. The comma-joined
+                  list field only while the feature is off on the server. */}
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <span className="text-sm font-medium">Email</span>
+                <LeadEmailsCard
+                  leadId={leadId}
+                  confirmMethod="agent_promoted"
+                  fallback={
+                    <EmailListField
+                      value={form.email}
+                      onChange={(value) => updateField("email", value)}
+                      inputClassName={inputClassName}
+                    />
+                  }
+                />
+              </div>
               <TextInput
                 label="Phone"
                 value={form.phone}
@@ -401,7 +411,7 @@ export function FixLeadEditForm() {
 
             <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/40">
               <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Per-Brand Lead Type
+                Per-Brand Lead Type &amp; Email
               </p>
               <div className="grid gap-4 md:grid-cols-3">
                 <TextInput
@@ -422,6 +432,20 @@ export function FixLeadEditForm() {
                   readOnly
                   className={readOnlyInputClassName}
                 />
+                {(
+                  [
+                    ["svg", "SVG"],
+                    ["benton", "Benton"],
+                    ["95rm", "95RM"],
+                  ] as const
+                ).map(([code, label]) => (
+                  <div key={code} className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {label} Email Status
+                    </span>
+                    <EmailProgressBadge email={data.brandStates[code].email} />
+                  </div>
+                ))}
               </div>
             </section>
 

@@ -16,7 +16,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "react-toastify";
 import { Confirmation } from "@/components/ui/Confirmation";
 import { EmailLink } from "@/components/ui/EmailLink";
@@ -54,6 +54,11 @@ type Props = {
   confirmMethod?: "phone" | "agent_promoted";
   /** The brand being worked; a reply also takes the lead out of its email queue. */
   brandCode?: string;
+  /**
+   * Rendered instead while the feature is switched off on the server: pages
+   * that edit the old comma-joined field pass that input here.
+   */
+  fallback?: ReactNode;
 };
 
 const DELIVERABILITY_LABEL: Record<Deliverability, string> = {
@@ -644,6 +649,7 @@ export function LeadEmailsCard({
   fallbackEmail,
   confirmMethod = "phone",
   brandCode,
+  fallback,
 }: Props) {
   const { data, isLoading, isError, error, refetch } = useLeadEmails(leadId);
   const add = useAddLeadEmail(leadId ?? "");
@@ -685,6 +691,7 @@ export function LeadEmailsCard({
   if (!leadId) return null;
 
   if (isError && isLeadEmailsDisabled(error)) {
+    if (fallback !== undefined) return <>{fallback}</>;
     const legacy = String(fallbackEmail ?? "").trim();
     return legacy ? (
       <EmailLink value={legacy} wrap />
