@@ -41,6 +41,12 @@ export type Level2UpdateRow = {
   lead_type_95rm: LEAD_TYPE | "";
   /** Who put the row on the board. Blank for local rows. */
   submitted_by: string;
+  // The Delisted column — the lead's company, live. Unknown (false/blank)
+  // while the row is local; the board fills it in once the row is shared.
+  company_delisted: boolean;
+  delisted_at: string;
+  delisted_by: string;
+  delisted_reason: string;
 };
 
 /** A row that has been submitted can no longer be edited, only reverted. */
@@ -81,6 +87,8 @@ export const level2ResultUpdateOptions = [
   { label: "Force General", value: "Force General" },
   { label: "Force Void", value: "Force Void" },
   { label: "Block Email To", value: "Block Email To" },
+  // Company-wide: delists every lead at the company on every campaign.
+  { label: "Delisted", value: "Delisted" },
 ];
 
 export const level2UpdateCampaignOptions = BRAND_OPTIONS.map((option) => ({
@@ -113,6 +121,10 @@ export function createEmptyLevel2UpdateRow(nextId: number): Level2UpdateRow {
     lead_type_benton: "",
     lead_type_95rm: "",
     submitted_by: "",
+    company_delisted: false,
+    delisted_at: "",
+    delisted_by: "",
+    delisted_reason: "",
   };
 }
 
@@ -149,5 +161,9 @@ export function boardRowToUpdateRow(row: Level2BoardRow): Level2UpdateRow {
     lead_type_benton: (row.leadTypeBenton ?? "") as LEAD_TYPE | "",
     lead_type_95rm: (row.leadType95rm ?? "") as LEAD_TYPE | "",
     submitted_by: row.submittedByName ?? "",
+    company_delisted: Boolean(row.companyDelisted),
+    delisted_at: row.delistedAt ?? "",
+    delisted_by: row.delistedByName ?? "",
+    delisted_reason: row.delistedReason ?? "",
   };
 }

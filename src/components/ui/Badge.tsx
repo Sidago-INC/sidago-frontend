@@ -24,6 +24,11 @@ const LEAD_TYPE_STYLES: Record<string, string> = {
   Fix: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
   Fixed:
     "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+  // Company-wide terminal state: the company left the exchange, so every
+  // lead at it is out of the calling stream. Neutral stone so it reads as
+  // "archived" rather than as a call outcome.
+  Delisted:
+    "border-stone-300 bg-stone-100 text-stone-700 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300",
 };
 
 const CONTACT_TYPE_STYLES: Record<string, string> = {
