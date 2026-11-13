@@ -39,6 +39,12 @@ export type Level2BoardRow = {
   leadTypeSvg: string | null;
   leadTypeBenton: string | null;
   leadType95rm: string | null;
+  // Delisting is company-wide, so these repeat on every row for the company.
+  companyId: string | null;
+  companyDelisted: boolean;
+  delistedAt: string | null;
+  delistedByName: string | null;
+  delistedReason: string | null;
 };
 
 type BoardResponse = { ok: true; count: number; data: Level2BoardRow[] };

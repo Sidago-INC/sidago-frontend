@@ -2,14 +2,26 @@ import {
   Badge,
   Button,
   CampaignBadge,
+  Confirmation,
   DatePickerField,
+  Modal,
   Select,
   Table,
+  Textarea,
   TypeBadge,
 } from "@/components/ui";
 import { type Column } from "@/components/ui/Table";
 import clsx from "clsx";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import {
+  Ban,
+  CircleCheck,
+  FileText,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
+import { formatEasternDateTime } from "@/lib/est";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
@@ -45,6 +57,32 @@ import {
   buildRevertMessage,
   useRevertLevel2Result,
 } from "@/features/level-2-shared/revert";
+import {
+  useDelistCompany,
+  useRestoreCompany,
+  useUpdateDelistingReason,
+} from "../_lib/delisting";
+
+const delistIconButtonClass =
+  "inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900";
+
+function formatDelistedAt(value: string): string {
+  if (!value) return "";
+  return Number.isNaN(new Date(value).getTime())
+    ? value
+    : formatEasternDateTime(value);
+}
+
+// Delist (create) and manage (edit reason / restore) share one dialog.
+type DelistDialogState = {
+  mode: "delist" | "edit";
+  rowId: string;
+  leadId: string;
+  leadLabel: string;
+  reason: string;
+  /** "Nov 13, 12:42 PM ET by Mostakim Billah" — edit mode only. */
+  delistedInfo: string;
+};
 
 const cellInputClass =
   "h-8 min-w-[8rem] w-full rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 hover:bg-slate-50 focus:border-slate-200 focus:bg-white focus:text-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:bg-slate-800/70 dark:focus:border-slate-700 dark:focus:bg-slate-900 dark:focus:text-slate-100";
@@ -127,6 +165,7 @@ const RESULT_CATEGORY: Record<
   "Force General": "admin",
   "Force Void": "admin",
   "Block Email To": "admin",
+  Delisted: "admin",
 };
 
 // Pre-unification spellings, so a stored value still resolves to its colour.
@@ -145,6 +184,7 @@ const LEGACY_RESULT_LABELS: Record<string, string> = {
   "force fix": "Force Fix",
   "force general": "Force General",
   "force void": "Force Void",
+  delisted: "Delisted",
   dnc: "DNC",
 };
 
@@ -215,6 +255,20 @@ export function Level2Update() {
 
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [busyRowId, setBusyRowId] = useState<string | null>(null);
+  // Delisted is company-wide and leaves the calling stream entirely, so it is
+  // the one result that asks before it is logged.
+  const [delistConfirmRowId, setDelistConfirmRowId] = useState<string | null>(
+    null,
+  );
+
+  // The Delisted column's dialogs.
+  const [delistDialog, setDelistDialog] = useState<DelistDialogState | null>(
+    null,
+  );
+  const [restoreRowId, setRestoreRowId] = useState<string | null>(null);
+  const delistCompany = useDelistCompany();
+  const updateDelistingReason = useUpdateDelistingReason();
+  const restoreCompany = useRestoreCompany();
 
   const createDraft = useCreateLevel2Draft();
   const patchDraft = usePatchLevel2Draft();
@@ -526,7 +580,7 @@ export function Level2Update() {
     }
   };
 
-  const handleLogResult = async (rowId: string) => {
+  const handleLogResult = async (rowId: string, confirmed = false) => {
     const row = findRow(rowId);
     if (!row) return;
 
@@ -553,6 +607,11 @@ export function Level2Update() {
     const callbackError = getCallBackDateError(row.call_back_date, "");
     if (callbackError) {
       showErrorToast({ message: callbackError });
+      return;
+    }
+
+    if (row.level_2_result_update === "Delisted" && !confirmed) {
+      setDelistConfirmRowId(rowId);
       return;
     }
 
@@ -598,6 +657,67 @@ export function Level2Update() {
     } finally {
       setBusyRowId(null);
       void board.refetch();
+    }
+  };
+
+  const openDelistDialog = (row: Level2UpdateRow, mode: "delist" | "edit") => {
+    if (!row.lead) return;
+    setDelistDialog({
+      mode,
+      rowId: row.id,
+      leadId: row.lead,
+      leadLabel: row.lead_label,
+      reason: mode === "edit" ? row.delisted_reason : row.updated_notes,
+      delistedInfo: [
+        formatDelistedAt(row.delisted_at),
+        row.delisted_by && `by ${row.delisted_by}`,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    });
+  };
+
+  const handleDelistDialogSave = async () => {
+    if (!delistDialog) return;
+    if (delistCompany.isPending || updateDelistingReason.isPending) return;
+    const reason = delistDialog.reason.trim() || null;
+    try {
+      if (delistDialog.mode === "delist") {
+        const result = await delistCompany.mutateAsync({
+          leadId: delistDialog.leadId,
+          reason,
+        });
+        showSuccessToast(
+          `Company delisted — ${result.leadsAffected} lead${
+            result.leadsAffected === 1 ? "" : "s"
+          } removed from the calling stream.`,
+        );
+      } else {
+        await updateDelistingReason.mutateAsync({
+          leadId: delistDialog.leadId,
+          reason,
+        });
+        showSuccessToast("Delisting reason updated.");
+      }
+      setDelistDialog(null);
+    } catch (err) {
+      showErrorToast(err);
+    }
+  };
+
+  const handleRestore = async () => {
+    const row = findRow(restoreRowId ?? "");
+    if (!row?.lead || restoreCompany.isPending) return;
+    try {
+      const result = await restoreCompany.mutateAsync(row.lead);
+      showSuccessToast(
+        `Company restored — ${result.leadsRestored} lead${
+          result.leadsRestored === 1 ? "" : "s"
+        } back to their previous lead type.`,
+      );
+      setRestoreRowId(null);
+    } catch (err) {
+      showErrorToast(err);
     }
   };
 
@@ -791,6 +911,107 @@ export function Level2Update() {
       ),
     },
     {
+      // Company-wide and live: every row for a delisted company shows it,
+      // including rows logged earlier today.
+      title: "Delisted",
+      key: "company_delisted",
+      type: "select",
+      // Status icon (+ Edit reason and Restore when delisted). Details live in
+      // the tooltip and dialog, so the column stays narrow on every screen.
+      width: 140,
+      minWidth: 120,
+      options: [
+        { label: "Delisted", value: "Delisted" },
+        { label: "Active", value: "Active" },
+      ],
+      getValue: (row) =>
+        !row.serverId ? "" : row.company_delisted ? "Delisted" : "Active",
+      render: (row) => {
+        if (!row.serverId) {
+          return (
+            <span className="px-2.5 text-sm text-slate-400 dark:text-slate-500">
+              —
+            </span>
+          );
+        }
+
+        const delisted = row.company_delisted;
+        const tooltip = delisted
+          ? [
+              `Delisted ${formatDelistedAt(row.delisted_at)}`.trim(),
+              row.delisted_by && `by ${row.delisted_by}`,
+              row.delisted_reason && `Reason: ${row.delisted_reason}`,
+              "Click to edit the reason or restore",
+            ]
+              .filter(Boolean)
+              .join("\n")
+          : "Active. Click to delist this company";
+
+        const statusIcon = (
+          <button
+            type="button"
+            title={tooltip}
+            aria-label={
+              delisted
+                ? `Company delisted. Manage delisting for ${row.lead_label || "this lead"}`
+                : `Company active. Delist the company of ${row.lead_label || "this lead"}`
+            }
+            onClick={(event) => {
+              event.stopPropagation();
+              openDelistDialog(row, delisted ? "edit" : "delist");
+            }}
+            className={clsx(
+              "inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900",
+              delisted
+                ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 focus-visible:ring-rose-400 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 focus-visible:ring-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60",
+            )}
+          >
+            {delisted ? <Ban size={16} /> : <CircleCheck size={16} />}
+          </button>
+        );
+
+        if (!delisted) return statusIcon;
+
+        // Delisted: the status icon plus one-click Edit reason and Restore.
+        return (
+          <div className="flex items-center gap-1.5">
+            {statusIcon}
+            <button
+              type="button"
+              title="Edit reason"
+              aria-label="Edit delisting reason"
+              onClick={(event) => {
+                event.stopPropagation();
+                openDelistDialog(row, "edit");
+              }}
+              className={clsx(
+                delistIconButtonClass,
+                "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 focus-visible:ring-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+              )}
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              title="Restore company"
+              aria-label="Restore company"
+              onClick={(event) => {
+                event.stopPropagation();
+                setRestoreRowId(row.id);
+              }}
+              className={clsx(
+                delistIconButtonClass,
+                "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 focus-visible:ring-emerald-400 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-900/60",
+              )}
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        );
+      },
+    },
+    {
       title: "Log Result",
       key: "log_result",
       render: (row) => {
@@ -878,6 +1099,94 @@ export function Level2Update() {
         showToolbarTitle={false}
         emptyText="Click Add Lead to start a new Level 2 update."
         onRowClick={(row) => setEditingRowId(row.id)}
+      />
+
+      <Confirmation
+        open={delistConfirmRowId !== null}
+        title="Delist this company?"
+        description={`Delisted applies to every lead at the company of ${
+          findRow(delistConfirmRowId ?? "")?.lead_label || "this lead"
+        }, on every campaign, and removes them all from the calling stream. It can be undone with Restore in the Delisted column.`}
+        confirmLabel="Delist Company"
+        loadingLabel="Delisting..."
+        loading={busyRowId !== null && busyRowId === delistConfirmRowId}
+        onCancel={() => setDelistConfirmRowId(null)}
+        onConfirm={() => {
+          const rowId = delistConfirmRowId;
+          setDelistConfirmRowId(null);
+          if (rowId) void handleLogResult(rowId, true);
+        }}
+      />
+
+      <Modal
+        isOpen={delistDialog !== null}
+        showAccentBar={false}
+        title={
+          delistDialog?.mode === "edit"
+            ? "Company delisted"
+            : "Delist this company?"
+        }
+        description={
+          delistDialog?.mode === "edit"
+            ? `The company of ${delistDialog.leadLabel || "this lead"} was delisted${
+                delistDialog.delistedInfo ? ` ${delistDialog.delistedInfo}` : ""
+              }. The reason is shared by every lead there; Restore returns them all to the calling stream.`
+            : `Every lead at the company of ${
+                delistDialog?.leadLabel || "this lead"
+              } moves to Delisted on every campaign and leaves the calling stream. Restore undoes it.`
+        }
+        onClose={() => setDelistDialog(null)}
+        secondaryAction={
+          delistDialog?.mode === "edit"
+            ? {
+                label: "Restore Company",
+                variant: "secondary",
+                onClick: () => {
+                  const rowId = delistDialog.rowId;
+                  setDelistDialog(null);
+                  setRestoreRowId(rowId);
+                },
+              }
+            : {
+                label: "Cancel",
+                variant: "secondary",
+                onClick: () => setDelistDialog(null),
+              }
+        }
+        primaryAction={{
+          label:
+            delistCompany.isPending || updateDelistingReason.isPending
+              ? "Saving..."
+              : delistDialog?.mode === "edit"
+                ? "Save Reason"
+                : "Delist Company",
+          onClick: () => void handleDelistDialogSave(),
+        }}
+      >
+        <Textarea
+          label="Reason"
+          rows={4}
+          value={delistDialog?.reason ?? ""}
+          placeholder="Why is this company delisted? (optional)"
+          onChange={(event) =>
+            setDelistDialog((current) =>
+              current ? { ...current, reason: event.target.value } : current,
+            )
+          }
+        />
+      </Modal>
+
+      <Confirmation
+        open={restoreRowId !== null}
+        title="Restore this company?"
+        description={`Every lead at the company of ${
+          findRow(restoreRowId ?? "")?.lead_label || "this lead"
+        } goes back to the lead type it had before it was delisted, and returns to the calling stream.`}
+        confirmLabel="Restore Company"
+        loadingLabel="Restoring..."
+        loading={restoreCompany.isPending}
+        onCancel={() => setRestoreRowId(null)}
+        onConfirm={() => void handleRestore()}
       />
     </div>
   );

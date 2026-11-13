@@ -5,6 +5,7 @@ export const LEAD_TYPE_VALUES = [
   "Can't Locate",
   "Company Not Found",
   "Contract Closed",
+  "Delisted",
   "DNC",
   "Fix",
   "General",
