@@ -1,10 +1,10 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import {
-  runBackfillBatch,
+  isJobActive,
+  useBackfillJobs,
   useBackfillPreview,
+  useStartBackfill,
   type ManagedBrand,
 } from "../_lib/hooks";
 
@@ -14,116 +14,67 @@ type Props = {
 };
 
 export function AddExistingLeadsModal({ brand, onClose }: Props) {
-  const queryClient = useQueryClient();
-  const {
-    data: preview,
-    isLoading,
-    isError,
-  } = useBackfillPreview(brand?.id ?? null);
-  const [added, setAdded] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  // Saved when the run starts: the preview can refetch mid-run and shrink.
-  const [totalToAdd, setTotalToAdd] = useState(0);
+  const { data: preview, isFetching, isError } = useBackfillPreview(brand?.id ?? null);
+  const { data: jobs = [] } = useBackfillJobs(Boolean(brand));
+  const start = useStartBackfill();
 
-  useEffect(() => {
-    setAdded(0);
-    setIsRunning(false);
-    setTotalToAdd(0);
-  }, [brand]);
+  const runningJob = jobs.find((job) => job.brandId === brand?.id && isJobActive(job));
 
   const canRun =
-    !isRunning &&
-    !isLoading &&
+    !runningJob &&
+    !start.isPending &&
+    !isFetching &&
     (preview?.leadsToAdd ?? 0) > 0 &&
     (preview?.agentCount ?? 0) > 0;
-  const percent =
-    totalToAdd > 0 ? Math.min(100, Math.round((added / totalToAdd) * 100)) : 0;
 
   const handleRun = async () => {
     if (!brand || !canRun) return;
-    setIsRunning(true);
-    setAdded(0);
-    setTotalToAdd(preview?.leadsToAdd ?? 0);
-
-    let total = 0;
     try {
-      // Small batches, so a dropped connection loses nothing: already added
-      // leads are skipped on the next run.
-      for (;;) {
-        const batch = await runBackfillBatch(brand.id);
-        total += batch.added;
-        setAdded(total);
-        if (batch.done) break;
-      }
-      showSuccessToast(`${total} leads added to ${brand.displayName}`);
-      void queryClient.invalidateQueries({ queryKey: ["brands"] });
+      await start.mutateAsync(brand.id);
+      showSuccessToast(
+        `Adding leads to ${brand.displayName} in the background. Progress shows at the top of the page.`,
+      );
       onClose();
     } catch (error) {
       showErrorToast(error);
-      void queryClient.invalidateQueries({
-        queryKey: ["brands", "backfill-preview", brand.id],
-      });
-    } finally {
-      setIsRunning(false);
     }
   };
+
+  const perAgent = preview?.agents.perAgent ?? [];
 
   return (
     <Modal
       isOpen={Boolean(brand)}
       title={`Add existing leads to ${brand?.displayName ?? ""}`}
       description={
-        isRunning
-          ? "Keep this window open until it finishes."
-          : "Preview only. Nothing changes until you confirm."
+        runningJob
+          ? "Leads are being added right now. Progress shows at the top of the page."
+          : "Preview only. Nothing changes until you confirm. The run continues in the background if you close this window or reload."
       }
-      onClose={() => {
-        if (!isRunning) onClose();
-      }}
+      onClose={onClose}
       primaryAction={
-        canRun || isRunning
+        canRun || start.isPending
           ? {
-              label: isRunning ? `Adding... ${percent}%` : "Add Leads",
+              label: start.isPending ? "Starting..." : "Add Leads",
               onClick: () => void handleRun(),
             }
           : undefined
       }
-      secondaryAction={{
-        label: "Close",
-        onClick: () => {
-          if (!isRunning) onClose();
-        },
-      }}
+      secondaryAction={{ label: "Close", onClick: onClose }}
     >
       <div className="grid gap-2 text-left text-sm text-slate-700 dark:text-slate-200">
-        {isRunning && (
-          <div className="mb-3 grid gap-1.5">
-            <div className="flex justify-between text-xs font-medium">
-              <span>
-                {added.toLocaleString()} of {totalToAdd.toLocaleString()} leads
-                added
-              </span>
-              <span>{percent}%</span>
-            </div>
-            <div
-              role="progressbar"
-              aria-valuenow={percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
-            >
-              <div
-                className="h-full rounded-full bg-indigo-600 transition-all duration-300 dark:bg-indigo-400"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-          </div>
+        {runningJob && (
+          <p className="rounded border border-indigo-200 bg-indigo-50 p-3 text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+            {runningJob.status === "queued"
+              ? "Waiting for the automations service to start."
+              : `${runningJob.added.toLocaleString()} of about ${runningJob.totalEstimate.toLocaleString()} leads added so far.`}
+          </p>
         )}
 
-        {isLoading && <p>Counting leads...</p>}
+        {isFetching && !preview && <p>Counting leads...</p>}
         {isError && <p className="text-red-500">Could not load the preview.</p>}
-        {preview && (
-          <>
+        {preview && !runningJob && (
+          <div className={isFetching ? "opacity-60" : undefined}>
             <div className="flex justify-between gap-4 font-medium">
               <span>Leads to add</span>
               <span>{preview.leadsToAdd.toLocaleString()}</span>
@@ -138,12 +89,59 @@ export function AddExistingLeadsModal({ brand, onClose }: Props) {
               <span>Already in this brand</span>
               <span>{preview.alreadyInBrand.toLocaleString()}</span>
             </div>
-            {preview.agentCount === 0 && (
-              <p className="mt-2 text-red-500">
-                Assign at least one agent first.
-              </p>
+
+            {perAgent.length > 0 && preview.leadsToAdd > 0 && (
+              <div className="mt-3">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Where the leads land (estimate)
+                </p>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-slate-500 dark:text-slate-400">
+                      <th className="py-1 font-medium">Agent</th>
+                      <th className="py-1 text-right font-medium">Share</th>
+                      <th className="py-1 text-right font-medium">Has now</th>
+                      <th className="py-1 text-right font-medium">Adding</th>
+                      <th className="py-1 text-right font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {perAgent.map((agent) => (
+                      <tr
+                        key={agent.userId}
+                        className="border-t border-slate-100 dark:border-slate-700"
+                      >
+                        <td className="py-1">{agent.name}</td>
+                        <td className="py-1 text-right">
+                          {agent.percent == null ? "-" : `${agent.percent}%`}
+                        </td>
+                        <td className="py-1 text-right">{agent.existing.toLocaleString()}</td>
+                        <td className="py-1 text-right font-medium">
+                          {agent.adding.toLocaleString()}
+                        </td>
+                        <td className="py-1 text-right">{agent.total.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {preview.agents.otherAssignees > 0 && (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {preview.agents.otherAssignees.toLocaleString()} On Hold leads go
+                    to whoever already holds a Hot lead at the same company, outside
+                    this brand's agents.
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Leads are added in batches, so the final split can differ by a
+                  few leads.
+                </p>
+              </div>
             )}
-          </>
+
+            {preview.agentCount === 0 && (
+              <p className="mt-2 text-red-500">Assign at least one agent first.</p>
+            )}
+          </div>
         )}
       </div>
     </Modal>

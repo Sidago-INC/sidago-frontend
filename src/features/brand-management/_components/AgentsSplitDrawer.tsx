@@ -1,13 +1,19 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Drawer, Select, TextInput } from "@/components/ui";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 import {
+  fetchHotLeadsForRemoval,
+  type HotLeadAssignment,
+  type HotLeadsBrandGroup,
   useAssignableUsers,
+  useDeactivateAgent,
   useSetBrandAgents,
   type ManagedBrand,
 } from "../_lib/hooks";
+import { rescaleShares } from "../_lib/rescale-shares";
 import { CreateAgentModal } from "./CreateAgentModal";
+import { HotLeadsAssignModal } from "./HotLeadsAssignModal";
 
 type Row = { key: number; userId: string; percent: string };
 
@@ -28,6 +34,57 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const { data: users = [], isLoading } = useAssignableUsers(Boolean(brand));
   const setAgents = useSetBrandAgents();
+  const deactivateAgent = useDeactivateAgent();
+  const [deactivating, setDeactivating] = useState<{
+    userId: string;
+    name: string;
+    groups: HotLeadsBrandGroup[];
+  } | null>(null);
+  // Hot and On Hold leads of agents removed in this panel, waiting for the
+  // Super Owner to pick who takes them before the save goes through.
+  const [pendingSave, setPendingSave] = useState<HotLeadsBrandGroup[] | null>(
+    null,
+  );
+  const [isChecking, setIsChecking] = useState(false);
+
+  // Only agents already saved on this brand can be deactivated from here.
+  const savedAgent = (userId: string) =>
+    brand?.agents.find((agent) => agent.userId === userId) ?? null;
+
+  const startDeactivate = async (userId: string, name: string) => {
+    setIsChecking(true);
+    try {
+      const groups = await fetchHotLeadsForRemoval(userId);
+      setDeactivating({ userId, name, groups });
+    } catch (error) {
+      showErrorToast(error);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleDeactivate = async (hotLeadAssignments: HotLeadAssignment[]) => {
+    if (!deactivating) return;
+    try {
+      const result = await deactivateAgent.mutateAsync({
+        userId: deactivating.userId,
+        hotLeadAssignments,
+      });
+      const noAgent = result.brands.filter((b) => b.unassigned).map((b) => b.brandName);
+      showSuccessToast(`${result.name} deactivated`);
+      if (result.leadsQueued > 0) {
+        showInfoToast(
+          noAgent.length > 0
+            ? `Moving ${result.leadsQueued} of ${result.name}'s leads in the background. On ${noAgent.join(", ")} they become unassigned: no other agent. Progress shows at the top of the page.`
+            : `Moving ${result.leadsQueued} of ${result.name}'s leads to the remaining agents in the background. Progress shows at the top of the page.`,
+        );
+      }
+      setDeactivating(null);
+      onClose();
+    } catch (error) {
+      showErrorToast(error);
+    }
+  };
 
   useEffect(() => {
     if (!brand) return;
@@ -63,12 +120,24 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
       .filter((user) => !user.brandCode || user.brandCode === brand?.code)
       .map((user) => ({ label: user.name, value: user.userId }));
 
+  // Removing an agent hands their share to the others in proportion to what
+  // each one has, as whole numbers that add up to 100 again.
+  const removeRow = (key: number) =>
+    setRows((current) => {
+      const removed = current.find((r) => r.key === key);
+      const rest = current.filter((r) => r.key !== key);
+      if (!removed || !removed.userId || !(Number(removed.percent) > 0))
+        return rest;
+      const shares = rescaleShares(rest.map((r) => Number(r.percent) || 0));
+      return rest.map((r, i) => ({ ...r, percent: String(shares[i]) }));
+    });
+
   const updateRow = (key: number, patch: Partial<Row>) =>
     setRows((current) =>
       current.map((row) => (row.key === key ? { ...row, ...patch } : row)),
     );
 
-  const handleSave = async () => {
+  const save = async (hotLeadAssignments: HotLeadAssignment[] = []) => {
     if (!brand) return;
     try {
       const result = await setAgents.mutateAsync({
@@ -77,11 +146,15 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
           userId: row.userId,
           percent: Number(row.percent),
         })),
+        hotLeadAssignments,
       });
+      setPendingSave(null);
       showSuccessToast("Agents updated");
-      if (result.leadsHeldByRemovedAgents > 0) {
+      if (result.leadsQueued > 0) {
         showInfoToast(
-          `${result.leadsHeldByRemovedAgents} leads stay with the removed agents.`,
+          result.unassigned
+            ? `${result.leadsQueued} leads become unassigned in the background: the brand has no agents left.`
+            : `Moving ${result.leadsQueued} leads to the remaining agents in the background. Progress shows at the top of the page.`,
         );
       }
       onClose();
@@ -89,6 +162,53 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
       showErrorToast(error);
     }
   };
+
+  // Before saving, finds the removed agents' Hot and On Hold leads on this
+  // brand. If there are any, the Super Owner assigns them first.
+  const handleSave = async () => {
+    if (!brand) return;
+    const keptIds = new Set(rows.map((row) => row.userId));
+    const removed = brand.agents.filter((agent) => !keptIds.has(agent.userId));
+    const remaining = rows
+      .filter((row) => row.userId)
+      .map((row) => ({
+        userId: row.userId,
+        name:
+          users.find((u) => u.userId === row.userId)?.name ??
+          savedAgent(row.userId)?.name ??
+          "Agent",
+      }));
+    if (removed.length === 0) return save();
+
+    setIsChecking(true);
+    try {
+      const lists = await Promise.all(
+        removed.map((agent) => fetchHotLeadsForRemoval(agent.userId, brand.id)),
+      );
+      const leads = lists.flat().flatMap((group) => group.leads);
+      if (leads.length === 0) return save();
+      // The panel's unsaved list decides who can take them, not the saved one.
+      setPendingSave([
+        {
+          brandId: brand.id,
+          brandName: brand.displayName,
+          candidates: remaining,
+          leads,
+        },
+      ]);
+    } catch (error) {
+      showErrorToast(error);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const removedNames = brand
+    ? brand.agents
+        .filter((agent) => !rows.some((row) => row.userId === agent.userId))
+        .map((agent) => agent.name)
+        .join(", ")
+    : "";
 
   return (
     <>
@@ -110,11 +230,15 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
             </button>
             <button
               type="button"
-              disabled={!canSave}
+              disabled={!canSave || isChecking}
               onClick={() => void handleSave()}
               className={primaryButton}
             >
-              {setAgents.isPending ? "Saving..." : "Save"}
+              {setAgents.isPending
+                ? "Saving..."
+                : isChecking
+                  ? "Checking..."
+                  : "Save"}
             </button>
           </div>
         }
@@ -133,7 +257,9 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
                   label="Agent"
                   options={optionsFor(row)}
                   value={row.userId}
-                  onChange={(value) => updateRow(row.key, { userId: String(value) })}
+                  onChange={(value) =>
+                    updateRow(row.key, { userId: String(value) })
+                  }
                   placeholder={isLoading ? "Loading..." : "Select agent"}
                   floatingOptions
                   searchable
@@ -145,16 +271,34 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
                   label="Share %"
                   inputMode="decimal"
                   value={row.percent}
-                  onChange={(event) => updateRow(row.key, { percent: event.target.value })}
+                  onChange={(event) =>
+                    updateRow(row.key, { percent: event.target.value })
+                  }
                   className="h-10 rounded text-sm"
                 />
               </div>
+              {savedAgent(row.userId) && (
+                <button
+                  type="button"
+                  aria-label="Deactivate agent"
+                  title="Deactivate agent"
+                  disabled={isChecking}
+                  onClick={() =>
+                    void startDeactivate(
+                      row.userId,
+                      savedAgent(row.userId)?.name ?? "this agent",
+                    )
+                  }
+                  className={`${secondaryButton} shrink-0 px-3 text-red-600 dark:text-red-400`}
+                >
+                  <UserX className="h-4 w-4" />
+                </button>
+              )}
               <button
                 type="button"
                 aria-label="Remove agent"
-                onClick={() =>
-                  setRows((current) => current.filter((r) => r.key !== row.key))
-                }
+                title="Remove from this brand"
+                onClick={() => removeRow(row.key)}
                 className={`${secondaryButton} shrink-0 px-3`}
               >
                 <Trash2 className="h-4 w-4" />
@@ -202,11 +346,41 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
           )}
 
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Existing leads rebalance at the daily 2 PM (New York) run, within 3%.
-            Hot and On Hold leads don't move.
+            Removing an agent splits their share across the others by ratio. On
+            save, you choose who takes their Hot and On Hold leads; the rest of
+            their leads move to the remaining agents in the background, then the
+            brand rebalances to the new shares within 3%. Progress shows at the
+            top of the page. Hot and On Hold leads, and leads without a
+            timezone, don't move in the rebalance.
           </p>
         </div>
       </Drawer>
+
+      <HotLeadsAssignModal
+        isOpen={Boolean(deactivating)}
+        title={`Deactivate ${deactivating?.name ?? ""}?`}
+        description={
+          (deactivating?.groups.length ?? 0) > 0
+            ? "They are signed out and can't log in. Choose who takes each of their Hot and On Hold leads below. Their other leads and their share go to the remaining agents by ratio. Unsaved changes in this panel are discarded."
+            : "They are signed out and can't log in. On every brand they work, their share and all their leads go to the remaining agents by ratio. If a brand has no other agent, its leads become unassigned. Unsaved changes in this panel are discarded."
+        }
+        groups={deactivating?.groups ?? []}
+        confirmLabel="Deactivate"
+        isBusy={deactivateAgent.isPending}
+        onConfirm={(assignments) => void handleDeactivate(assignments)}
+        onCancel={() => setDeactivating(null)}
+      />
+
+      <HotLeadsAssignModal
+        isOpen={Boolean(pendingSave)}
+        title={`Hot and On Hold leads of ${removedNames}`}
+        description="Choose who takes over each company's Hot and On Hold leads. The removed agents' other leads go to the remaining agents along with their shares."
+        groups={pendingSave ?? []}
+        confirmLabel="Assign and save"
+        isBusy={setAgents.isPending}
+        onConfirm={(assignments) => void save(assignments)}
+        onCancel={() => setPendingSave(null)}
+      />
 
       <CreateAgentModal
         isOpen={isCreatingAgent}
@@ -214,7 +388,11 @@ export function AgentsSplitDrawer({ brand, onClose }: Props) {
         onCreated={(userId) =>
           setRows((current) => [
             ...current,
-            { key: nextKey++, userId, percent: current.length === 0 ? "100" : "0" },
+            {
+              key: nextKey++,
+              userId,
+              percent: current.length === 0 ? "100" : "0",
+            },
           ])
         }
       />

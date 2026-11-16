@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckboxInput, Modal, Select, TextInput } from "@/components/ui";
+import { Modal, Select, TextInput } from "@/components/ui";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import {
   toSlug,
@@ -24,7 +24,6 @@ export function BrandFormModal({ isOpen, organization, brand, brands, onClose }:
   const [code, setCode] = useState("");
   const [codeEdited, setCodeEdited] = useState(false);
   const [parentId, setParentId] = useState("");
-  const [isActive, setIsActive] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const createBrand = useCreateBrand(organization?.id ?? "");
@@ -37,7 +36,6 @@ export function BrandFormModal({ isOpen, organization, brand, brands, onClose }:
     setCode(brand?.code ?? "");
     setCodeEdited(false);
     setParentId(brand?.parentBrandId ?? "");
-    setIsActive(brand?.isActive ?? true);
     setErrors({});
   }, [isOpen, brand]);
 
@@ -70,9 +68,8 @@ export function BrandFormModal({ isOpen, organization, brand, brands, onClose }:
           displayName: name.trim(),
           code,
           parentBrandId: parentId || undefined,
-          isActive,
         });
-        showSuccessToast("Brand created");
+        showSuccessToast("Brand created as inactive");
       }
       onClose();
     } catch (error) {
@@ -140,11 +137,10 @@ export function BrandFormModal({ isOpen, organization, brand, brands, onClose }:
           optionsClassName="z-[1200]!"
         />
         {!brand && (
-          <CheckboxInput
-            label="Active"
-            checked={isActive}
-            onChange={(event) => setIsActive(event.target.checked)}
-          />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            New brands are saved as inactive. Agents don't see the brand and it
+            gets no new leads until you activate it from the brand list.
+          </p>
         )}
       </div>
     </Modal>
