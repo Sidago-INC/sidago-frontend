@@ -1,4 +1,5 @@
 import {
+  Ban,
   BarChart2,
   Building2,
   Clock,
@@ -220,6 +221,11 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
         label: "History",
         href: "/level-2-history",
         icon: History,
+      },
+      {
+        label: "Delisted Leads",
+        href: "/delisted-leads",
+        icon: Ban,
       },
     ],
   },
@@ -502,6 +508,7 @@ const ROUTE_LABEL_FALLBACKS: Record<string, string> = {
   "/dead-missing-email": "Dead / Missing Email",
   "/level-2-update": "Level 2 Update",
   "/level-2-history": "Level 2 History",
+  "/delisted-leads": "Delisted Leads",
   "/fix-leads": "Fix Leads",
   "/leads-stats": "Leads Stats",
   "/additional-contacts": "Additional Contacts",

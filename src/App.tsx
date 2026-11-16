@@ -27,6 +27,7 @@ import { AddCompanyForm } from "@/features/companies/_components/AddCompanyForm"
 import { AdditionalContactsForm } from "@/features/additional-contacts/_components/AdditionalContactsForm";
 import { Level2Update } from "@/features/level-2-update/_components/Level2Update";
 import { Level2History } from "@/features/level-2-history/_components/Level2History";
+import { DelistedLeads } from "@/features/delisted-leads/_components/DelistedLeads";
 import { FixLeads } from "@/features/fix-leads/_components/FixLeads";
 import { FixLeadEditForm } from "@/features/fix-leads/_components/FixLeadEditForm";
 import { LeadsStats } from "@/features/leads-stats/_components/LeadsStats";
@@ -111,6 +112,7 @@ export default function App() {
                 {/* Admin / Level 2 */}
                 <Route path="/level-2-update" element={<P><Level2Update /></P>} />
                 <Route path="/level-2-history" element={<P><Level2History /></P>} />
+                <Route path="/delisted-leads" element={<P><DelistedLeads /></P>} />
                 <Route path="/fix-leads" element={<P><FixLeads /></P>} />
                 <Route path="/fix-leads/:leadId" element={<P><FixLeadEditForm /></P>} />
                 <Route path="/leads-stats" element={<P><LeadsStats /></P>} />
