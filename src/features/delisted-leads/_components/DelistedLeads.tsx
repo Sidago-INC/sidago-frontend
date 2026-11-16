@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Pencil, RotateCcw } from "lucide-react";
 import {
   Button,
   Confirmation,
@@ -123,6 +124,44 @@ export function DelistedLeads() {
       },
       { title: "Delisted By", key: "delistedByName" },
       { title: "Reason", key: "delistedReason", longText: true },
+      {
+        // Per-row CRUD: edit the reason or restore, without opening the drawer.
+        // Stops propagation so the row's click (open drawer) does not fire too.
+        title: "Actions",
+        key: "actions",
+        width: 96,
+        minWidth: 96,
+        maxWidth: 96,
+        resizable: false,
+        filterable: false,
+        sortable: false,
+        groupable: false,
+        render: (row) => (
+          <div
+            className="flex items-center gap-1.5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label={`Edit delisting reason for ${getLeadGridLabel(row)}`}
+              title="Edit reason"
+              onClick={() => setModalState({ mode: "edit", row })}
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              type="button"
+              aria-label={`Restore company of ${getLeadGridLabel(row)}`}
+              title="Restore company"
+              onClick={() => setRestoreRow(row)}
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        ),
+      },
       {
         // Display only: the brand list is derived server-side, not a grid field.
         title: "Delisted Brands",
