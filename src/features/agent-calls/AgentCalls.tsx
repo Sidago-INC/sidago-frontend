@@ -76,6 +76,7 @@ export function AgentCalls() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
   const [callBackDateError, setCallBackDateError] = useState<string>();
   // null = every timezone, in the normal priority order.
   const [timezone, setTimezone] = useState<QueueTimezone | null>(null);
@@ -243,6 +244,30 @@ export function AgentCalls() {
     }
   };
 
+  // Resolves true when the card can leave edit mode.
+  const handleEmailSave = async (value: string): Promise<boolean> => {
+    if (!currentLead || !detail || emailSaving) return false;
+    const email = value.trim();
+    if (email === (detail.lead.email ?? "")) return true;
+    const leadId = currentLead.leadId;
+    setEmailSaving(true);
+    try {
+      await agentCallsApi.updateEmail(leadId, email);
+      if (currentLeadIdRef.current === leadId) {
+        setDetail((prev) =>
+          prev ? { ...prev, lead: { ...prev.lead, email } } : prev,
+        );
+        setForm((prev) => ({ ...prev, email }));
+      }
+      return true;
+    } catch (err) {
+      setModal({ title: "Email Not Saved", message: errMessage(err) });
+      return false;
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
   const handleFollowUpDate = async (date: string) => {
     const lastCalled = detail?.brandState.lastCalledDate ?? "";
     const error = getCallBackDateError(date, lastCalled);
@@ -311,6 +336,9 @@ export function AgentCalls() {
               <IdentityCard
                 form={form}
                 leadName={currentLead.fullName}
+                leadId={currentLead.leadId}
+                onSaveEmail={handleEmailSave}
+                emailSaving={emailSaving}
               />
               <WorkToggleRow
                 value={form.notWorkAnymore}
