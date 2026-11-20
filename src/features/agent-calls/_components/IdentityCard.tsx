@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { EmailLink } from "@/components/ui/EmailLink";
+import { EmailListField } from "@/components/ui/EmailListField";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { splitEmails } from "@/lib/validation";
 import { Mail, Pencil, UserRound } from "lucide-react";
 import type { CallsFormState } from "@/types";
+
+const ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Props = {
   form: CallsFormState;
@@ -34,8 +38,14 @@ export function IdentityCard({
     setEditing(true);
   };
 
+  // Every address in the draft must be well-formed before it can be saved.
+  // Existing bad rows are shown so the agent can fix or remove them.
+  const invalid = splitEmails(draft).filter((address) => !ADDRESS.test(address));
+
   const save = async () => {
-    if (await onSaveEmail(draft)) setEditing(false);
+    if (invalid.length > 0) return;
+    // Normalise to the stored form: trimmed addresses joined by ", ".
+    if (await onSaveEmail(splitEmails(draft).join(", "))) setEditing(false);
   };
 
   return (
@@ -66,12 +76,14 @@ export function IdentityCard({
 
         <div className="w-full">
           <div className="mb-1 flex items-center justify-between">
-            <label
-              htmlFor="calls-lead-email"
-              className="text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
-              Email
-            </label>
+            {!editing && (
+              <label
+                htmlFor="calls-lead-email"
+                className="text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Email
+              </label>
+            )}
             {!editing && (
               <button
                 type="button"
@@ -86,25 +98,20 @@ export function IdentityCard({
 
           {editing ? (
             <div className="space-y-2">
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-gray-500" />
-                {/* Plain text, not type="email": leads can hold several
-                    comma-separated addresses. */}
-                <input
-                  id="calls-lead-email"
-                  type="text"
-                  autoFocus
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") save();
-                    if (event.key === "Escape") setEditing(false);
-                  }}
-                  disabled={emailSaving}
-                  placeholder="name@company.com, other@company.com"
-                  className="w-full rounded-lg border border-blue-500 bg-white py-2 pl-9 pr-3 text-sm leading-5 text-slate-700 placeholder:text-slate-400 focus:outline-none disabled:opacity-60 dark:bg-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500"
-                />
-              </div>
+              {/* Add / remove individual addresses; emits the same
+                  comma-joined string the backend stores. */}
+              <EmailListField
+                label="Email"
+                value={draft}
+                onChange={setDraft}
+                disabled={emailSaving}
+                placeholder="name@company.com"
+              />
+              {invalid.length > 0 ? (
+                <p className="text-xs text-red-500">
+                  Fix or remove: {invalid.join(", ")}
+                </p>
+              ) : null}
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
@@ -117,8 +124,8 @@ export function IdentityCard({
                 <button
                   type="button"
                   onClick={save}
-                  disabled={emailSaving}
-                  className="cursor-pointer rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                  disabled={emailSaving || invalid.length > 0}
+                  className="cursor-pointer rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {emailSaving ? "Saving…" : "Save"}
                 </button>
