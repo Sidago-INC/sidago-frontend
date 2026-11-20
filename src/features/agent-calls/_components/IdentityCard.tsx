@@ -1,14 +1,27 @@
-import { EmailLink } from "@/components/ui/EmailLink";
+import { EmailListField } from "@/components/ui/EmailListField";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { Mail, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import type { CallsFormState } from "@/types";
 
 type Props = {
   form: CallsFormState;
   leadName: string;
+  emailDirty: boolean;
+  emailSaving: boolean;
+  onEmailChange: (value: string) => void;
+  onEmailSave: () => void;
+  onEmailCancel: () => void;
 };
 
-export function IdentityCard({ form, leadName }: Props) {
+export function IdentityCard({
+  form,
+  leadName,
+  emailDirty,
+  emailSaving,
+  onEmailChange,
+  onEmailSave,
+  onEmailCancel,
+}: Props) {
   return (
     <div className="space-y-3">
       <SectionLabel>Identity</SectionLabel>
@@ -35,22 +48,33 @@ export function IdentityCard({ form, leadName }: Props) {
 
         <div className="border-t border-slate-100 dark:border-gray-700" />
 
-        <div className="w-full">
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-            Email
-          </label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-gray-500" />
-            <div className="w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-9 pr-3 text-sm leading-5 break-words text-slate-700 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
-              {String(form.email ?? "").trim() ? (
-                <EmailLink value={form.email} wrap />
-              ) : (
-                <span className="text-slate-400 dark:text-gray-500">
-                  No email on record
-                </span>
-              )}
+        <div className="w-full space-y-2">
+          <EmailListField
+            label="Email"
+            value={form.email}
+            onChange={onEmailChange}
+            disabled={emailSaving}
+          />
+          {emailDirty ? (
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onEmailCancel}
+                disabled={emailSaving}
+                className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onEmailSave}
+                disabled={emailSaving}
+                className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {emailSaving ? "Saving…" : "Save email"}
+              </button>
             </div>
-          </div>
+          ) : null}
         </div>
 
         <div className="border-t border-slate-100 dark:border-gray-700" />

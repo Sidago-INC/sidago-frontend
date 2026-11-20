@@ -57,6 +57,15 @@ function formFromDetail(d: LeadDetailResponse): CallsFormState {
   };
 }
 
+// Canonical form of a comma-joined email list, used only for comparison.
+function normalizeEmailList(value: string | null | undefined): string {
+  return (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function errMessage(err: unknown): string {
   if (err && typeof err === "object" && "message" in err) {
     const m = (err as { message: string | string[] }).message;
@@ -76,6 +85,7 @@ export function AgentCalls() {
   const [queueLoading, setQueueLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [outcomeLoading, setOutcomeLoading] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
   const [callBackDateError, setCallBackDateError] = useState<string>();
   // null = every timezone, in the normal priority order.
   const [timezone, setTimezone] = useState<QueueTimezone | null>(null);
@@ -258,6 +268,40 @@ export function AgentCalls() {
     }
   };
 
+  // Compare lists, not raw strings: "a@x.com,b@y.com" and "a@x.com, b@y.com"
+  // are the same email list, so they must not show as an unsaved change.
+  const savedEmail = detail?.lead.email ?? "";
+  const emailDirty =
+    normalizeEmailList(form.email) !== normalizeEmailList(savedEmail);
+
+  const handleEmailChange = (value: string) =>
+    setForm((prev) => ({ ...prev, email: value }));
+
+  const handleEmailCancel = () =>
+    setForm((prev) => ({ ...prev, email: savedEmail }));
+
+  const handleEmailSave = async () => {
+    if (!currentLead || savingEmail) return;
+    const leadId = currentLead.leadId;
+    const next = normalizeEmailList(form.email);
+    setSavingEmail(true);
+    try {
+      await agentCallsApi.updateLeadEmail(leadId, next);
+      // The agent may have moved to another lead while the request was in
+      // flight; only update the detail if it is still the one on screen.
+      if (currentLeadIdRef.current === leadId) {
+        setDetail((prev) =>
+          prev ? { ...prev, lead: { ...prev.lead, email: next } } : prev,
+        );
+        setForm((prev) => ({ ...prev, email: next }));
+      }
+    } catch (err) {
+      setModal({ title: "Email Not Saved", message: errMessage(err), direction: "top" });
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
   if (queueLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -311,6 +355,11 @@ export function AgentCalls() {
               <IdentityCard
                 form={form}
                 leadName={currentLead.fullName}
+                emailDirty={emailDirty}
+                emailSaving={savingEmail}
+                onEmailChange={handleEmailChange}
+                onEmailSave={handleEmailSave}
+                onEmailCancel={handleEmailCancel}
               />
               <WorkToggleRow
                 value={form.notWorkAnymore}

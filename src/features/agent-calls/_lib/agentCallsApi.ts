@@ -77,4 +77,9 @@ export const agentCallsApi = {
 
   logResult: (body: LogResultBody) =>
     api.post("/agent-calls/log-result", body),
+
+  // `email` is the comma-joined list EmailListField emits — the same string
+  // the backend stores in leads.email. An empty string clears the field.
+  updateLeadEmail: (leadId: string, email: string) =>
+    api.patch(`/leads/${leadId}`, { lead: { email } }),
 };
