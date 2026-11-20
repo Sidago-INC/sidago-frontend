@@ -75,11 +75,10 @@ export const agentCallsApi = {
   markVoid: (agentSlug: string, leadId: string, notWorkAnymore = false) =>
     api.post("/agent-calls/mark-void", { agentSlug, leadId, notWorkAnymore }),
 
+  // Same composite lead PATCH the Call Logs drawer uses for its email edits.
+  updateEmail: (leadId: string, email: string) =>
+    api.patch(`/leads/${leadId}`, { lead: { email } }),
+
   logResult: (body: LogResultBody) =>
     api.post("/agent-calls/log-result", body),
-
-  // `email` is the comma-joined list EmailListField emits — the same string
-  // the backend stores in leads.email. An empty string clears the field.
-  updateLeadEmail: (leadId: string, email: string) =>
-    api.patch(`/leads/${leadId}`, { lead: { email } }),
 };
