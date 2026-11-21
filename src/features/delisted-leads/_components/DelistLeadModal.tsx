@@ -105,6 +105,7 @@ export function DelistLeadModal({ state, onClose }: DelistLeadModalProps) {
             hasMore={leadSelectSource.hasMore}
             isLoadingMore={leadSelectSource.isLoadingMore}
             isSearching={leadSelectSource.isSearching}
+            isLoading={leadSelectSource.isLoading}
             onChange={(value) => setLeadId(String(value))}
             disabled={isSaving}
           />

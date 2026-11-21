@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { Pencil, RotateCcw } from "lucide-react";
 import {
   Button,
-  Confirmation,
   CompanySymbolBadge,
   EmailLink,
   ErrorState,
+  Modal,
   Table,
   TypeBadge,
 } from "@/components/ui";
@@ -246,17 +246,25 @@ export function DelistedLeads() {
         <DelistLeadModal state={modalState} onClose={() => setModalState(null)} />
       )}
 
-      <Confirmation
-        open={restoreRow !== null}
+      {/* Modal, not Confirmation: the drawer above is portaled at z-200, and a
+          z-50 confirm rendered under its backdrop (visible, greyed, unclickable). */}
+      <Modal
+        isOpen={restoreRow !== null}
+        onClose={() => setRestoreRow(null)}
         title="Restore this company?"
+        showAccentBar={false}
         description={`Every lead at ${
           restoreRow?.companyName || restoreRow?.companySymbol || "this company"
         } goes back to the lead type it had before it was delisted, and returns to the calling stream.`}
-        confirmLabel="Restore Company"
-        loadingLabel="Restoring..."
-        loading={restoreMutation.isPending}
-        onCancel={() => setRestoreRow(null)}
-        onConfirm={() => void confirmRestore()}
+        secondaryAction={{
+          label: "Cancel",
+          variant: "secondary",
+          onClick: () => setRestoreRow(null),
+        }}
+        primaryAction={{
+          label: restoreMutation.isPending ? "Restoring..." : "Restore Company",
+          onClick: () => void confirmRestore(),
+        }}
       />
     </div>
   );

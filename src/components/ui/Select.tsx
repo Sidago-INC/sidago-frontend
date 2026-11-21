@@ -17,6 +17,7 @@ import {
 import { Check, ChevronDown, Search } from "lucide-react";
 import clsx from "clsx";
 import { filterSelectOptions } from "@/lib/select-search";
+import { Wave } from "./Spinner";
 
 export type SelectOption = {
   label: string;
@@ -46,6 +47,7 @@ type Props = {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   isSearching?: boolean;
+  isLoading?: boolean;
 };
 
 type SelectOptionsPanelProps = {
@@ -61,6 +63,7 @@ type SelectOptionsPanelProps = {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   isSearching?: boolean;
+  isLoading?: boolean;
 };
 
 type SelectControlProps = {
@@ -84,6 +87,7 @@ type SelectControlProps = {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   isSearching?: boolean;
+  isLoading?: boolean;
 };
 
 function SelectOptionsPanel({
@@ -99,6 +103,7 @@ function SelectOptionsPanel({
   hasMore,
   isLoadingMore,
   isSearching,
+  isLoading,
 }: SelectOptionsPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
@@ -159,39 +164,49 @@ function SelectOptionsPanel({
   return (
     <ListboxOptions
       anchor={placement === "top" ? "top start" : "bottom start"}
+      // Inline z-index: the Modal sits at 1000, so the list must render above it.
+      style={{ zIndex: 1100 }}
       className={clsx(
-        "z-300 max-h-64 w-(--button-width) overflow-hidden rounded-lg border border-slate-200 bg-white p-0 shadow-lg [--anchor-gap:0.25rem] dark:border-slate-700 dark:bg-gray-800",
+        "flex max-h-72 min-w-48 w-(--button-width) flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-xl [--anchor-gap:0.25rem] dark:border-slate-700 dark:bg-gray-800",
         optionsClassName,
       )}
     >
+      {searchable && (
+        <div className="shrink-0 border-b border-slate-100 bg-white p-2 dark:border-slate-700 dark:bg-gray-800">
+          <div className="relative">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              autoFocus
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => event.stopPropagation()}
+              placeholder={searchPlaceholder}
+              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-indigo-500 dark:focus:ring-indigo-900/40"
+            />
+          </div>
+        </div>
+      )}
+
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="max-h-[inherit] overflow-auto p-1"
+        className="min-h-0 flex-1 overflow-y-auto p-1"
       >
-        {searchable && (
-          <div className="sticky top-0 z-10 bg-white pb-1 dark:bg-gray-800">
-            <div className="relative">
-              <Search
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={(event) => event.stopPropagation()}
-                placeholder={searchPlaceholder}
-                className="h-9 w-full rounded border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-700 shadow-none outline-none transition placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:border-slate-700 dark:bg-gray-900 dark:text-slate-100 dark:placeholder:text-slate-500"
-              />
-            </div>
-          </div>
-        )}
-
         {displayOptions.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
-            {isSearching ? "Searching..." : "No options found"}
-          </div>
+          isSearching || isLoading ? (
+            <div className="flex items-center gap-3 px-3 py-4 text-sm text-slate-500 dark:text-slate-400">
+              <Wave />
+              <span>{isLoading ? "Loading leads..." : "Searching..."}</span>
+            </div>
+          ) : (
+            <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400">
+              No options found
+            </div>
+          )
         ) : (
           displayOptions.map((option, index) => (
             <ListboxOption
@@ -200,7 +215,7 @@ function SelectOptionsPanel({
               title={option.label}
               className={({ focus }) =>
                 clsx(
-                  "relative cursor-pointer select-none rounded px-4 py-2 text-sm",
+                  "relative cursor-pointer select-none rounded-md px-3 py-2 text-sm",
                   focus
                     ? "bg-indigo-50 text-indigo-700 dark:bg-slate-700 dark:text-indigo-300"
                     : "text-slate-700 dark:text-gray-200",
@@ -223,8 +238,9 @@ function SelectOptionsPanel({
         )}
 
         {isSearching && displayOptions.length > 0 && (
-          <div className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
-            Searching...
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+            <Wave />
+            <span>Searching...</span>
           </div>
         )}
 
@@ -233,8 +249,9 @@ function SelectOptionsPanel({
         )}
 
         {isLoadingMore && (
-          <div className="px-4 py-2 text-xs text-slate-500 dark:text-slate-400">
-            Loading more...
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+            <Wave />
+            <span>Loading more...</span>
           </div>
         )}
       </div>
@@ -263,6 +280,7 @@ function SelectControl({
   hasMore,
   isLoadingMore,
   isSearching,
+  isLoading,
 }: SelectControlProps) {
   useEffect(() => {
     if (!open) {
@@ -324,6 +342,7 @@ function SelectControl({
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           isSearching={isSearching}
+          isLoading={isLoading}
         />
       )}
     </div>
@@ -350,6 +369,7 @@ export function Select({
   hasMore,
   isLoadingMore,
   isSearching,
+  isLoading,
 }: Props) {
   const id = useId();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -463,6 +483,7 @@ export function Select({
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             isSearching={isSearching}
+            isLoading={isLoading}
           />
         )}
       </Listbox>
