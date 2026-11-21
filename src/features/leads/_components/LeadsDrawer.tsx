@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import type { Column } from "@/components/ui/Table";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
+import { formatEasternDate } from "@/lib/est";
 import { openPrintFrame } from "@/lib/print-html";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { validateExtension } from "@/lib/validation/phone";
@@ -931,6 +932,17 @@ export function LeadsDrawer({
               onChange={handleNotWorkedChange}
             />
           </div>
+          {/* Set by the server when an agent fixes the lead's numbers (new or
+              corrected number, added number, status / extension changed by
+              hand). Read-only. Phone Numbers card saves refetch the detail, and
+              so does the drawer's Save, so it updates in place. */}
+          <EditableField label="Lead Fixed Date">
+            <TextInput
+              value={formatEasternDate(detailQuery.data?.lead.phoneFixedAt) || "-"}
+              readOnly
+              className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
+            />
+          </EditableField>
         </DetailCard>
 
         <DetailCard label="Additional Contacts">
