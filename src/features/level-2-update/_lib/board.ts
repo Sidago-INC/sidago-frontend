@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 
 /**
  * The shared Level 2 Update board.
@@ -39,6 +40,7 @@ export type Level2BoardRow = {
   leadTypeSvg: string | null;
   leadTypeBenton: string | null;
   leadType95rm: string | null;
+  extraBrandStates?: ExtraBrandStates;
   // Delisting is company-wide, so these repeat on every row for the company.
   companyId: string | null;
   companyDelisted: boolean;

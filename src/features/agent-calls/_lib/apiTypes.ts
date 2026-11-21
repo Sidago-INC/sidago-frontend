@@ -1,8 +1,12 @@
+import type { LeadPhone } from "@/features/lead-phones/_lib/types";
+
 export type QueueLead = {
   leadId: string;
   leadIdExternal: string;
   fullName: string;
-  phone: string;
+  // The lead's primary number; null when it has no live number (every number is
+  // retired), which the API sends as-is.
+  phone: string | null;
   phoneExtension: string | null;
   email: string;
   role: string;
@@ -19,6 +23,12 @@ export type QueueLead = {
   notWorkAnymore: boolean;
   matchedBlock: number;
   timezonePriority: string;
+  // The one number rotation picked for the next call (null for a lead with no
+  // recorded numbers - `phone` is then all there is). The queue carries only
+  // this; the full list comes with the lead detail.
+  nextPhoneId?: string | null;
+  nextPhoneNumber?: string | null;
+  nextPhoneExtension?: string | null;
 };
 
 export type QueueResponse = {
@@ -73,13 +83,15 @@ export type HistoryEntry = {
   durationSeconds: number | null;
   source: string;
   mightyCallId: string | null;
+  /** The number actually dialled. Null on calls from before multiple numbers. */
+  phoneDialled?: string | null;
 };
 
 export type RelatedContact = {
   id: string;
   fullName: string;
   role: string;
-  phone: string;
+  phone: string | null;
   email: string;
   // Served by the detail endpoint so the "All Company Contacts" card no longer
   // has to be stitched together from whichever rows the page happens to hold.
@@ -113,7 +125,8 @@ export type LeadDetailResponse = {
     id: string;
     leadIdExternal: string;
     fullName: string;
-    phone: string;
+    /** Primary number; null when the lead has no live number. */
+    phone: string | null;
     phoneExtension: string | null;
     email: string;
     role: string;
@@ -143,6 +156,16 @@ export type LeadDetailResponse = {
   peerBrandStates: BrandState[];
   history: HistoryEntry[] | HistoryByBrand;
   relatedContacts: RelatedContact[];
+  /** Every number the lead has, retired included (for the drawer / phone card). */
+  phones?: LeadPhone[];
+  /** The number the next dial will use. */
+  nextPhone?: LeadPhone | null;
+  /**
+   * True while a result just logged for this lead is still being applied in the
+   * background: `phones` and `nextPhone` do not reflect it yet. Refetch until it
+   * is false before trusting `nextPhone` for another call.
+   */
+  numbersUpdating?: boolean;
   /** Some detail payloads surface this at the root instead of under lead. */
   lastActionDate?: string | null;
 };
@@ -157,4 +180,6 @@ export type LogResultBody = {
   durationSeconds?: number;
   mightyCallId?: string;
   source?: string;
+  /** The lead_phones row that was called - the outcome is recorded on it. */
+  leadPhoneId?: string;
 };

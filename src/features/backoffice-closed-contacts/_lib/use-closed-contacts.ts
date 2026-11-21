@@ -9,7 +9,7 @@ import {
 } from "@/lib/pagination";
 import type { ClosedContactRow } from "./data";
 
-type Brand = "svg" | "95rm" | "benton";
+type Brand = string;
 type Category = "current" | "historical" | "all";
 
 type ApiResponse = {

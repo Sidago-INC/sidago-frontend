@@ -30,6 +30,8 @@ import {
   type BrandWithAgents,
 } from "./navigation-agents";
 
+export const BRAND_MANAGEMENT_PATH = "/brand-management";
+
 export type UserRole = "agent" | "admin" | "backoffice";
 
 export type NavigationItem = {
@@ -46,6 +48,12 @@ export type NavigationItem = {
    * its own window for exactly this reason.
    */
   openInNewTab?: boolean;
+};
+
+export type NavigationOptions = {
+  // Brands added after svg, 95rm and benton.
+  extraBrands?: { code: string; displayName: string }[];
+  isSuperOwner?: boolean;
 };
 
 export type NavigationUserContext = {
@@ -196,7 +204,22 @@ function buildEmailNavSection(agents: BrandWithAgents["agents"]): NavigationItem
   };
 }
 
-function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationItem[] {
+function extraBrandItems(
+  brands: NavigationOptions["extraBrands"],
+  basePath: string,
+  icon: LucideIcon,
+): NavigationItem[] {
+  return (brands ?? []).map((brand) => ({
+    label: brand.displayName,
+    href: `${basePath}/${brand.code}`,
+    icon,
+  }));
+}
+
+function buildAdminNavigation(
+  brandsWithAgents?: BrandWithAgents[],
+  options?: NavigationOptions,
+): NavigationItem[] {
   const uniqueAgents = brandsWithAgents
     ? flattenUniqueAgents(brandsWithAgents)
     : [];
@@ -208,6 +231,9 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
     icon: LayoutDashboard,
   },
   ...(brandsWithAgents ? [buildAgentsNavSection(brandsWithAgents)] : []),
+  ...(options?.isSuperOwner
+    ? [{ label: "Brand Management", href: BRAND_MANAGEMENT_PATH, icon: Building2 }]
+    : []),
   {
     label: "Level 2",
     icon: Package,
@@ -307,6 +333,7 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
             href: "/currently-hot-leads-benton",
             icon: Flame,
           },
+          ...extraBrandItems(options?.extraBrands, "/currently-hot-leads", Flame),
         ],
       },
       {
@@ -328,6 +355,7 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
             href: "/recent-interest-benton",
             icon: Clock,
           },
+          ...extraBrandItems(options?.extraBrands, "/recent-interest", Clock),
         ],
       },
       {
@@ -349,6 +377,7 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
             href: "/ever-been-hot-benton",
             icon: RotateCcw,
           },
+          ...extraBrandItems(options?.extraBrands, "/ever-been-hot", RotateCcw),
         ],
       },
       {
@@ -370,6 +399,7 @@ function buildAdminNavigation(brandsWithAgents?: BrandWithAgents[]): NavigationI
             href: "/unassigned-hot-leads-benton",
             icon: Flame,
           },
+          ...extraBrandItems(options?.extraBrands, "/unassigned-hot-leads", Flame),
         ],
       },
       {
@@ -391,9 +421,12 @@ export const adminOnlyNavigation: NavigationItem[] = buildAdminNavigation();
 
 export function buildBackofficeNavigation(
   brandsWithAgents?: BrandWithAgents[],
+  options?: NavigationOptions,
 ): NavigationItem[] {
   return cloneNavigationItems(
-    buildAdminNavigation(brandsWithAgents).filter((item) => item.label !== "Agents"),
+    buildAdminNavigation(brandsWithAgents, {
+      extraBrands: options?.extraBrands,
+    }).filter((item) => item.label !== "Agents"),
   );
 }
 
@@ -573,6 +606,7 @@ export function getRouteBreadcrumbFallback(pathname: string) {
 export const getNavigationsForRole = (
   roleOrUser?: string | NavigationUserContext,
   brandsWithAgents?: BrandWithAgents[],
+  options?: NavigationOptions,
 ): NavigationItem[] => {
   if (!roleOrUser) {
     return [];
@@ -580,10 +614,10 @@ export const getNavigationsForRole = (
 
   if (typeof roleOrUser === "string") {
     if (roleOrUser === "admin") {
-      return buildAdminNavigation(brandsWithAgents);
+      return buildAdminNavigation(brandsWithAgents, options);
     }
     if (roleOrUser === "backoffice") {
-      return buildBackofficeNavigation(brandsWithAgents);
+      return buildBackofficeNavigation(brandsWithAgents, options);
     }
     return navigationByRole[roleOrUser as UserRole] ?? [];
   }
@@ -593,11 +627,11 @@ export const getNavigationsForRole = (
   }
 
   if (roleOrUser.role === "admin") {
-    return buildAdminNavigation(brandsWithAgents);
+    return buildAdminNavigation(brandsWithAgents, options);
   }
 
   if (roleOrUser.role === "backoffice") {
-    return buildBackofficeNavigation(brandsWithAgents);
+    return buildBackofficeNavigation(brandsWithAgents, options);
   }
 
   return navigationByRole[roleOrUser.role] ?? [];

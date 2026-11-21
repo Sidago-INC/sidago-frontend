@@ -1,4 +1,5 @@
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
@@ -19,6 +20,7 @@ export type DeadMissingEmailRow = {
   leadType95rm: string | null;
   leadTypeBenton: string | null;
   missingDeadBrands: string[];
+  extraBrandStates?: ExtraBrandStates;
 };
 
 type DeadEmailResponse = {

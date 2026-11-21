@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { UserCog } from "lucide-react";
+import { useSuperOwner } from "@/hooks/useBrandCatalog";
 
 interface SidebarRoleBadgeProps {
   role?: string;
@@ -10,9 +11,12 @@ export function SidebarRoleBadge({
   role,
   compact = false,
 }: SidebarRoleBadgeProps) {
-  const roleLabel = role
-    ? role.charAt(0).toUpperCase() + role.slice(1)
-    : "Unknown";
+  const { isSuperOwner } = useSuperOwner(role === "admin");
+  const roleLabel = isSuperOwner
+    ? "Super Owner"
+    : role
+      ? role.charAt(0).toUpperCase() + role.slice(1)
+      : "Unknown";
 
   return (
     <div
