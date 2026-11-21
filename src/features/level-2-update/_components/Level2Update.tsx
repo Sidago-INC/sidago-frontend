@@ -1153,7 +1153,6 @@ export function Level2Update() {
 
       <Modal
         isOpen={delistDialog !== null}
-        showAccentBar={false}
         title={
           delistDialog?.mode === "edit"
             ? "Company delisted"

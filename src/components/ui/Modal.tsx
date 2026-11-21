@@ -32,8 +32,6 @@ type ModalProps = {
    * out, and impossible to click.
    */
   zIndex?: number;
-  /** The coloured strip across the top. Default true. */
-  showAccentBar?: boolean;
 };
 
 const directionVariants: Record<ModalDirection, Variants> = {
@@ -83,7 +81,6 @@ export function Modal({
   primaryAction,
   secondaryAction,
   zIndex = 1000,
-  showAccentBar = true,
 }: ModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -116,10 +113,6 @@ export function Modal({
             className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
             onClick={(e) => e.stopPropagation()}
           >
-            {showAccentBar && (
-              <div className="h-1 bg-linear-to-r from-sky-500 via-indigo-500 to-cyan-500" />
-            )}
-
             <div className="p-6">
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-3">

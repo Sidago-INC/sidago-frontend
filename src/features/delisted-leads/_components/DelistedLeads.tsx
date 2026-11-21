@@ -252,7 +252,6 @@ export function DelistedLeads() {
         isOpen={restoreRow !== null}
         onClose={() => setRestoreRow(null)}
         title="Restore this company?"
-        showAccentBar={false}
         description={`Every lead at ${
           restoreRow?.companyName || restoreRow?.companySymbol || "this company"
         } goes back to the lead type it had before it was delisted, and returns to the calling stream.`}

@@ -65,7 +65,6 @@ export function DelistLeadModal({ state, onClose }: DelistLeadModalProps) {
   return (
     <Modal
       isOpen
-      showAccentBar={false}
       title={isEdit ? "Edit delisting reason" : "Delist a company"}
       description={
         isEdit
