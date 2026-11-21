@@ -23,6 +23,7 @@ import {
 import { ClosedContactDrawer } from "./CloseContactDrawer";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 
 type ClosedContactsTableProps = {
   data: ClosedContactRow[];
@@ -87,7 +88,7 @@ export function ClosedContactsTable({
       },
       { title: "Company Name", key: "companyName" },
       { title: "Full Name", key: "fullName" },
-      { title: "Phone", key: "phone" },
+      { title: "Phone", key: "phone", render: (row) => formatPhone(row.phone) },
       { title: "Email", key: "email" },
       {
         title: "Timezone",

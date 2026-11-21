@@ -157,7 +157,6 @@ export function generateRandomLeads(count: number): LEAD[] {
         counter_b: randomInt(20),
         counter_f: randomInt(20),
         counter_fixes: randomInt(10),
-        old_phones: randomPhone(),
         last_fixed_date: randomDate(),
         to_be_sent_email: randomBool(),
         to_be_logged_email_sidago: randomBool(),

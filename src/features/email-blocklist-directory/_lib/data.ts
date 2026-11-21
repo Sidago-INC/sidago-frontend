@@ -1,5 +1,6 @@
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { api } from "@/lib/api";
 import {
   buildPaginationParams,
@@ -15,6 +16,7 @@ export type CallHistoryEntry = {
   resultCode: string | null;
   durationSeconds: number | null;
   notes: string | null;
+  phoneDialled?: string | null;
 };
 
 export type CallHistoryByBrand = {
@@ -103,7 +105,11 @@ export function formatCallHistoryCallsText(entries: CallHistoryEntry[]): string 
     .map((entry) => {
       const parts = [
         formatCallHistoryDate(entry.calledAt),
-        ...[entry.userName, entry.resultCode].filter(Boolean),
+        ...[
+          entry.userName,
+          entry.resultCode,
+          entry.phoneDialled ? formatPhone(entry.phoneDialled) : null,
+        ].filter(Boolean),
       ];
       return parts.join(" - ");
     })

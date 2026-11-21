@@ -11,6 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
 import { LeadsDrawer } from "./LeadsDrawer";
+import { PhoneWithCount } from "@/features/lead-phones/_components/PhoneWithCount";
 import {
   leadTypeOptions,
   timezoneOptions,
@@ -92,7 +93,12 @@ export function Leads() {
       },
       { title: "Company Name", key: "companyName", width: 200 },
       { title: "Full Name", key: "fullName", width: 195 },
-      { title: "Phone", key: "phone", width: 150 },
+      {
+        title: "Phone",
+        key: "phone",
+        width: 170,
+        render: (row) => <PhoneWithCount phone={row.phone} count={row.phoneCount} />,
+      },
       { title: "Email", key: "email", width: 220 },
       {
         title: "Timezone",

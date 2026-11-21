@@ -80,6 +80,10 @@ export function AgentCalls() {
   const [callBackDateError, setCallBackDateError] = useState<string>();
   // null = every timezone, in the normal priority order.
   const [timezone, setTimezone] = useState<QueueTimezone | null>(null);
+  // The number the agent is about to dial. Starts as the one rotation picked
+  // (detail.nextPhone) and can be switched on the phone card; the call result
+  // is recorded against it.
+  const [selectedPhoneId, setSelectedPhoneId] = useState<string | null>(null);
   const currentLeadIdRef = useRef<string | null>(null);
 
   // Queue: load on mount + refetch every 90s, and again when the filter changes
@@ -118,6 +122,10 @@ export function AgentCalls() {
 
   useEffect(() => {
     currentLeadIdRef.current = currentLead?.leadId ?? null;
+    setSelectedPhoneId(currentLead?.nextPhoneId ?? null);
+    // Only when the lead changes - a queue refetch must not undo the agent's
+    // choice of number for the lead on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLead?.leadId]);
 
   // Detail: load whenever the selected lead changes
@@ -131,6 +139,7 @@ export function AgentCalls() {
       .then((res) => {
         if (cancelled) return;
         setDetail(res);
+        setSelectedPhoneId(res.nextPhone?.id ?? null);
         const nextForm = formFromDetail(res);
         setForm(nextForm);
         setCallBackDateError(
@@ -151,6 +160,33 @@ export function AgentCalls() {
       cancelled = true;
     };
   }, [currentLead?.leadId, agentSlug]);
+
+  // A result logged on this lead is applied to its numbers a few seconds later,
+  // in the background, so the refetch that follows a log can still show the
+  // number that was just used up as "next". While the server says the numbers are
+  // updating, ask again, then move the selection to the real next number - unless
+  // the agent has already picked a different one themselves.
+  const numbersUpdating = detail?.numbersUpdating === true;
+  const currentLeadId = currentLead?.leadId;
+  useEffect(() => {
+    if (!numbersUpdating || !currentLeadId) return;
+    const staleNextId = detail?.nextPhone?.id ?? null;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await agentCallsApi.detail(currentLeadId, agentSlug);
+        if (currentLeadIdRef.current !== currentLeadId) return;
+        setDetail(res);
+        if (!res.numbersUpdating) {
+          setSelectedPhoneId((prev) =>
+            prev === staleNextId ? (res.nextPhone?.id ?? null) : prev,
+          );
+        }
+      } catch {
+        // Keep what is on screen; the next log or refresh resyncs it.
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [numbersUpdating, currentLeadId, agentSlug, detail]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -197,6 +233,7 @@ export function AgentCalls() {
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
         source: "manual",
+        leadPhoneId: selectedPhoneId ?? undefined,
       });
 
       const [detailRes, queueRes] = await Promise.all([
@@ -204,6 +241,9 @@ export function AgentCalls() {
         agentCallsApi.queue(agentSlug, timezone ?? undefined),
       ]);
       setDetail(detailRes);
+      // Rotation may have moved on (an unanswered number hands over to the
+      // next one), so the next attempt starts from the new pick.
+      setSelectedPhoneId(detailRes.nextPhone?.id ?? null);
       const nextForm = formFromDetail(detailRes);
       setForm(nextForm);
       setCallBackDateError(
@@ -241,6 +281,20 @@ export function AgentCalls() {
     } catch (err) {
       setForm((prev) => ({ ...prev, notWorkAnymore: false }));
       setModal({ title: "Error", message: errMessage(err), direction: "bottom" });
+    }
+  };
+
+  // After a number is added on the phone card: reload the detail so the new
+  // number is listed, keeping the agent's current selection.
+  const refreshPhones = async () => {
+    if (!currentLead) return;
+    try {
+      const res = await agentCallsApi.detail(currentLead.leadId, agentSlug);
+      if (currentLeadIdRef.current !== currentLead.leadId) return;
+      setDetail(res);
+      setSelectedPhoneId((prev) => prev ?? res.nextPhone?.id ?? null);
+    } catch (err) {
+      setModal({ title: "Error", message: errMessage(err) });
     }
   };
 
@@ -331,7 +385,22 @@ export function AgentCalls() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-1">
-            <PhoneCard phone={currentLead.phone} />
+            <PhoneCard
+              leadId={currentLead.leadId}
+              phones={
+                detail?.lead.id === currentLead.leadId ? (detail.phones ?? []) : []
+              }
+              selectedId={selectedPhoneId}
+              onSelect={setSelectedPhoneId}
+              fallbackPhone={currentLead.nextPhoneNumber ?? currentLead.phone}
+              fallbackExtension={
+                currentLead.nextPhoneNumber
+                  ? currentLead.nextPhoneExtension
+                  : currentLead.phoneExtension
+              }
+              onAdded={refreshPhones}
+              onPreferredChanged={refreshPhones}
+            />
             <CardShell>
               <IdentityCard
                 form={form}

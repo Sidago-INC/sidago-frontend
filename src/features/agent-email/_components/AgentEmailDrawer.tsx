@@ -25,6 +25,7 @@ import {
   leadTypeOptions,
 } from "@/features/backoffice-closed-contacts/_lib/data";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import {
   Ban,
   Check,
@@ -259,7 +260,7 @@ export function AgentEmailDrawer({
       ["Lead", row.lead],
       ["Company Name", row.companyName],
       ["Full Name", row.fullName],
-      ["Phone", row.phone],
+      ["Phone", formatPhone(row.phone)],
       ["Email", row.email],
       ["Time zone", row.timezone],
       ["Contact Type", row.contactType],
@@ -409,7 +410,7 @@ export function AgentEmailDrawer({
             </EditableField>
             <EditableField label="Phone">
               <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                {row.phone || "—"}
+                {formatPhone(row.phone) || "—"}
               </span>
             </EditableField>
             <EditableField label="Email">

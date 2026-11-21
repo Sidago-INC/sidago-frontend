@@ -12,6 +12,7 @@ import { COMPANY } from "@/types/company.types";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { useLeadsByCompany } from "@/features/leads/_lib/hooks";
 import { openPrintFrame } from "@/lib/print-html";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import type { TIMEZONE } from "@/types/timezone.types";
 import { useEffect, useMemo, useState } from "react";
 import { CountryPicker } from "./CountryPicker";
@@ -337,7 +338,7 @@ export function CompanyDrawer({
                           onClick={(event) => event.stopPropagation()}
                           className="block truncate text-[11px] tabular-nums text-slate-600 hover:underline dark:text-slate-300"
                         >
-                          {lead.phone}
+                          {formatPhone(lead.phone)}
                         </a>
                       ) : null}
                       {lead.email?.trim() ? (

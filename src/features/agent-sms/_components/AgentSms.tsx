@@ -29,6 +29,7 @@ import {
   useUpdateSmsState,
 } from "../_lib/hooks";
 import { toggleMarkVoid } from "@/features/agent-calls/_lib/markVoid";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 
 type AgentSmsProps = {
   agentName: string;
@@ -345,23 +346,10 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
       {
         title: "Phone",
         key: "phone",
-        render: (row) =>
-          editingRowId === row.id ? (
-            <AgentSmsInlineTextCell
-              value={row.phone}
-              placeholder="Phone"
-              onChange={(value) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  phone: value,
-                }))
-              }
-            />
-          ) : (
-            <AgentSmsEditableTrigger onClick={() => setEditingRowId(row.id)}>
-              <AgentSmsReadText value={row.phone} />
-            </AgentSmsEditableTrigger>
-          ),
+        // Read-only: this screen only persists the SMS-logged flag, so an edited
+        // number would look saved and then vanish on refresh. A lead can hold
+        // several numbers now; they are managed in the Leads drawer.
+        render: (row) => <AgentSmsReadText value={formatPhone(row.phone)} />,
       },
       {
         title: "SMS Status",

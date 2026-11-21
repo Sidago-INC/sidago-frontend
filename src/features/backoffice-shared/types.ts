@@ -8,6 +8,8 @@ export type HotLeadRow = {
   companySymbol: string;
   fullName: string;
   phone: string;
+  /** Live numbers on the lead (All Leads grid). The list itself is in the drawer. */
+  phoneCount?: number;
   role?: string;
   email: string;
   timezone: string;

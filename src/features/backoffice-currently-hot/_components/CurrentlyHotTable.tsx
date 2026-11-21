@@ -24,6 +24,7 @@ import {
 } from "../_lib/data";
 import { useSearchParams } from "react-router-dom";
 import { findDrawerRouteIndex } from "@/features/backoffice-shared/drawer-route";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 
 type CurrentlyHotTableProps = {
   data: LeadRow[];
@@ -93,7 +94,7 @@ export function CurrentlyHotTable({
       },
       { title: "Company Name", key: "companyName" },
       { title: "Full Name", key: "fullName" },
-      { title: "Phone", key: "phone" },
+      { title: "Phone", key: "phone", render: (row) => formatPhone(row.phone) },
       { title: "Email", key: "email" },
       {
         title: "Timezone",

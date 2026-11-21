@@ -6,6 +6,8 @@ import { InputHTMLAttributes, useId } from "react";
 type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   error?: string;
+  /** Small note under the input, shown while there is no error. */
+  hint?: string;
   required?: boolean;
   wrapperClassName?: string;
   labelClassName?: string;
@@ -14,6 +16,7 @@ type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
 export function TextInput({
   label,
   error,
+  hint,
   required = false,
   className,
   wrapperClassName,
@@ -49,7 +52,11 @@ export function TextInput({
         {...props}
       />
 
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error ? (
+        <span className="text-xs text-red-500">{error}</span>
+      ) : hint ? (
+        <span className="text-xs text-slate-500 dark:text-slate-400">{hint}</span>
+      ) : null}
     </div>
   );
 }
