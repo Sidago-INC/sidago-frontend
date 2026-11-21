@@ -4,14 +4,20 @@ import clsx from "clsx";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import React, { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
-import { closedContactsTabs, type ClosedContactsTabKey } from "../_lib/data";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import {
+  buildClosedContactsTabs,
+  type ClosedContactsTab,
+  type ClosedContactsTabKey,
+} from "../_lib/data";
 import { useClosedContracts } from "../_lib/use-closed-contacts";
 import { ClosedContactsTable } from "./ClosedContactsTable";
 
 function isClosedContactsTabKey(
   value: string | null,
+  tabs: ClosedContactsTab[],
 ): value is ClosedContactsTabKey {
-  return closedContactsTabs.some((tab) => tab.key === value);
+  return tabs.some((tab) => tab.key === value);
 }
 
 export function ClosedContacts() {
@@ -19,15 +25,15 @@ export function ClosedContacts() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const activeTab: ClosedContactsTabKey = isClosedContactsTabKey(tabParam)
+  const extraBrands = useExtraBrands();
+  const tabs = useMemo(() => buildClosedContactsTabs(extraBrands), [extraBrands]);
+  const activeTab: ClosedContactsTabKey = isClosedContactsTabKey(tabParam, tabs)
     ? tabParam
     : "svg-current";
 
   const activeView = useMemo(
-    () =>
-      closedContactsTabs.find((tab) => tab.key === activeTab) ??
-      closedContactsTabs[0],
-    [activeTab],
+    () => tabs.find((tab) => tab.key === activeTab) ?? tabs[0],
+    [activeTab, tabs],
   );
 
   const {
@@ -62,7 +68,7 @@ export function ClosedContacts() {
     <div className="space-y-4">
       <div className="overflow-x-auto">
         <div className="inline-flex min-w-full px-4 py-2 gap-2 border-b border-slate-200/80 bg-white/75 backdrop-blur-md transition-colors dark:border-slate-600 dark:bg-slate-950/70">
-          {closedContactsTabs.map((tab) => {
+          {tabs.map((tab) => {
             const isActive = tab.key === activeView.key;
 
             return (

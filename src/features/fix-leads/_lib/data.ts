@@ -1,3 +1,4 @@
+import type { LeadPhone } from "@/features/lead-phones/_lib/types";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import {
@@ -12,6 +13,7 @@ import {
   getLeadIdOptions,
   timezoneOptions,
 } from "@/features/backoffice-shared/constants";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 import {
   resolveLeadTimezone,
   stripTimezonePrefix,
@@ -50,6 +52,9 @@ export type FixQueueRow = {
   leadId: string;
   fullName: string | null;
   phone: string | null;
+  /** Live numbers, and how many can still be dialled - 0 usable is why it is in Fix. */
+  phoneCount?: number;
+  usablePhoneCount?: number;
   email: string | null;
   timezone: string | null;
   companyTimezone: string | null;
@@ -64,6 +69,7 @@ export type FixQueueRow = {
   otherContacts: string | null;
   contactsFilter: ContactsFilter;
   hasOtherContacts: boolean;
+  extraBrandStates?: ExtraBrandStates;
 };
 
 export type FullLead = {
@@ -133,7 +139,7 @@ export type RelatedLead = {
     svg: RelatedLeadBrandState;
     benton: RelatedLeadBrandState;
     "95rm": RelatedLeadBrandState;
-  };
+  } & Record<string, RelatedLeadBrandState>;
 };
 
 type FixQueueResponse = {
@@ -154,7 +160,13 @@ export type FixQueueGridQuery = {
   sort?: string;
   groupBy?: string;
 };
-type FullLeadResponse = { ok: true; lead: FullLead; brandStates: BrandStates };
+type FullLeadResponse = {
+  ok: true;
+  lead: FullLead;
+  brandStates: BrandStates & Record<string, { leadType: string | null }>;
+  /** Every number on the lead, retired included. */
+  phones?: LeadPhone[];
+};
 type RelatedResponse = { ok: true; count: number; data: RelatedLead[] };
 
 type FixQueueApiRow = FixQueueRow & {

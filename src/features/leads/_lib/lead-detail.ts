@@ -4,6 +4,7 @@ import type {
   LeadDetailResponse,
   RelatedContact,
 } from "@/features/agent-calls/_lib/apiTypes";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { getHistoryEntries } from "@/features/agent-calls/_lib/history";
 import {
   normalizeBrandCode,
@@ -13,6 +14,8 @@ import type {
   FullLead,
   RelatedLead,
 } from "@/features/fix-leads/_lib/data";
+import { isLegacyBrandCode } from "@/lib/brands";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 import { resolveLeadTimezone, stripTimezonePrefix } from "@/types/timezone.types";
 import { createLeadDirectoryRow, type LeadDirectoryRow } from "./data";
 
@@ -22,6 +25,7 @@ type CallHistoryEntry = {
   userName?: string | null;
   resultCode?: string | null;
   notes?: string | null;
+  phoneDialled?: string | null;
 };
 
 type ExtendedBrandState = {
@@ -45,6 +49,15 @@ type ExtendedBrandStates = {
 export type LeadDetailPayload = {
   lead: FullLead;
   brandStates: BrandStates & ExtendedBrandStates;
+  extraBrands: Record<string, ExtendedBrandState>;
+};
+
+export type LeadDrawerExtraBrandState = {
+  leadType: string;
+  toBeCalledBy: string;
+  toBeCalledOn: string;
+  historyCalls: string;
+  historyNotes: string;
 };
 
 export type LeadDrawerFormState = {
@@ -72,6 +85,7 @@ export type LeadDrawerFormState = {
   rm95HistoryCalls: string;
   rm95HistoryNotes: string;
   rm95ToBeCalledOn: string;
+  extraBrands: Record<string, LeadDrawerExtraBrandState>;
 };
 
 function isoToDate(iso: string | null | undefined): string {
@@ -100,6 +114,7 @@ function formatBrandCallsHistory(
         formatCallLogDate(entry.calledAt),
         entry.agentName ?? entry.userName,
         entry.resultCode,
+        entry.phoneDialled ? formatPhone(entry.phoneDialled) : null,
       ]
         .filter(Boolean)
         .join(" - "),
@@ -151,6 +166,7 @@ function mapHistoryEntry(entry: HistoryEntry): CallHistoryEntry {
     agentName: entry.agentName,
     resultCode: entry.resultCode,
     notes: entry.notes,
+    phoneDialled: entry.phoneDialled,
   };
 }
 
@@ -186,10 +202,19 @@ export function mapLeadDetailResponseToPayload(
     benton: emptyBrandState(),
     "95rm": emptyBrandState(),
   };
+  const extraBrands: Record<string, ExtendedBrandState> = {};
 
-  for (const state of [brandState, ...peerBrandStates]) {
+  const allStates = [brandState, ...(peerBrandStates ?? [])].filter(
+    (state): state is BrandState => Boolean(state && state.brandCode),
+  );
+
+  for (const state of allStates) {
     const key = toBrandStatesKey(state.brandCode);
-    if (!key) continue;
+    if (!key) {
+      const code = normalizeBrandCode(state.brandCode);
+      if (code) extraBrands[code] = mapBrandState(state, history);
+      continue;
+    }
     brandStates[key] = {
       ...brandStates[key],
       ...mapBrandState(state, history),
@@ -219,6 +244,7 @@ export function mapLeadDetailResponseToPayload(
       lastActionDate: response.lastActionDate ?? lead.lastActionDate ?? null,
     },
     brandStates,
+    extraBrands,
   };
 }
 
@@ -264,6 +290,27 @@ function getCallHistory(
   return state?.callHistory ?? state?.history;
 }
 
+function relatedLeadExtraBrandStates(
+  contact: RelatedLead,
+): ExtraBrandStates | undefined {
+  const entries = Object.entries(contact.brandStates ?? {}).filter(
+    ([code]) => !isLegacyBrandCode(code),
+  );
+  if (entries.length === 0) return undefined;
+
+  return Object.fromEntries(
+    entries.map(([code, state]) => [
+      code,
+      {
+        leadType: state.leadType,
+        toBeCalledBy: state.toBeCalledBy,
+        lastCalledDate: isoToDateInput(state.lastCalledDate),
+        dateBecomeHot: null,
+      },
+    ]),
+  );
+}
+
 export function relatedLeadToDirectoryRow(contact: RelatedLead): LeadDirectoryRow {
   const timezone =
     resolveLeadTimezone(contact.timezone, contact.companyTimezone) ?? "";
@@ -300,6 +347,7 @@ export function relatedLeadToDirectoryRow(contact: RelatedLead): LeadDirectoryRo
       lastActionDate: "",
       lastFixedDate: "",
       notWorked: contact.notWorkAnymore ?? false,
+      extraBrandStates: relatedLeadExtraBrandStates(contact),
     },
     {
       firstName,
@@ -335,6 +383,42 @@ export function directoryRowToFormState(row: LeadDirectoryRow): LeadDrawerFormSt
     rm95HistoryCalls: "",
     rm95HistoryNotes: "",
     rm95ToBeCalledOn: "",
+    extraBrands: Object.fromEntries(
+      Object.entries(row.extraBrandStates ?? {}).map(([code, state]) => [
+        code,
+        {
+          leadType: state.leadType ?? "",
+          toBeCalledBy: state.toBeCalledBy ?? "",
+          toBeCalledOn: "",
+          historyCalls: "",
+          historyNotes: "",
+        },
+      ]),
+    ),
+  };
+}
+
+function detailExtraBrandStates(
+  detail: LeadDetailPayload,
+  fallback?: LeadDirectoryRow | null,
+): ExtraBrandStates | undefined {
+  const entries = Object.entries(detail.extraBrands);
+  if (entries.length === 0) return fallback?.extraBrandStates;
+
+  return {
+    ...fallback?.extraBrandStates,
+    ...Object.fromEntries(
+      entries.map(([code, state]) => [
+        code,
+        {
+          leadType: state.leadType ?? null,
+          toBeCalledBy: getToBeCalledBy(state) || null,
+          lastCalledDate: isoToDate(state.lastCalledDate) || null,
+          dateBecomeHot:
+            fallback?.extraBrandStates?.[code]?.dateBecomeHot ?? null,
+        },
+      ]),
+    ),
   };
 }
 
@@ -378,6 +462,7 @@ export function leadDetailToDirectoryRow(
         isoToDate(lead.lastActionDate) || fallback?.lastActionDate || "",
       lastFixedDate: "",
       notWorked: lead.notWorkAnymore ?? false,
+      extraBrandStates: detailExtraBrandStates(detail, fallback),
     },
     {
       firstName,
@@ -430,5 +515,17 @@ export function leadDetailToFormState(
     rm95HistoryCalls: formatBrandCallsHistory(getCallHistory(extended["95rm"])),
     rm95HistoryNotes: formatBrandNotesHistory(getCallHistory(extended["95rm"])),
     rm95ToBeCalledOn: isoToDate(detail.brandStates["95rm"]?.followUpDate),
+    extraBrands: Object.fromEntries(
+      Object.entries(detail.extraBrands).map(([code, state]) => [
+        code,
+        {
+          leadType: state.leadType ?? "",
+          toBeCalledBy: getToBeCalledBy(state),
+          toBeCalledOn: isoToDate(state.followUpDate),
+          historyCalls: formatBrandCallsHistory(getCallHistory(state)),
+          historyNotes: formatBrandNotesHistory(getCallHistory(state)),
+        },
+      ]),
+    ),
   };
 }

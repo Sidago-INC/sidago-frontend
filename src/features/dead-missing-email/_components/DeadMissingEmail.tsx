@@ -14,6 +14,11 @@ import {
   showSuccessToast,
 } from "@/lib/toast";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
+import {
+  buildExtraBrandLeadTypeColumns,
+  resolveBrandLabel,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
@@ -75,8 +80,14 @@ export function DeadMissingEmail() {
     ? data.findIndex((row) => row.leadId === selectedRow.leadId)
     : -1;
 
+  const extraBrands = useExtraBrands();
+
   const columns = useMemo<Column<DeadMissingEmailRow>[]>(
-    () => [
+    () => {
+      const brandLabel = (brand: string) =>
+        resolveBrandLabel(brand, extraBrands, getDeadEmailBrandLabel);
+
+      return [
       {
         title: "Lead ID",
         key: "lead",
@@ -139,14 +150,14 @@ export function DeadMissingEmail() {
         title: "Flagged Brands",
         key: "flaggedBrands",
         getValue: (row) =>
-          row.missingDeadBrands.map(getDeadEmailBrandLabel).join(", "),
+          row.missingDeadBrands.map(brandLabel).join(", "),
         filterable: false,
         sortable: false,
         groupable: false,
         render: (row) => (
           <div className="flex flex-wrap gap-1.5">
             {row.missingDeadBrands.map((brand) => (
-              <Badge key={brand}>{getDeadEmailBrandLabel(brand)}</Badge>
+              <Badge key={brand}>{brandLabel(brand)}</Badge>
             ))}
           </div>
         ),
@@ -169,8 +180,10 @@ export function DeadMissingEmail() {
           </Button>
         ),
       },
-    ],
-    [navigate],
+      ...buildExtraBrandLeadTypeColumns<DeadMissingEmailRow>(extraBrands),
+      ];
+    },
+    [navigate, extraBrands],
   );
 
   const clearRow = async (row: DeadMissingEmailRow) => {

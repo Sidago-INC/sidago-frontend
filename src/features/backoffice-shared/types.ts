@@ -1,3 +1,13 @@
+export type ExtraBrandState = {
+  leadType: string | null;
+  toBeCalledBy: string | null;
+  lastCalledDate: string | null;
+  dateBecomeHot: string | null;
+};
+
+// Keyed by brand code. Holds only brands added after svg, 95rm and benton.
+export type ExtraBrandStates = Record<string, ExtraBrandState>;
+
 export type HotLeadRow = {
   // UUID from leads.id — populated by server-side report APIs and used as the
   // target for PATCH /api/leads/:leadId. Optional because mock-data generators
@@ -8,6 +18,8 @@ export type HotLeadRow = {
   companySymbol: string;
   fullName: string;
   phone: string;
+  /** Live numbers on the lead (All Leads grid). The list itself is in the drawer. */
+  phoneCount?: number;
   role?: string;
   email: string;
   timezone: string;
@@ -27,4 +39,8 @@ export type HotLeadRow = {
   lastActionDate: string;
   lastFixedDate?: string;
   notWorked?: boolean;
+  extraBrandStates?: ExtraBrandStates;
+  // Ever Been Hot rows for an added brand.
+  phaseToBeCalledBy?: string | null;
+  phaseDateBecomeHot?: string | null;
 };

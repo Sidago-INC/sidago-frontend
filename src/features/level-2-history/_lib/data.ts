@@ -15,4 +15,5 @@ export type Level2HistoryRow = {
   lead_type_sidago: string;
   lead_type_benton: string;
   lead_type_95rm: string;
+  extraLeadTypes?: Record<string, string | null>;
 };
