@@ -108,6 +108,12 @@ export function useCallLogDetail(
     queryFn: () =>
       agentCallsApi.detail(leadId!, agentSlug) as Promise<LeadDetailResponse>,
     staleTime: 15_000,
+    // A logged result is applied to the lead's numbers a few seconds later, in
+    // the background. The refetch that follows a log can land before that, so
+    // keep asking until the server says the numbers are up to date - otherwise
+    // "Next to dial" (and the number the next result is recorded against) stays
+    // on the number that was just used up.
+    refetchInterval: (query) => (query.state.data?.numbersUpdating ? 1500 : false),
   });
 }
 

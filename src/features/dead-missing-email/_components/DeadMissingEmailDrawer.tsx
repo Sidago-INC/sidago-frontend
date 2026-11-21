@@ -9,6 +9,8 @@ import {
 } from "@/components/ui";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { openPrintFrame } from "@/lib/print-html";
+import { resolveBrandLabel } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { useEffect, useMemo, useState } from "react";
 import {
   getDeadEmailBrandLabel,
@@ -84,6 +86,9 @@ export function DeadMissingEmailDrawer({
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [copied, setCopied] = useState(false);
+  const extraBrands = useExtraBrands();
+  const brandLabel = (brand: string) =>
+    resolveBrandLabel(brand, extraBrands, getDeadEmailBrandLabel);
 
   const drawerUrl = useMemo(() => {
     if (!row || typeof window === "undefined") return "";
@@ -121,9 +126,13 @@ export function DeadMissingEmailDrawer({
       ["Lead Type", row.leadTypeSvg ?? ""],
       ["Lead Type Benton", row.leadTypeBenton ?? ""],
       ["Lead Type 95RM", row.leadType95rm ?? ""],
+      ...extraBrands.map((brand) => [
+        `Lead Type ${brand.displayName}`,
+        row.extraBrandStates?.[brand.code]?.leadType ?? "",
+      ]),
       [
         "Flagged Brands",
-        row.missingDeadBrands.map(getDeadEmailBrandLabel).join(", "),
+        row.missingDeadBrands.map(brandLabel).join(", "),
       ],
       ["Missing/Dead Email", row.missingDeadBrands.length > 0 ? "Yes" : "No"],
     ];
@@ -231,7 +240,7 @@ export function DeadMissingEmailDrawer({
               value={
                 <div className="flex flex-wrap justify-end gap-1.5">
                   {row.missingDeadBrands.map((brand) => (
-                    <Badge key={brand}>{getDeadEmailBrandLabel(brand)}</Badge>
+                    <Badge key={brand}>{brandLabel(brand)}</Badge>
                   ))}
                 </div>
               }
@@ -269,6 +278,18 @@ export function DeadMissingEmailDrawer({
                 )
               }
             />
+            {extraBrands.map((brand) => {
+              const leadType = row.extraBrandStates?.[brand.code]?.leadType;
+              return (
+                <DetailRow
+                  key={brand.code}
+                  label={brand.displayName}
+                  value={
+                    leadType ? <TypeBadge value={leadType} kind="lead" /> : "-"
+                  }
+                />
+              );
+            })}
           </DetailCard>
         </div>
       )}

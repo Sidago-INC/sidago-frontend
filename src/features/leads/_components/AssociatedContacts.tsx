@@ -1,5 +1,7 @@
 import { TypeBadge, Wave } from "@/components/ui";
 import type { RelatedLead } from "@/features/fix-leads/_lib/data";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import { isLegacyBrandCode } from "@/lib/brands";
 import { type ReactNode } from "react";
 
 type ContactsSectionProps = {
@@ -17,6 +19,8 @@ export function AssociatedContactsSection({
   onContactClick,
   activeContactId,
 }: ContactsSectionProps) {
+  const extraBrands = useExtraBrands();
+
   return (
     <ContactsSectionShell
       label="Associated Contacts"
@@ -78,6 +82,24 @@ export function AssociatedContactsSection({
               )
             }
           />
+          {Object.entries(contact.brandStates ?? {})
+            .filter(([code]) => !isLegacyBrandCode(code))
+            .map(([code, state]) => (
+              <AssociationDetail
+                key={code}
+                label={`${
+                  extraBrands.find((brand) => brand.code === code)
+                    ?.displayName ?? code
+                } Lead Type`}
+                value={
+                  state.leadType ? (
+                    <TypeBadge value={state.leadType} kind="lead" />
+                  ) : (
+                    "-"
+                  )
+                }
+              />
+            ))}
         </>
       )}
     />

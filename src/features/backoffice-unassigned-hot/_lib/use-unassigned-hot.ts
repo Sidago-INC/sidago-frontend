@@ -10,7 +10,7 @@ import {
 import type { HotLeadRow } from "@/features/backoffice-shared/types";
 import { normalizeHotLeadRow } from "@/features/backoffice-shared/normalize-hot-lead-row";
 
-type Brand = "svg" | "95rm" | "benton";
+type Brand = string;
 
 type ApiResponse = {
   ok: true;

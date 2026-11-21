@@ -18,6 +18,8 @@ type RevisionChange = {
 type RevisionGroup = {
   table: string;
   brandCode?: string;
+  /** The phone number a lead_phones change belongs to. */
+  recordLabel?: string;
   operation?: string;
   changes: RevisionChange[];
 };
@@ -61,7 +63,9 @@ function mapRevisionToActivity(
   const sections: ActivitySection[] = (entry.groups ?? []).map((group) => ({
     title: group.brandCode
       ? `${group.table} (${group.brandCode.toUpperCase()})`
-      : (group.table ?? "UPDATE").toUpperCase(),
+      : group.recordLabel
+        ? `${group.table} (${group.recordLabel})`
+        : (group.table ?? "UPDATE").toUpperCase(),
     items: (group.changes ?? []).map((change) => ({
       type: "badge" as const,
       label: `${formatFieldLabel(change.field)}: ${String(change.from ?? "-")} → ${String(change.to ?? "-")}`,

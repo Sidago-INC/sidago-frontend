@@ -38,6 +38,7 @@ function normalizeHistoryEntry(entry: unknown): HistoryEntry | null {
     ),
     source: toString(record.source),
     mightyCallId: toNullableString(record.mightyCallId ?? record.mighty_call_id),
+    phoneDialled: toNullableString(record.phoneDialled ?? record.phone_dialled),
   };
 }
 
