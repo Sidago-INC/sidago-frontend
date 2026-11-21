@@ -78,6 +78,16 @@ export function formatEasternDateTime(ts: string): string {
   return `${label} ET`;
 }
 
+// Absolute timestamp → 'YYYY-MM-DD', the Eastern calendar day it fell on (so a
+// late-evening change is not shown as the next UTC day). '' for no/bad input.
+export function formatEasternDate(ts: string | null | undefined): string {
+  if (!ts) return "";
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return "";
+  // en-CA formats a date as YYYY-MM-DD.
+  return date.toLocaleDateString("en-CA", { timeZone: EASTERN_TIME_ZONE });
+}
+
 // Absolute timestamp → 'hh:mm AM ET' (time only), rendered in Eastern.
 export function formatEasternTime(ts: string): string {
   const label = new Date(ts).toLocaleTimeString("en-US", {

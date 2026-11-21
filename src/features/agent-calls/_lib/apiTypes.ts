@@ -139,6 +139,12 @@ export type LeadDetailResponse = {
     counterB: number;
     counterF: number;
     counterFixes: number;
+    /**
+     * "Lead Fixed Date": when an agent last fixed / corrected / added one of the
+     * lead's numbers (ISO, UTC), or null. Lead-wide - not brandState.lastFixedDate.
+     * Optional: an older backend does not send it.
+     */
+    phoneFixedAt?: string | null;
     /** Cross-brand last action timestamp when provided by lead detail. */
     lastActionDate?: string | null;
   };
