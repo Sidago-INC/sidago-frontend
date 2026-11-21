@@ -7,6 +7,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   AgentSmsEditableTrigger,
   AgentSmsInlineTextCell,
@@ -29,6 +30,7 @@ import {
   useUpdateSmsState,
 } from "../_lib/hooks";
 import { toggleMarkVoid } from "@/features/agent-calls/_lib/markVoid";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 
 type AgentSmsProps = {
   agentName: string;
@@ -97,7 +99,7 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
   const [searchParams] = useSearchParams();
   const profile = smsAgentProfiles[agentSlug] ?? {
     agentName: agentSlug,
-    brand: "Sidago" as const,
+    brand: "Sidago",
   };
   const {
     page,
@@ -123,14 +125,20 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
         onPerPageChange: setPerPage,
       }
     : undefined;
+  const extraBrands = useExtraBrands();
   const updateSmsState = useUpdateSmsState();
   const logSms = useLogSms();
   const apiRows = useMemo(
     () =>
       (queueData?.data ?? []).map((item) =>
-        mapSmsQueueItem(item, queueData?.brandCode ?? "svg", profile.brand),
+        mapSmsQueueItem(
+          item,
+          queueData?.brandCode ?? "svg",
+          extraBrands.find((brand) => brand.code === queueData?.brandCode)
+            ?.displayName ?? profile.brand,
+        ),
       ),
-    [queueData, profile.brand],
+    [queueData, profile.brand, extraBrands],
   );
   const [rows, setRows] = useState<AgentSmsRow[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
@@ -345,23 +353,10 @@ export function AgentSms({ agentName, agentSlug }: AgentSmsProps) {
       {
         title: "Phone",
         key: "phone",
-        render: (row) =>
-          editingRowId === row.id ? (
-            <AgentSmsInlineTextCell
-              value={row.phone}
-              placeholder="Phone"
-              onChange={(value) =>
-                updateRow(row.id, (currentRow) => ({
-                  ...currentRow,
-                  phone: value,
-                }))
-              }
-            />
-          ) : (
-            <AgentSmsEditableTrigger onClick={() => setEditingRowId(row.id)}>
-              <AgentSmsReadText value={row.phone} />
-            </AgentSmsEditableTrigger>
-          ),
+        // Read-only: this screen only persists the SMS-logged flag, so an edited
+        // number would look saved and then vanish on refresh. A lead can hold
+        // several numbers now; they are managed in the Leads drawer.
+        render: (row) => <AgentSmsReadText value={formatPhone(row.phone)} />,
       },
       {
         title: "SMS Status",

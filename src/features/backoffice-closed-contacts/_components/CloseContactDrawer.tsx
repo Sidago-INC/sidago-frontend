@@ -47,7 +47,9 @@ import {
 } from "@/features/agent-calls/_lib/markVoid";
 import { useAuth } from "@/providers/AuthProvider";
 import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
 import {
   useUpdateLead,
   type LeadPatchBody,
@@ -167,6 +169,7 @@ export function ClosedContactDrawer({
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { data: brandsWithAgents } = useBrandsWithAgents(user?.role);
+  const extraBrands = useExtraBrands();
   const [copied, setCopied] = useState(false);
   const [formState, setFormState] = useState<{
     key: string;
@@ -251,7 +254,11 @@ export function ClosedContactDrawer({
       return;
     }
 
-    const brandCode = resolveClosedContactsBrandCode(tabKey, row.brand);
+    const brandCode = resolveClosedContactsBrandCode(
+      tabKey,
+      row.brand,
+      extraBrands.map((brand) => brand.code),
+    );
     if (!brandCode) {
       showErrorToast(
         new Error(
@@ -266,7 +273,9 @@ export function ClosedContactDrawer({
         ? row.svgToBeCalledBy
         : brandCode === "benton"
           ? row.bentonToBeCalledBy
-          : row.rm95ToBeCalledBy;
+          : brandCode === "95rm"
+            ? row.rm95ToBeCalledBy
+            : row.extraBrandStates?.[brandCode]?.toBeCalledBy;
     const agentSlug = resolveMarkVoidAgentSlug(
       brandsWithAgents,
       brandCode,
@@ -506,13 +515,14 @@ export function ClosedContactDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Phone">
+          <EditableField label="Preferred Phone">
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>
+          <PreferredPhoneHint />
           <EditableField label="Email">
             <EmailInput
               value={form.email}

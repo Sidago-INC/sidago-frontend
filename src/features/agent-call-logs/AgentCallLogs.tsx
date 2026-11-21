@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { isLegacyBrandCode } from "@/lib/brands";
+import { normalizeBrandCode } from "@/lib/navigation-agents";
 import {
   Ban,
   ChevronDown,
@@ -74,6 +76,10 @@ import {
   usePatchCallLogLead,
 } from "./_lib/hooks";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useQueryClient } from "@tanstack/react-query";
+import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
+import { preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
 
 // A co-worker at the same company, as served by the detail endpoint. Only the
 // fields the "All Company Contacts" card renders — clicking one loads its own
@@ -186,11 +192,8 @@ const callOutcomes = [
 
 type BrandKey = "svg" | "95rm" | "benton";
 
-function toBrandKey(brandCode: string): BrandKey {
-  const code = brandCode.toLowerCase();
-  if (code === "95rm") return "95rm";
-  if (code === "benton") return "benton";
-  return "svg";
+function isBrandKey(code: string): code is BrandKey {
+  return isLegacyBrandCode(code);
 }
 
 function formFromDetail(detail: LeadDetailResponse): EditableCallLogState {
@@ -219,7 +222,7 @@ function formFromDetail(detail: LeadDetailResponse): EditableCallLogState {
 function buildLeadPatchBody(
   form: EditableCallLogState,
   detail: LeadDetailResponse,
-  brandKey: BrandKey,
+  summaryBrandCode: string | undefined,
 ): LeadPatchBody | null {
   const body: LeadPatchBody = {};
   const leadPatch: NonNullable<LeadPatchBody["lead"]> = {};
@@ -241,7 +244,19 @@ function buildLeadPatchBody(
   }
   const brandPatch: NonNullable<LeadPatchBody["brandStates"]> = {};
   if (form.svgLeadType !== detail.brandState.leadType) {
-    brandPatch[brandKey] = { lead_type: form.svgLeadType };
+    // Before the summary loads, a save goes to svg as it always has, unless
+    // the lead's own brand is one added later.
+    const detailBrandCode = normalizeBrandCode(detail.brandState.brandCode);
+    const code =
+      normalizeBrandCode(summaryBrandCode) ??
+      (detailBrandCode && !isLegacyBrandCode(detailBrandCode)
+        ? detailBrandCode
+        : "svg");
+    if (isBrandKey(code)) {
+      brandPatch[code] = { lead_type: form.svgLeadType };
+    } else {
+      brandPatch.others = [{ brandCode: code, lead_type: form.svgLeadType }];
+    }
   }
 
   if (Object.keys(leadPatch).length > 0) {
@@ -305,8 +320,7 @@ export function AgentCallLogs() {
   } = useCallsLogSummary(agentSlug, search);
 
   const groups = useMemo(() => summary?.groups ?? [], [summary]);
-  const brandCode = summary?.brandCode ?? "svg";
-  const brandKey = toBrandKey(brandCode);
+  const summaryBrandCode = summary?.brandCode;
 
   // Two independent things, which used to be one.
   //
@@ -561,11 +575,18 @@ export function AgentCallLogs() {
     [],
   );
 
+  // The next result is recorded against the number marked "Next to dial". While
+  // the last result is still being applied that number is out of date, so wait.
+  const numbersUpdating = Boolean(
+    detail?.numbersUpdating || companyContactDetail?.numbersUpdating,
+  );
+
   const actionPending =
     logResult.isPending ||
     followUp.isPending ||
     markVoid.isPending ||
-    patchLead.isPending;
+    patchLead.isPending ||
+    numbersUpdating;
 
   const updateForm = <Key extends keyof EditableCallLogState>(
     key: Key,
@@ -606,7 +627,7 @@ export function AgentCallLogs() {
     formValue: EditableCallLogState,
     detailValue: LeadDetailResponse,
   ) => {
-    const body = buildLeadPatchBody(formValue, detailValue, brandKey);
+    const body = buildLeadPatchBody(formValue, detailValue, summaryBrandCode);
     if (body) {
       await patchLead.mutateAsync({ leadId, body });
     }
@@ -645,7 +666,7 @@ export function AgentCallLogs() {
       return;
     }
 
-    const body = buildLeadPatchBody(form, detail, brandKey);
+    const body = buildLeadPatchBody(form, detail, summaryBrandCode);
     const callbackChanged =
       form.callBackDate !== (detail.brandState.followUpDate ?? "");
 
@@ -702,6 +723,8 @@ export function AgentCallLogs() {
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
         source: "manual",
+        // Recorded against the number marked "Next to dial" in Phone Numbers.
+        leadPhoneId: detail?.nextPhone?.id,
       });
       showSuccessToast("Call outcome logged successfully.");
     } catch (error) {
@@ -1242,6 +1265,7 @@ export function AgentCallLogs() {
                   followUpDate:
                     selectedCompanyContactForm.callBackDate || undefined,
                   source: "manual",
+                  leadPhoneId: companyContactDetail?.nextPhone?.id,
                 });
                 showSuccessToast("Call outcome logged successfully.");
               } catch (error) {
@@ -1335,6 +1359,7 @@ function CallLogDetailContent({
 }) {
   const companySymbol =
     lead.companySymbol ?? getCompanySymbol(lead.companyName);
+  const queryClient = useQueryClient();
 
   return (
     <div className="min-w-0 space-y-5">
@@ -1374,13 +1399,16 @@ function CallLogDetailContent({
             className="text-xs font-semibold"
           />
         </EditableField>
-        <EditableField label="Phone">
+        {/* A new number here replaces the PREFERRED one (the old one is
+            retired, not lost). Other numbers live in Phone Numbers below. */}
+        <EditableField label={preferredPhoneLabel(detail.phones)}>
           <TextInput
             value={form.phone}
             onChange={(event) => onUpdateForm("phone", event.target.value)}
             className="text-xs font-semibold"
           />
         </EditableField>
+        <PreferredPhoneHint />
         <EditableField label="Email">
           <EmailInput
             value={form.email}
@@ -1388,6 +1416,20 @@ function CallLogDetailContent({
             className="text-xs font-semibold"
           />
         </EditableField>
+      </DetailCard>
+
+      <DetailCard label="Phone Numbers">
+        <LeadPhonesPanel
+          leadId={lead.leadId}
+          phones={detail.phones ?? []}
+          nextPhoneId={detail.nextPhone?.id ?? null}
+          updating={detail.numbersUpdating}
+          onChanged={() =>
+            queryClient.invalidateQueries({
+              queryKey: ["call-log-detail", lead.leadId],
+            })
+          }
+        />
       </DetailCard>
 
       <DetailCard label="Lead Details">

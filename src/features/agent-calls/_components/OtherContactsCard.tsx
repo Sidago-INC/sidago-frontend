@@ -1,6 +1,7 @@
 import { Building2, Mail, Phone, Users } from "lucide-react";
 import { CardShell } from "@/components/ui/CardShell";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import type { LeadDetailResponse } from "../_lib/apiTypes";
 
 type Props = {
@@ -41,7 +42,7 @@ export function OtherContactsCard({ contacts, className }: Props) {
                 {contact.phone ? (
                   <p className="flex items-start gap-2">
                     <Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-gray-500" />
-                    <span className="select-all">{contact.phone}</span>
+                    <span className="select-all">{formatPhone(contact.phone)}</span>
                   </p>
                 ) : null}
 

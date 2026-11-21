@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useUsers, type AgentUser } from "@/features/backoffice-shared/use-users";
 
-type Brand = "svg" | "95rm" | "benton";
+type Brand = string;
 
 export function mapAgentUsersToSelectOptions(agents: AgentUser[] = []) {
   return agents.map((agent) => ({

@@ -14,6 +14,7 @@ import type { Column } from "@/components/ui/Table";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { openPrintFrame } from "@/lib/print-html";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { validateExtension } from "@/lib/validation/phone";
 import Revisions from "@/features/backoffice-shared/Revisions";
 import { DrawerCompanyField } from "@/features/backoffice-shared/DrawerCompanyField";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
@@ -29,6 +30,11 @@ import {
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
 import {
+  getExtraBrandPatch,
+  useExtraBrandAgents,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import {
   isBrandAgentSlug,
   resolveMarkVoidAgentSlug,
   toggleMarkVoid,
@@ -43,12 +49,16 @@ import { Check, ChevronDown, ChevronUp, Link, Printer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { AssociatedContactsSection } from "./AssociatedContacts";
+import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
+import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
+import { preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
 import {
   directoryRowToFormState,
   leadDetailToDirectoryRow,
   leadDetailToFormState,
   mapLeadDetailResponseToPayload,
   relatedLeadToDirectoryRow,
+  type LeadDrawerExtraBrandState,
   type LeadDrawerFormState,
 } from "../_lib/lead-detail";
 import { createLeadDirectoryRow, type LeadDirectoryRow } from "../_lib/data";
@@ -79,6 +89,14 @@ type LeadsDrawerProps = {
 
 const iconClass = "w-4 h-4 stroke-[2]";
 
+const EMPTY_EXTRA_BRAND_STATE: LeadDrawerExtraBrandState = {
+  leadType: "",
+  toBeCalledBy: "",
+  toBeCalledOn: "",
+  historyCalls: "",
+  historyNotes: "",
+};
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -107,6 +125,25 @@ function applyFormToDirectoryRow(
       rm95LeadType: form.rm95LeadType,
       rm95ToBeCalledBy: form.rm95ToBeCalledBy,
       notWorked: form.notWorked,
+      extraBrandStates:
+        Object.keys(form.extraBrands).length > 0
+          ? {
+              ...row.extraBrandStates,
+              ...Object.fromEntries(
+                Object.entries(form.extraBrands).map(([code, state]) => [
+                  code,
+                  {
+                    lastCalledDate:
+                      row.extraBrandStates?.[code]?.lastCalledDate ?? null,
+                    dateBecomeHot:
+                      row.extraBrandStates?.[code]?.dateBecomeHot ?? null,
+                    leadType: state.leadType || null,
+                    toBeCalledBy: state.toBeCalledBy || null,
+                  },
+                ]),
+              ),
+            }
+          : row.extraBrandStates,
     },
     { phoneExtension: form.phoneExtension },
   );
@@ -160,13 +197,26 @@ export function LeadsDrawer({
   const { data: brandsWithAgents, isLoading: brandsWithAgentsLoading } =
     useBrandsWithAgents(user?.role);
   const brandParam = searchParams.get("brand");
-  const brandCode = isBrandAgentSlug(brandParam) ? brandParam : "svg";
+  const extraBrands = useExtraBrands();
+  const extraBrandCodes = extraBrands.map((brand) => brand.code);
+  const extraBrandAgents = useExtraBrandAgents(extraBrandCodes);
+  const brandCode: string =
+    isBrandAgentSlug(brandParam) ||
+    (brandParam && extraBrandCodes.includes(brandParam))
+      ? brandParam
+      : "svg";
+  // A ?brand= for an added brand reads as svg until the catalog has loaded.
+  const brandParamUnresolved =
+    Boolean(brandParam) && !isBrandAgentSlug(brandParam) && brandCode === "svg";
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [svgToBeCalledOnError, setSvgToBeCalledOnError] = useState<string>();
   const [bentonToBeCalledOnError, setBentonToBeCalledOnError] =
     useState<string>();
   const [rm95ToBeCalledOnError, setRm95ToBeCalledOnError] = useState<string>();
+  const [extraToBeCalledOnErrors, setExtraToBeCalledOnErrors] = useState<
+    Record<string, string | undefined>
+  >({});
   const [nestedContact, setNestedContact] = useState<RelatedLead | null>(null);
   const [editModeKey, setEditModeKey] = useState<string | null>(null);
   const [companyEdits, setCompanyEdits] = useState<{
@@ -191,7 +241,8 @@ export function LeadsDrawer({
     if (!row) return undefined;
     if (brandCode === "svg") return row.svgToBeCalledBy;
     if (brandCode === "benton") return row.bentonToBeCalledBy;
-    return row.rm95ToBeCalledBy;
+    if (brandCode === "95rm") return row.rm95ToBeCalledBy;
+    return row.extraBrandStates?.[brandCode]?.toBeCalledBy ?? undefined;
   }, [row, brandCode]);
 
   const detailAgentSlug = useMemo(
@@ -270,13 +321,19 @@ export function LeadsDrawer({
       showErrorToast(new Error("Cannot update: this row has no leadId."));
       return;
     }
+    if (brandParamUnresolved) {
+      showErrorToast(new Error(`Unknown brand "${brandParam}". Please reload and try again.`));
+      return;
+    }
 
     const assigneeName =
       brandCode === "svg"
         ? form?.svgToBeCalledBy
         : brandCode === "benton"
           ? form?.bentonToBeCalledBy
-          : form?.rm95ToBeCalledBy;
+          : brandCode === "95rm"
+            ? form?.rm95ToBeCalledBy
+            : form?.extraBrands[brandCode]?.toBeCalledBy;
     const agentSlug = resolveMarkVoidAgentSlug(
       brandsWithAgents,
       brandCode,
@@ -406,8 +463,37 @@ export function LeadsDrawer({
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
     setRm95ToBeCalledOnError(undefined);
+    setExtraToBeCalledOnErrors({});
     setNestedContact(null);
   }, [rowKey]);
+
+  // The phone fields mirror the PREFERRED number, which the Phone Numbers card
+  // changes on its own (star, status, retire). Once an edit or a save has put a
+  // snapshot in formState it stops following the detail, so the field would keep
+  // the old number and the next Save would send it back - retiring the number
+  // the card just made preferred and reviving the old one. Follow the server's
+  // value whenever it changes. After a save this also swaps what was typed
+  // ("(604) 602-0002") for the stored form ("+16046020002").
+  const serverPhone = initialForm?.phone;
+  const serverPhoneExtension = initialForm?.phoneExtension;
+  useEffect(() => {
+    if (serverPhone === undefined || serverPhoneExtension === undefined) return;
+    setFormState((current) =>
+      current &&
+      current.key === rowKey &&
+      (current.value.phone !== serverPhone ||
+        current.value.phoneExtension !== serverPhoneExtension)
+        ? {
+            ...current,
+            value: {
+              ...current.value,
+              phone: serverPhone,
+              phoneExtension: serverPhoneExtension,
+            },
+          }
+        : current,
+    );
+  }, [rowKey, serverPhone, serverPhoneExtension]);
 
   if (!row || selectedIndex === null || !form || !displayRow) return null;
 
@@ -509,6 +595,29 @@ export function LeadsDrawer({
     updateForm("rm95ToBeCalledOn", value);
   };
 
+  const updateExtraBrand = (
+    code: string,
+    patch: Partial<LeadDrawerExtraBrandState>,
+  ) => {
+    updateForm("extraBrands", {
+      ...form.extraBrands,
+      [code]: {
+        ...(form.extraBrands[code] ?? EMPTY_EXTRA_BRAND_STATE),
+        ...patch,
+      },
+    });
+  };
+
+  const handleExtraToBeCalledOnChange = (code: string, value: string) => {
+    const error = getCallBackDateError(
+      value,
+      displayRow.extraBrandStates?.[code]?.lastCalledDate ?? "",
+    );
+    setExtraToBeCalledOnErrors((current) => ({ ...current, [code]: error }));
+    if (error) return;
+    updateExtraBrand(code, { toBeCalledOn: value });
+  };
+
   const handleEditStart = () => {
     if (!rowKey) return;
     setEditModeKey(rowKey);
@@ -520,6 +629,7 @@ export function LeadsDrawer({
     setSvgToBeCalledOnError(undefined);
     setBentonToBeCalledOnError(undefined);
     setRm95ToBeCalledOnError(undefined);
+    setExtraToBeCalledOnErrors({});
   };
 
   const handleAssociatedContactClick = (contact: RelatedLead) => {
@@ -545,6 +655,11 @@ export function LeadsDrawer({
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
     if (form.phoneExtension !== initialForm.phoneExtension) {
+      const extensionError = validateExtension(form.phoneExtension);
+      if (extensionError) {
+        showErrorToast(new Error(extensionError));
+        return;
+      }
       leadDiff.phone_extension = form.phoneExtension;
     }
     if (form.role !== initialForm.role) leadDiff.role = form.role;
@@ -611,6 +726,17 @@ export function LeadsDrawer({
         follow_up_date: form.rm95ToBeCalledOn || null,
       };
     }
+    const otherBrandStates = Object.entries(form.extraBrands).flatMap(
+      ([code, state]) => {
+        const patch = getExtraBrandPatch(
+          code,
+          state,
+          initialForm.extraBrands[code] ?? EMPTY_EXTRA_BRAND_STATE,
+        );
+        return patch ? [patch] : [];
+      },
+    );
+    if (otherBrandStates.length > 0) brandStates.others = otherBrandStates;
 
     if (Object.keys(brandStates).length > 0) body.brandStates = brandStates;
 
@@ -818,13 +944,17 @@ export function LeadsDrawer({
               className="text-xs font-semibold"
             />
           </EditableField>
-          <EditableField label="Phone">
+          {/* Typing a new number here replaces the PREFERRED number: the old
+              one is retired, not lost. Other numbers are managed in the
+              Phone Numbers card below. */}
+          <EditableField label={preferredPhoneLabel(detailQuery.data?.phones)}>
             <TextInput
               value={form.phone}
               onChange={(event) => updateForm("phone", event.target.value)}
               className="text-xs font-semibold"
             />
           </EditableField>
+          <PreferredPhoneHint />
           <EditableField label="Phone Extension">
             <TextInput
               value={form.phoneExtension}
@@ -849,6 +979,29 @@ export function LeadsDrawer({
             />
           </EditableField>
         </DetailCard>
+
+        {detailQuery.data && row.leadId ? (
+          <DetailCard label="Phone Numbers">
+            {/* Saves on its own, number by number - it must not flip the
+                drawer into edit mode (the wrapper's onFocus does that). */}
+            <div onFocus={(event) => event.stopPropagation()}>
+            <LeadPhonesPanel
+              leadId={row.leadId}
+              phones={detailQuery.data.phones ?? []}
+              nextPhoneId={detailQuery.data.nextPhone?.id ?? null}
+              onChanged={() =>
+                Promise.all([
+                  detailQuery.refetch(),
+                  queryClient.refetchQueries({
+                    queryKey: ["leads", "directory"],
+                    type: "active",
+                  }),
+                ])
+              }
+            />
+            </div>
+          </DetailCard>
+        ) : null}
 
         <DetailCard label="Lead Details">
           <EditableField label="Contact Type">
@@ -952,6 +1105,40 @@ export function LeadsDrawer({
           agentOptions={rm95AgentsQuery.options}
           agentsLoading={rm95AgentsQuery.isLoading}
         />
+
+        {extraBrands.map((brand) => {
+          const state =
+            form.extraBrands[brand.code] ?? EMPTY_EXTRA_BRAND_STATE;
+          const lastCalledDate =
+            displayRow.extraBrandStates?.[brand.code]?.lastCalledDate ?? "";
+
+          return (
+            <LeadDetailsCard
+              key={brand.code}
+              title={`${brand.displayName} Details`}
+              leadType={state.leadType}
+              onLeadTypeChange={(value) =>
+                updateExtraBrand(brand.code, { leadType: String(value) })
+              }
+              toBeCalledBy={state.toBeCalledBy}
+              onToBeCalledByChange={(value) =>
+                updateExtraBrand(brand.code, { toBeCalledBy: String(value) })
+              }
+              toBeCalledOn={state.toBeCalledOn}
+              onToBeCalledOnChange={(value) =>
+                handleExtraToBeCalledOnChange(brand.code, value)
+              }
+              toBeCalledOnError={extraToBeCalledOnErrors[brand.code]}
+              lastCalledDate={lastCalledDate}
+              minCallBackDate={getMinCallBackDate(lastCalledDate)}
+              historyCalls={state.historyCalls}
+              historyNotes={state.historyNotes}
+              leadTypeOptions={leadTypeOptions}
+              agentOptions={extraBrandAgents[brand.code]?.options ?? []}
+              agentsLoading={extraBrandAgents[brand.code]?.isLoading ?? false}
+            />
+          );
+        })}
 
         <AssociatedContactsSection
           key={rowKey}

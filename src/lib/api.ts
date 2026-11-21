@@ -20,9 +20,22 @@ async function request(url: string, options: RequestInit = {}, retry = true) {
   });
 
   if (res.status === 401 && retry && shouldRefreshOnUnauthorized) {
-    const refreshed = await refreshToken();
+    const outcome = await refreshToken();
 
-    if (!refreshed) {
+    if (outcome === "unavailable") {
+      // The server or the network is down, not the session. Signing the user
+      // out here turned every short outage into a forced re-login; keep the
+      // tokens and let the next request try again.
+      throw {
+        status: 503,
+        message: [
+          "Can't reach the server right now. Check your connection and try again.",
+        ],
+        code: "SERVICE_UNAVAILABLE",
+      };
+    }
+
+    if (outcome === "invalid") {
       const hadToken = tokenService.getAccessToken();
 
       if (hadToken) {
@@ -70,29 +83,59 @@ async function request(url: string, options: RequestInit = {}, retry = true) {
   return data;
 }
 
-async function refreshToken() {
+/**
+ * ok           new tokens are stored
+ * invalid      the server rejected the refresh token: the session is over
+ * unavailable  no answer, or a server-side failure: says nothing about the
+ *              session, so it must not end it
+ */
+type RefreshOutcome = "ok" | "invalid" | "unavailable";
+
+// One refresh at a time. When the access token expires every request on the
+// page gets a 401 at once; they all wait on this one call instead of each
+// sending its own (six identical refreshes in the same second, before).
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+function refreshToken(): Promise<RefreshOutcome> {
+  refreshInFlight ??= doRefresh().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function doRefresh(): Promise<RefreshOutcome> {
+  const refreshToken = tokenService.getRefreshToken();
+
+  if (!refreshToken) return "invalid";
+
+  let res: Response;
   try {
-    const refreshToken = tokenService.getRefreshToken();
-
-    if (!refreshToken) return false;
-
-    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+    res = await fetch(`${BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ refreshToken }),
     });
-
-    if (!res.ok) return false;
-
-    const data = await res.json();
-
-    await tokenService.setTokens(data.accessToken, data.refreshToken);
-
-    return true;
   } catch {
-    return false;
+    // fetch only throws when there was no HTTP answer at all.
+    return "unavailable";
+  }
+
+  // 401/403: the token is expired, revoked or the user was deactivated.
+  // 400: the token is malformed. Anything else (5xx, 429, a proxy's HTML
+  // error page) is the server's problem, not the session's.
+  if (res.status === 400 || res.status === 401 || res.status === 403) {
+    return "invalid";
+  }
+  if (!res.ok) return "unavailable";
+
+  try {
+    const data = await res.json();
+    await tokenService.setTokens(data.accessToken, data.refreshToken);
+    return "ok";
+  } catch {
+    return "unavailable";
   }
 }
 

@@ -12,6 +12,7 @@ import {
   TextInput,
   TimezoneBadge,
 } from "@/components/ui";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
@@ -20,6 +21,7 @@ import {
   leadTypeOptions,
 } from "@/features/backoffice-closed-contacts/_lib/data";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import {
   Ban,
   Check,
@@ -191,6 +193,13 @@ export function AgentSmsDrawer({
   onSave,
 }: AgentSmsDrawerProps) {
   const [copied, setCopied] = useState(false);
+  const extraBrands = useExtraBrands();
+  const extraBrandName = extraBrands.find(
+    (brand) => brand.code === row?.brandCode,
+  )?.displayName;
+  const leadTypeLabel = extraBrandName
+    ? `Lead Type ${extraBrandName}`
+    : "Lead Type Benton";
 
   useEffect(() => {
     if (!copied) {
@@ -233,11 +242,11 @@ export function AgentSmsDrawer({
       ["Lead", row.lead],
       ["Company Name", row.companyName],
       ["Full Name", row.fullName],
-      ["Phone", row.phone],
+      ["Phone", formatPhone(row.phone)],
       ["Email", row.email],
       ["Time zone", row.timezone],
       ["Contact Type", row.contactType],
-      ["Lead Type Benton", row.bentonLeadType],
+      [leadTypeLabel, row.bentonLeadType],
       ["SMS Status", row.smsStatus],
       ["Call Back Date", row.callBackDate],
       ["Notes", row.notes],
@@ -376,11 +385,14 @@ export function AgentSmsDrawer({
                 className="text-xs font-semibold"
               />
             </EditableField>
+            {/* Read-only: the SMS screen saves only the SMS-logged flag, and a
+                lead can hold several numbers (managed in the Leads drawer). */}
             <EditableField label="Phone">
               <TextInput
-                value={row.phone}
-                onChange={(event) => onChange("phone", event.target.value)}
-                className="text-xs font-semibold"
+                value={formatPhone(row.phone)}
+                readOnly
+                tabIndex={-1}
+                className="cursor-default text-xs font-semibold"
               />
             </EditableField>
             <EditableField label="Email">
@@ -404,7 +416,7 @@ export function AgentSmsDrawer({
                 className="text-xs font-semibold"
               />
             </EditableField>
-            <EditableField label="Lead Type Benton">
+            <EditableField label={leadTypeLabel}>
               <Select
                 value={row.bentonLeadType}
                 onChange={(value) => onChange("bentonLeadType", String(value))}

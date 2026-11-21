@@ -11,6 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useGridPage } from "@/lib/use-grid-page";
 import { LeadsDrawer } from "./LeadsDrawer";
+import { PhoneWithCount } from "@/features/lead-phones/_components/PhoneWithCount";
 import {
   leadTypeOptions,
   timezoneOptions,
@@ -18,6 +19,8 @@ import {
 } from "../_lib/data";
 import { useLeadsDirectory } from "../_lib/hooks";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import { buildExtraBrandColumns } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 
 export function Leads() {
   const [searchParams] = useSearchParams();
@@ -58,6 +61,7 @@ export function Leads() {
   const svgAgents = useAgentSelectOptions("svg");
   const bentonAgents = useAgentSelectOptions("benton");
   const rm95Agents = useAgentSelectOptions("95rm");
+  const extraBrands = useExtraBrands();
 
   const columns = useMemo<Column<LeadDirectoryRow>[]>(
     () => [
@@ -92,7 +96,12 @@ export function Leads() {
       },
       { title: "Company Name", key: "companyName", width: 200 },
       { title: "Full Name", key: "fullName", width: 195 },
-      { title: "Phone", key: "phone", width: 150 },
+      {
+        title: "Phone",
+        key: "phone",
+        width: 170,
+        render: (row) => <PhoneWithCount phone={row.phone} count={row.phoneCount} />,
+      },
       { title: "Email", key: "email", width: 220 },
       {
         title: "Timezone",
@@ -180,8 +189,18 @@ export function Leads() {
         width: 165,
         type: "date",
       },
+      ...buildExtraBrandColumns<LeadDirectoryRow>(extraBrands).map((column) => ({
+        ...column,
+        width: 190,
+      })),
     ],
-    [rows, svgAgents.options, bentonAgents.options, rm95Agents.options],
+    [
+      rows,
+      svgAgents.options,
+      bentonAgents.options,
+      rm95Agents.options,
+      extraBrands,
+    ],
   );
 
   return (
@@ -207,7 +226,13 @@ export function Leads() {
           groupCounts: result?.meta?.groups,
         }}
         title="Leads"
-        description="All lead records across SVG, Benton, and 95RM"
+        description={
+          extraBrands.length > 0
+            ? `All lead records across SVG, Benton, 95RM, ${extraBrands
+                .map((brand) => brand.displayName)
+                .join(", ")}`
+            : "All lead records across SVG, Benton, and 95RM"
+        }
         onRowClick={(row) => {
           const index = rows.findIndex((item) => item.leadId === row.leadId);
           setSelectedIndex(index >= 0 ? index : null);

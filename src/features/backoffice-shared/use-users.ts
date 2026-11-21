@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-type Brand = "svg" | "95rm" | "benton";
+type Brand = string;
 
 export type AgentUser = {
   id: string;
@@ -13,7 +13,7 @@ export type AgentUser = {
 
 type ApiResponse = { ok: true; count: number; data: AgentUser[] };
 
-async function fetchAgents(brand: Brand): Promise<AgentUser[]> {
+export async function fetchAgents(brand: Brand): Promise<AgentUser[]> {
   const json = (await api.get(`/users?brand=${brand}`)) as ApiResponse;
   return json.data;
 }

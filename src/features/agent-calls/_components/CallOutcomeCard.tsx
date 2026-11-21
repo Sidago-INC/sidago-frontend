@@ -2,6 +2,7 @@ import {
   Ban,
   Clock3,
   FileCheck2,
+  Loader2,
   MessageCircleWarning,
   MessageSquareText,
   PhoneCall,
@@ -71,13 +72,28 @@ const outcomes = [
 export function CallOutcomeCard({
   onSelect,
   disabled = false,
+  status,
 }: {
   onSelect: (value: string) => void;
   disabled?: boolean;
+  /** Shown beside the title, e.g. "Saving No Answer…", so a click never looks ignored. */
+  status?: { text: string; busy: boolean } | null;
 }) {
   return (
     <CardShell>
-      <SectionLabel className="mb-4">Call Outcome</SectionLabel>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <SectionLabel>Call Outcome</SectionLabel>
+        {status && (
+          <span
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-gray-400"
+          >
+            {status.busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {status.text}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {outcomes.map((outcome) => (
           <OutcomeButton

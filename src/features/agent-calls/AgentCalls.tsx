@@ -80,44 +80,86 @@ export function AgentCalls() {
   const [callBackDateError, setCallBackDateError] = useState<string>();
   // null = every timezone, in the normal priority order.
   const [timezone, setTimezone] = useState<QueueTimezone | null>(null);
+  // The number the agent is about to dial. Starts as the one rotation picked
+  // (detail.nextPhone) and can be switched on the phone card; the call result
+  // is recorded against it.
+  const [selectedPhoneId, setSelectedPhoneId] = useState<string | null>(null);
   const currentLeadIdRef = useRef<string | null>(null);
+  // Set synchronously on click: two fast clicks land before React re-renders,
+  // so the outcomeLoading state alone would let both through.
+  const outcomeBusyRef = useRef(false);
+  // The queue is reloaded from several places (mount, the 90s refetch, after a
+  // logged result). Only the newest request may update the screen, so a slow
+  // older response can never put back a lead that has already been worked.
+  const queueSeqRef = useRef(0);
+  const outcomeSeqRef = useRef(0);
+  // When the queue was last asked for, by anything. The 90s refetch skips its
+  // turn when a logged result reloaded the queue moments ago: the list is
+  // already fresh, and the queue is the slowest call on this page.
+  const lastQueueFetchAtRef = useRef(0);
+  // After a result is saved the queue reloads in the background; the outcome
+  // card says so instead of leaving the agent wondering whether it worked.
+  const [outcomeStatus, setOutcomeStatus] = useState<
+    { text: string; busy: boolean } | null
+  >(null);
+
+  /** Fetch the queue and show it, keeping the lead on screen if it is still in it. */
+  const reloadQueue = async (isCancelled: () => boolean = () => false) => {
+    const seq = ++queueSeqRef.current;
+    lastQueueFetchAtRef.current = Date.now();
+    const res = await agentCallsApi.queue(agentSlug, timezone ?? undefined);
+    if (isCancelled() || seq !== queueSeqRef.current) return;
+    setLeads(res.data);
+    const currentLeadId = currentLeadIdRef.current;
+    setCurrentIndex((prev) => {
+      if (currentLeadId) {
+        const preservedIndex = res.data.findIndex(
+          (lead) => lead.leadId === currentLeadId,
+        );
+        if (preservedIndex >= 0) return preservedIndex;
+      }
+      // The lead was worked off the queue: the one after it has moved up into
+      // this slot, so staying on the same index shows the next lead.
+      return Math.min(prev, Math.max(res.data.length - 1, 0));
+    });
+  };
 
   // Queue: load on mount + refetch every 90s, and again when the filter changes
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+    const load = async (periodic: boolean) => {
+      if (
+        periodic &&
+        Date.now() - lastQueueFetchAtRef.current < QUEUE_REFETCH_MS / 2
+      ) {
+        return;
+      }
       try {
-        const res = await agentCallsApi.queue(agentSlug, timezone ?? undefined);
-        if (cancelled) return;
-        setLeads(res.data);
-        const currentLeadId = currentLeadIdRef.current;
-        setCurrentIndex((prev) => {
-          if (currentLeadId) {
-            const preservedIndex = res.data.findIndex(
-              (lead) => lead.leadId === currentLeadId,
-            );
-            if (preservedIndex >= 0) return preservedIndex;
-          }
-          return Math.min(prev, Math.max(res.data.length - 1, 0));
-        });
+        await reloadQueue(() => cancelled);
       } catch {
         // Keep existing leads on refetch failure
       } finally {
         if (!cancelled) setQueueLoading(false);
       }
     };
-    load();
-    const id = setInterval(load, QUEUE_REFETCH_MS);
+    void load(false);
+    const id = setInterval(() => void load(true), QUEUE_REFETCH_MS);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
+    // reloadQueue only reads agentSlug/timezone, which are the deps here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentSlug, timezone]);
 
   const currentLead: QueueLead | null = leads[currentIndex] ?? null;
 
   useEffect(() => {
     currentLeadIdRef.current = currentLead?.leadId ?? null;
+    setSelectedPhoneId(currentLead?.nextPhoneId ?? null);
+    // Only when the lead changes - a queue refetch must not undo the agent's
+    // choice of number for the lead on screen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLead?.leadId]);
 
   // Detail: load whenever the selected lead changes
@@ -131,6 +173,7 @@ export function AgentCalls() {
       .then((res) => {
         if (cancelled) return;
         setDetail(res);
+        setSelectedPhoneId(res.nextPhone?.id ?? null);
         const nextForm = formFromDetail(res);
         setForm(nextForm);
         setCallBackDateError(
@@ -152,6 +195,33 @@ export function AgentCalls() {
     };
   }, [currentLead?.leadId, agentSlug]);
 
+  // A result logged on this lead is applied to its numbers a few seconds later,
+  // in the background, so the refetch that follows a log can still show the
+  // number that was just used up as "next". While the server says the numbers are
+  // updating, ask again, then move the selection to the real next number - unless
+  // the agent has already picked a different one themselves.
+  const numbersUpdating = detail?.numbersUpdating === true;
+  const currentLeadId = currentLead?.leadId;
+  useEffect(() => {
+    if (!numbersUpdating || !currentLeadId) return;
+    const staleNextId = detail?.nextPhone?.id ?? null;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await agentCallsApi.detail(currentLeadId, agentSlug);
+        if (currentLeadIdRef.current !== currentLeadId) return;
+        setDetail(res);
+        if (!res.numbersUpdating) {
+          setSelectedPhoneId((prev) =>
+            prev === staleNextId ? (res.nextPhone?.id ?? null) : prev,
+          );
+        }
+      } catch {
+        // Keep what is on screen; the next log or refresh resyncs it.
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [numbersUpdating, currentLeadId, agentSlug, detail]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.sessionStorage.removeItem(LEGACY_PENDING_OUTCOME_KEY);
@@ -172,7 +242,7 @@ export function AgentCalls() {
   };
 
   const handleOutcome = async (resultCode: string) => {
-    if (!currentLead || outcomeLoading) return;
+    if (!currentLead || outcomeBusyRef.current) return;
 
     const callbackError = getCallBackDateError(
       form.callBackDate,
@@ -188,47 +258,80 @@ export function AgentCalls() {
       return;
     }
 
+    const leadId = currentLead.leadId;
+    outcomeBusyRef.current = true;
     setOutcomeLoading(true);
+    setOutcomeStatus({ text: `Saving ${resultCode}…`, busy: true });
     try {
+      // 1) Save the result, then refresh this lead (next number, cleared
+      //    notes). This is what the buttons wait for.
       await agentCallsApi.logResult({
         agentSlug,
-        leadId: currentLead.leadId,
+        leadId,
         resultCode,
         notes: form.notes || undefined,
         followUpDate: form.callBackDate || undefined,
         source: "manual",
+        leadPhoneId: selectedPhoneId ?? undefined,
       });
 
-      const [detailRes, queueRes] = await Promise.all([
-        agentCallsApi.detail(currentLead.leadId, agentSlug),
-        agentCallsApi.queue(agentSlug, timezone ?? undefined),
-      ]);
-      setDetail(detailRes);
-      const nextForm = formFromDetail(detailRes);
-      setForm(nextForm);
-      setCallBackDateError(
-        getCallBackDateError(
-          nextForm.callBackDate,
-          detailRes.brandState.lastCalledDate ?? "",
-        ),
-      );
-
-      setLeads(queueRes.data);
-
-      const preservedIndex = queueRes.data.findIndex(
-        (lead) => lead.leadId === currentLead.leadId,
-      );
-      if (preservedIndex >= 0) {
-        setCurrentIndex(preservedIndex);
-      } else if (currentIndex >= queueRes.data.length) {
-        setCurrentIndex(Math.max(queueRes.data.length - 1, 0));
+      const detailRes = await agentCallsApi.detail(leadId, agentSlug);
+      // The agent may have moved to another lead while this was saving; that
+      // lead's own detail load owns the screen then.
+      if (currentLeadIdRef.current === leadId) {
+        setDetail(detailRes);
+        // Rotation may have moved on (an unanswered number hands over to the
+        // next one), so the next attempt starts from the new pick.
+        setSelectedPhoneId(detailRes.nextPhone?.id ?? null);
+        const nextForm = formFromDetail(detailRes);
+        setForm(nextForm);
+        setCallBackDateError(
+          getCallBackDateError(
+            nextForm.callBackDate,
+            detailRes.brandState.lastCalledDate ?? "",
+          ),
+        );
       }
     } catch (err) {
+      setOutcomeStatus(null);
       setModal({ title: "Error", message: errMessage(err), direction: "top" });
+      return;
     } finally {
+      outcomeBusyRef.current = false;
       setOutcomeLoading(false);
     }
+
+    // 2) The result is saved. Reload the queue in the background (it is the
+    //    slow call); if this lead has left the queue, the next one moves onto
+    //    the screen when it arrives.
+    const seq = ++outcomeSeqRef.current;
+    // A newer click owns the status line; an older save must not overwrite it.
+    const report = (text: string, busy: boolean) => {
+      if (seq === outcomeSeqRef.current && !outcomeBusyRef.current) {
+        setOutcomeStatus({ text, busy });
+      }
+    };
+    report(`${resultCode} saved · updating queue…`, true);
+    try {
+      await reloadQueue();
+      report(
+        currentLeadIdRef.current === leadId
+          ? `${resultCode} saved`
+          : `${resultCode} saved for the previous lead`,
+        false,
+      );
+    } catch {
+      // The result itself is saved; the 90s refetch will catch the queue up.
+      report(`${resultCode} saved · queue refresh failed`, false);
+    }
   };
+
+  // A finished "saved" note fades after a few seconds.
+  useEffect(() => {
+    if (!outcomeStatus || outcomeStatus.busy) return;
+    const timer = setTimeout(() => setOutcomeStatus(null), 5000);
+    return () => clearTimeout(timer);
+  }, [outcomeStatus]);
 
   const handleMarkVoid = async (value: boolean) => {
     setForm((prev) => ({ ...prev, notWorkAnymore: value }));
@@ -241,6 +344,20 @@ export function AgentCalls() {
     } catch (err) {
       setForm((prev) => ({ ...prev, notWorkAnymore: false }));
       setModal({ title: "Error", message: errMessage(err), direction: "bottom" });
+    }
+  };
+
+  // After a number is added on the phone card: reload the detail so the new
+  // number is listed, keeping the agent's current selection.
+  const refreshPhones = async () => {
+    if (!currentLead) return;
+    try {
+      const res = await agentCallsApi.detail(currentLead.leadId, agentSlug);
+      if (currentLeadIdRef.current !== currentLead.leadId) return;
+      setDetail(res);
+      setSelectedPhoneId((prev) => prev ?? res.nextPhone?.id ?? null);
+    } catch (err) {
+      setModal({ title: "Error", message: errMessage(err) });
     }
   };
 
@@ -331,7 +448,22 @@ export function AgentCalls() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-1">
-            <PhoneCard phone={currentLead.phone} />
+            <PhoneCard
+              leadId={currentLead.leadId}
+              phones={
+                detail?.lead.id === currentLead.leadId ? (detail.phones ?? []) : []
+              }
+              selectedId={selectedPhoneId}
+              onSelect={setSelectedPhoneId}
+              fallbackPhone={currentLead.nextPhoneNumber ?? currentLead.phone}
+              fallbackExtension={
+                currentLead.nextPhoneNumber
+                  ? currentLead.nextPhoneExtension
+                  : currentLead.phoneExtension
+              }
+              onAdded={refreshPhones}
+              onPreferredChanged={refreshPhones}
+            />
             <CardShell>
               <IdentityCard
                 form={form}
@@ -362,7 +494,11 @@ export function AgentCalls() {
               }
               onSave={() => {}}
             />
-            <CallOutcomeCard onSelect={handleOutcome} />
+            <CallOutcomeCard
+              onSelect={handleOutcome}
+              disabled={outcomeLoading}
+              status={outcomeStatus}
+            />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <HistoryCard

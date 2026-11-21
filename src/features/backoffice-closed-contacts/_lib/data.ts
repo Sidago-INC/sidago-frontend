@@ -1,3 +1,6 @@
+import type { CatalogBrand } from "@/hooks/useBrandCatalog";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
+
 export type ClosedContactRow = {
   // UUID from leads.id — populated by server-side report API. Optional only
   // because the type may also be used in dev contexts without DB data.
@@ -21,6 +24,7 @@ export type ClosedContactRow = {
   callBackDate: string;
   lastActionDate: string;
   brand: string;
+  extraBrandStates?: ExtraBrandStates;
 };
 
 export type ClosedContactsTabKey =
@@ -30,9 +34,11 @@ export type ClosedContactsTabKey =
   | "rm95-historical"
   | "benton-current"
   | "benton-historical"
-  | "all-closed-contracts";
+  | "all-closed-contracts"
+  | `${string}-current`
+  | `${string}-historical`;
 
-export type ClosedContactsBrand = "svg" | "95rm" | "benton";
+export type ClosedContactsBrand = string;
 export type ClosedContactsCategory = "current" | "historical" | "all";
 
 export type ClosedContactsTab = {
@@ -93,6 +99,30 @@ export const closedContactsTabs: ClosedContactsTab[] = [
     category: "all",
   },
 ];
+
+export function buildClosedContactsTabs(
+  extraBrands: CatalogBrand[],
+): ClosedContactsTab[] {
+  return [
+    ...closedContactsTabs,
+    ...extraBrands.flatMap((brand): ClosedContactsTab[] => [
+      {
+        key: `${brand.code}-current`,
+        label: `${brand.displayName} Current`,
+        title: `Closed Contacts - ${brand.displayName} Current`,
+        brand: brand.code,
+        category: "current",
+      },
+      {
+        key: `${brand.code}-historical`,
+        label: `${brand.displayName} Historical`,
+        title: `Closed Contacts - ${brand.displayName} Historical`,
+        brand: brand.code,
+        category: "historical",
+      },
+    ]),
+  ];
+}
 
 export {
   leadOptions,

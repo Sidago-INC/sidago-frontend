@@ -16,11 +16,15 @@ import {
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { PhoneWithCount } from "@/features/lead-phones/_components/PhoneWithCount";
+import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { Users } from "lucide-react";
 import {
   getLeadGridLabel,
   timezoneOptions,
 } from "@/features/backoffice-shared/constants";
+import { buildExtraBrandColumns } from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
 import {
   type FixQueueRow,
   getFixQueueTimezone,
@@ -62,6 +66,7 @@ export function FixLeadsTable({
   serverGrid,
 }: FixLeadsTableProps) {
   const navigate = useNavigate();
+  const extraBrands = useExtraBrands();
   const [contactsModalRow, setContactsModalRow] = useState<FixQueueRow | null>(
     null,
   );
@@ -109,7 +114,17 @@ export function FixLeadsTable({
         },
       },
       { title: "Name", key: "fullName" },
-      { title: "Phone", key: "phone" },
+      {
+        title: "Phone",
+        key: "phone",
+        render: (row) => (
+          <PhoneWithCount
+            phone={row.phone}
+            count={row.phoneCount}
+            usable={row.usablePhoneCount}
+          />
+        ),
+      },
       {
         // Not in the fix-queue endpoint's permitted filter/sort/group fields.
         title: "Fix Entry Date",
@@ -241,8 +256,9 @@ export function FixLeadsTable({
           </Button>
         ),
       },
+      ...buildExtraBrandColumns<FixQueueRow>(extraBrands),
     ],
-    [data, navigate],
+    [data, navigate, extraBrands],
   );
 
   return (
@@ -326,7 +342,7 @@ function RelatedContactsList({ leadId }: { leadId: string }) {
           ) : null}
           <div className="mt-1 space-y-0.5 text-xs text-slate-600 dark:text-slate-300">
             {contact.email ? <p>{contact.email}</p> : null}
-            {contact.phone ? <p>{contact.phone}</p> : null}
+            {contact.phone ? <p>{formatPhone(contact.phone)}</p> : null}
           </div>
         </li>
       ))}
