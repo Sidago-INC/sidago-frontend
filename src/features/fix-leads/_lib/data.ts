@@ -13,6 +13,7 @@ import {
   getLeadIdOptions,
   timezoneOptions,
 } from "@/features/backoffice-shared/constants";
+import type { ExtraBrandStates } from "@/features/backoffice-shared/types";
 import {
   resolveLeadTimezone,
   stripTimezonePrefix,
@@ -68,6 +69,7 @@ export type FixQueueRow = {
   otherContacts: string | null;
   contactsFilter: ContactsFilter;
   hasOtherContacts: boolean;
+  extraBrandStates?: ExtraBrandStates;
 };
 
 export type FullLead = {
@@ -137,7 +139,7 @@ export type RelatedLead = {
     svg: RelatedLeadBrandState;
     benton: RelatedLeadBrandState;
     "95rm": RelatedLeadBrandState;
-  };
+  } & Record<string, RelatedLeadBrandState>;
 };
 
 type FixQueueResponse = {
@@ -161,7 +163,7 @@ export type FixQueueGridQuery = {
 type FullLeadResponse = {
   ok: true;
   lead: FullLead;
-  brandStates: BrandStates;
+  brandStates: BrandStates & Record<string, { leadType: string | null }>;
   /** Every number on the lead, retired included. */
   phones?: LeadPhone[];
 };

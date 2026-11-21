@@ -12,6 +12,12 @@ import { useCompanyOptions } from "@/features/companies/_lib/hooks";
 import React, { useEffect, useMemo, useState } from "react";
 import { getLeadGridLabel } from "@/features/backoffice-shared/constants";
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
+import {
+  buildBrandReportColumns,
+  buildExtraBrandColumns,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import { isLegacyBrandCode } from "@/lib/brands";
 import { CurrentlyHotDrawer } from "./CurrentlyHotDrawer";
 import {
   contactTypeOptions,
@@ -29,7 +35,7 @@ import { formatPhone } from "@/features/lead-phones/_lib/format";
 type CurrentlyHotTableProps = {
   data: LeadRow[];
   title: string;
-  variant: "svg" | "95rm" | "benton";
+  variant: string;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
   serverGrid?: ServerGridConfig;
@@ -60,6 +66,7 @@ export function CurrentlyHotTable({
   const svgAgents = useAgentSelectOptions("svg");
   const bentonAgents = useAgentSelectOptions("benton");
   const rm95Agents = useAgentSelectOptions("95rm");
+  const extraBrands = useExtraBrands();
 
   const columns = useMemo<Column<LeadRow>[]>(() => {
     const baseColumns: Column<LeadRow>[] = [
@@ -114,6 +121,15 @@ export function CurrentlyHotTable({
       },
     ];
 
+    if (!isLegacyBrandCode(variant)) {
+      return [
+        ...baseColumns,
+        ...buildBrandReportColumns<LeadRow>(variant, extraBrands),
+      ];
+    }
+
+    const extraColumns = buildExtraBrandColumns<LeadRow>(extraBrands);
+
     if (variant === "svg") {
       return [
         ...baseColumns,
@@ -160,6 +176,7 @@ export function CurrentlyHotTable({
           sortable: false,
           groupable: false,
         },
+        ...extraColumns,
       ];
     }
 
@@ -196,6 +213,7 @@ export function CurrentlyHotTable({
           sortable: false,
           groupable: false,
         },
+        ...extraColumns,
       ];
     }
 
@@ -249,6 +267,7 @@ export function CurrentlyHotTable({
         sortable: false,
         groupable: false,
       },
+      ...extraColumns,
     ];
   }, [
     companies,
@@ -257,6 +276,7 @@ export function CurrentlyHotTable({
     svgAgents.options,
     bentonAgents.options,
     rm95Agents.options,
+    extraBrands,
   ]);
 
   return (

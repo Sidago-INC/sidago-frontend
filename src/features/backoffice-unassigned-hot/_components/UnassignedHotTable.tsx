@@ -23,6 +23,12 @@ import {
 import { useAgentSelectOptions } from "@/features/backoffice-shared/use-agent-select-options";
 import { formatPhone } from "@/features/lead-phones/_lib/format";
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  buildBrandReportColumns,
+  buildExtraBrandColumns,
+} from "@/features/backoffice-shared/extra-brand-columns";
+import { useExtraBrands } from "@/hooks/useBrandCatalog";
+import { isLegacyBrandCode } from "@/lib/brands";
 import { UnassignedHotDrawer } from "./UnassignedHotDrawer";
 import {
   contactTypeOptions,
@@ -34,7 +40,7 @@ import {
 type UnassignedHotLeadsTableProps = {
   data: UnassignedHotLeadRow[];
   title: string;
-  variant: "svg" | "95rm" | "benton";
+  variant: string;
   serverPagination?: ServerPaginationConfig;
   serverSearch?: ServerSearchConfig;
   serverGrid?: ServerGridConfig;
@@ -62,6 +68,7 @@ export function UnassignedHotTable({
   const svgAgentsQuery = useAgentSelectOptions("svg");
   const bentonAgentsQuery = useAgentSelectOptions("benton");
   const rm95AgentsQuery = useAgentSelectOptions("95rm");
+  const extraBrands = useExtraBrands();
 
   const columns = useMemo<Column<UnassignedHotLeadRow>[]>(() => {
     const baseColumns: Column<UnassignedHotLeadRow>[] = [
@@ -115,6 +122,15 @@ export function UnassignedHotTable({
         render: (row) => <TypeBadge value={row.contactType} kind="contact" />,
       },
     ];
+
+    if (!isLegacyBrandCode(variant)) {
+      return [
+        ...baseColumns,
+        ...buildBrandReportColumns<UnassignedHotLeadRow>(variant, extraBrands),
+      ];
+    }
+
+    const extraColumns = buildExtraBrandColumns<UnassignedHotLeadRow>(extraBrands);
 
     if (variant === "svg") {
       return [
@@ -185,6 +201,7 @@ export function UnassignedHotTable({
           sortable: false,
           groupable: false,
         },
+        ...extraColumns,
       ];
     }
 
@@ -221,6 +238,7 @@ export function UnassignedHotTable({
           sortable: false,
           groupable: false,
         },
+        ...extraColumns,
       ];
     }
 
@@ -274,10 +292,12 @@ export function UnassignedHotTable({
         sortable: false,
         groupable: false,
       },
+      ...extraColumns,
     ];
   }, [
     bentonAgentsQuery.options,
     data,
+    extraBrands,
     rm95AgentsQuery.options,
     svgAgentsQuery.options,
     variant,

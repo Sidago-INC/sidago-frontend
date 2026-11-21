@@ -5,6 +5,7 @@ import Header from "./Header";
 import Mobilebar from "./Mobilebar";
 import { useAuth } from "@/providers/AuthProvider";
 import { PrivateRoute } from "@/components/guards/PrivateRoute";
+import { BackfillProgressBar } from "@/features/brand-management/_components/BackfillProgressBar";
 
 export function AuthLayout({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -33,6 +34,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           }
         >
           <Header onMenuClick={() => setIsMobileOpen(true)} />
+          <BackfillProgressBar />
 
           <main className="flex min-h-0 flex-1 flex-col overflow-y-auto text-slate-900 transition-colors dark:text-slate-100">
             {children}
