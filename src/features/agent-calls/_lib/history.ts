@@ -78,6 +78,19 @@ function mergeBrandEntries(record: Record<string, unknown>): HistoryEntry[] {
   );
 }
 
+/**
+ * Newest call first. Entries with an unreadable timestamp sort last rather than
+ * throwing or landing at random. Returns a new array; the input is not mutated.
+ */
+export function sortNewestFirst(entries: HistoryEntry[]): HistoryEntry[] {
+  return [...entries].sort((a, b) => calledAtTime(b) - calledAtTime(a));
+}
+
+function calledAtTime(entry: HistoryEntry): number {
+  const time = Date.parse(entry.calledAt);
+  return Number.isNaN(time) ? 0 : time;
+}
+
 export function getHistoryEntries(
   history: unknown,
   brandCode?: string,
