@@ -1,6 +1,9 @@
 import { formatPhone } from "@/features/lead-phones/_lib/format";
 import { getHistoryEntries } from "@/features/agent-calls/_lib/history";
-import type { LeadDetailResponse } from "@/features/agent-calls/_lib/apiTypes";
+import type {
+  HistoryEntry,
+  LeadDetailResponse,
+} from "@/features/agent-calls/_lib/apiTypes";
 
 export function formatCallLogDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -10,11 +13,11 @@ export function formatCallLogDate(dateStr: string): string {
   });
 }
 
-export function formatNotesHistory(
-  history: LeadDetailResponse["history"],
-  brandCode?: string,
-): string {
-  return getHistoryEntries(history, brandCode)
+// Entry-based formatters take history that is already in the order wanted
+// (the Calls page sorts newest first). The history-based ones keep the
+// original order, so Call Logs and Lead detail are unchanged.
+export function formatNotesEntries(entries: HistoryEntry[]): string {
+  return entries
     .filter((entry) => entry.notes)
     .map((entry) =>
       [formatCallLogDate(entry.calledAt), entry.agentName, entry.notes]
@@ -24,11 +27,8 @@ export function formatNotesHistory(
     .join("\n");
 }
 
-export function formatCallsHistory(
-  history: LeadDetailResponse["history"],
-  brandCode?: string,
-): string {
-  return getHistoryEntries(history, brandCode)
+export function formatCallsEntries(entries: HistoryEntry[]): string {
+  return entries
     .map((entry) =>
       [
         formatCallLogDate(entry.calledAt),
@@ -41,6 +41,20 @@ export function formatCallsHistory(
         .join(" - "),
     )
     .join("\n");
+}
+
+export function formatNotesHistory(
+  history: LeadDetailResponse["history"],
+  brandCode?: string,
+): string {
+  return formatNotesEntries(getHistoryEntries(history, brandCode));
+}
+
+export function formatCallsHistory(
+  history: LeadDetailResponse["history"],
+  brandCode?: string,
+): string {
+  return formatCallsEntries(getHistoryEntries(history, brandCode));
 }
 
 export function formatRelatedContacts(

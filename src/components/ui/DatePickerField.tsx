@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { useId } from "react";
 import ReactDatePicker from "react-datepicker";
 import { selectLikeFieldClassName, datePickerInputProps, datePickerPopperConfig } from "./datePickerInputStyles";
+import { formatCalendarDate, parseCalendarDate } from "@/lib/calendar-date";
 
 type DatePickerFieldProps = {
   label?: string;
@@ -17,20 +18,6 @@ type DatePickerFieldProps = {
   maxDate?: Date;
 };
 
-function parseDateValue(value: string) {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return null;
-
-  const date = new Date(trimmedValue);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date;
-}
-
-function formatDateValue(value: Date | null) {
-  if (!value || Number.isNaN(value.getTime())) return "";
-  return value.toISOString().slice(0, 10);
-}
 
 export function DatePickerField({
   label,
@@ -64,8 +51,8 @@ export function DatePickerField({
           {...datePickerPopperConfig}
           id={id}
           name={`date-field-${id.replace(/:/g, "")}`}
-          selected={parseDateValue(value)}
-          onChange={(date: Date | null) => onChange(formatDateValue(date))}
+          selected={parseCalendarDate(value)}
+          onChange={(date: Date | null) => onChange(formatCalendarDate(date))}
           placeholderText={placeholder}
           isClearable
           disabled={disabled}
