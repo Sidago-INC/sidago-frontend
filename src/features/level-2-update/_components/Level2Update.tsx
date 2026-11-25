@@ -13,7 +13,11 @@ import { FileText, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BRAND } from "@/types/brand.types";
 import type { LEAD_TYPE } from "@/types/lead-type.types";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import {
+  showErrorToast,
+  showInfoToast,
+  showSuccessToast,
+} from "@/lib/toast";
 import { useUsers } from "@/features/backoffice-shared/use-users";
 import { useExtraBrandAgents } from "@/features/backoffice-shared/extra-brand-columns";
 import { useExtraBrands } from "@/hooks/useBrandCatalog";
@@ -21,6 +25,7 @@ import {
   getCallBackDateError,
   getMinCallBackDate,
 } from "@/features/agent-calls/_lib/utils";
+import { diffDraftPatch } from "../_lib/draft-patch";
 import {
   boardRowToUpdateRow,
   brandCodeFor,
@@ -207,6 +212,12 @@ export function Level2Update() {
   // field is picked, then become a shared draft.
   const [localRows, setLocalRows] = useState<Level2UpdateRow[]>([]);
   const localCounter = useRef(0);
+  // Latest local rows, readable from async code. promoteToDraft awaits network
+  // calls, and the user keeps editing the row during them.
+  const localRowsRef = useRef(localRows);
+  useEffect(() => {
+    localRowsRef.current = localRows;
+  }, [localRows]);
 
   // Edits typed or picked but not yet confirmed by the server, keyed by row
   // id. Rendered on top of the board so a poll landing mid-edit cannot blank
@@ -345,31 +356,92 @@ export function Level2Update() {
     const brand = brandCodeFor(next.campaign);
     if (!next.lead || !brand) return;
 
+    // Read the row as it is now, not as it was when the campaign was picked:
+    // the agent and result are often picked while the draft is being created.
+    const currentValues = (): Level2DraftPatch => {
+      const source =
+        localRowsRef.current.find((item) => item.id === row.id) ?? next;
+      const values: Level2DraftPatch = {};
+      if (source.level_2_agent) values.level2AgentName = source.level_2_agent;
+      if (source.level_2_result_update)
+        values.resultUpdate = source.level_2_result_update;
+      if (source.updated_notes) values.updatedNotes = source.updated_notes;
+      if (source.call_back_date) values.callBackDate = source.call_back_date;
+      return values;
+    };
+
+    // What has been sent to the draft so far, per field ("" = cleared).
+    const saved: Record<string, string> = {};
+    // Saves whatever on the local row differs from what was last sent.
+    // Returns false when there was nothing new to send.
+    const sendUnsaved = async (draftId: string): Promise<boolean> => {
+      const changed = diffDraftPatch(
+        saved,
+        currentValues() as Record<string, string | undefined>,
+      );
+      if (Object.keys(changed).length === 0) return false;
+      await patchDraft.mutateAsync({
+        id: draftId,
+        patch: changed as Level2DraftPatch,
+      });
+      Object.assign(saved, changed);
+      return true;
+    };
+
+    // Moves the local row's values onto a shared draft and removes the local
+    // row. Used for the new draft and for an existing one (the 409 path).
+    const attachTo = async (draftId: string) => {
+      await sendUnsaved(draftId);
+
+      // Wait for the board to actually contain the row before dropping the
+      // local one. Removing it first would blank the line the agent is
+      // looking at until the next fetch landed.
+      await board.refetch();
+
+      // Values picked while the saves were in flight exist only on the local
+      // row. Keep saving until none are left. The loop ends with no await
+      // between its last check and the removal below, so nothing can slip in.
+      while (await sendUnsaved(draftId)) {
+        // keep going
+      }
+
+      setLocalRows((current) => current.filter((item) => item.id !== row.id));
+      setEditingRowId((current) => (current === row.id ? draftId : current));
+    };
+
     try {
       const created = await createDraft.mutateAsync({
         leadId: next.lead,
         brand,
       });
-
-      const carried: Level2DraftPatch = {};
-      if (next.level_2_agent) carried.level2AgentName = next.level_2_agent;
-      if (next.level_2_result_update)
-        carried.resultUpdate = next.level_2_result_update;
-      if (next.updated_notes) carried.updatedNotes = next.updated_notes;
-      if (next.call_back_date) carried.callBackDate = next.call_back_date;
-
-      if (Object.keys(carried).length > 0) {
-        await patchDraft.mutateAsync({ id: created.id, patch: carried });
-      }
-
-      // Wait for the board to actually contain the new row before dropping
-      // the local one. Removing it first would blank the line the agent is
-      // looking at until the next fetch landed.
-      await board.refetch();
-
-      setLocalRows((current) => current.filter((item) => item.id !== row.id));
-      setEditingRowId((current) => (current === row.id ? created.id : current));
+      await attachTo(created.id);
     } catch (err) {
+      // The lead already has an open draft for this campaign (someone added
+      // it first). Rather than leave the typed values on a local row that can
+      // never be saved, move them onto that existing draft.
+      if ((err as { status?: number })?.status === 409) {
+        const fresh = await board.refetch();
+        // The board stores the campaign as a brand code ("svg"), the same as
+        // the `brand` used for the create call.
+        const existing = (fresh.data ?? []).find(
+          (item) =>
+            item.status === "draft" &&
+            item.leadId === next.lead &&
+            item.campaign === brand,
+        );
+        if (existing) {
+          try {
+            await attachTo(existing.id);
+            showInfoToast(
+              "This lead is already on the board for that campaign. Your entries were added to that row.",
+            );
+            return;
+          } catch (attachErr) {
+            showErrorToast(attachErr);
+            return;
+          }
+        }
+      }
       showErrorToast(err);
     }
   };
