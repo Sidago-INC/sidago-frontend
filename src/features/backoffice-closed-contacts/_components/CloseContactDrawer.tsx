@@ -14,10 +14,10 @@ import {
 import type { Column } from "@/components/ui/Table";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { openPrintFrame } from "@/lib/print-html";
+import { contactTypeHint } from "@/features/lead-phones/_lib/format";
 import type { ClosedContactRow } from "../_lib/data";
 import {
   type ClosedContactsTabKey,
-  contactTypeOptions,
   getCompanySymbol,
   getLeadId,
   leadTypeOptions,
@@ -189,7 +189,6 @@ export function ClosedContactDrawer({
       form.fullName !== initialForm.fullName ||
       form.phone !== initialForm.phone ||
       form.email !== initialForm.email ||
-      form.contactType !== initialForm.contactType ||
       form.bentonLeadType !== initialForm.bentonLeadType
     );
   }, [form, initialForm]);
@@ -315,9 +314,6 @@ export function ClosedContactDrawer({
       leadDiff.phone = form.phone;
     }
     if (form.email !== initialForm.email) leadDiff.email = form.email;
-    if (form.contactType !== initialForm.contactType) {
-      leadDiff.contact_type = form.contactType;
-    }
 
     if (Object.keys(leadDiff).length > 0) body.lead = leadDiff;
 
@@ -525,15 +521,14 @@ export function ClosedContactDrawer({
         </DetailCard>
 
         <DetailCard label="Lead Details">
+          {/* Read-only: the contact type of the number the lead is being called
+              on, set by the server (see contactTypeHint). */}
           <EditableField label="Contact Type">
-            <Select
-              value={form.contactType}
-              onChange={(value) => updateForm("contactType", String(value))}
-              options={contactTypeOptions.map((value) => ({
-                label: value,
-                value,
-              }))}
-              className="text-xs font-semibold"
+            <TextInput
+              value={form.contactType || "-"}
+              readOnly
+              title={contactTypeHint()}
+              className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
             />
           </EditableField>
           <EditableField label="Lead Type Benton">

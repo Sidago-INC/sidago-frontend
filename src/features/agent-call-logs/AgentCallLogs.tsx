@@ -50,7 +50,6 @@ import {
 import { getCompanySymbol } from "@/features/backoffice-shared/constants";
 import type { LeadPatchBody } from "@/features/backoffice-shared/use-update-lead";
 import clsx from "clsx";
-import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import {
@@ -77,7 +76,7 @@ import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useQueryClient } from "@tanstack/react-query";
 import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
 import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
-import { preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
+import { contactTypeHint, preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
 
 // A co-worker at the same company, as served by the detail endpoint. Only the
 // fields the "All Company Contacts" card renders — clicking one loads its own
@@ -239,9 +238,6 @@ function buildLeadPatchBody(
   }
   if (form.email !== detail.lead.email) {
     leadPatch.email = form.email;
-  }
-  if (form.contactType !== detail.lead.contactType) {
-    leadPatch.contact_type = form.contactType;
   }
   const brandPatch: NonNullable<LeadPatchBody["brandStates"]> = {};
   if (form.svgLeadType !== detail.brandState.leadType) {
@@ -556,10 +552,6 @@ export function AgentCallLogs() {
         ? formFromDetail(companyContactDetail)
         : null;
 
-  const contactTypeOptions = useMemo(
-    () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
-    [],
-  );
   const leadTypeOptions = useMemo(
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
@@ -1121,7 +1113,6 @@ export function AgentCallLogs() {
                     onOpenCompanyContact={(lead) =>
                       setCompanyContactLeadId(lead.leadId)
                     }
-                    contactTypeOptions={contactTypeOptions}
                     leadTypeOptions={leadTypeOptions}
                   />
                 ) : (
@@ -1302,7 +1293,6 @@ export function AgentCallLogs() {
             isDrawer
             allCompanyContacts={[]}
             onOpenCompanyContact={() => {}}
-            contactTypeOptions={contactTypeOptions}
             leadTypeOptions={leadTypeOptions}
           />
         ) : null}
@@ -1325,7 +1315,6 @@ function CallLogDetailContent({
   isDrawer,
   allCompanyContacts,
   onOpenCompanyContact,
-  contactTypeOptions,
   leadTypeOptions,
 }: {
   lead: QueueLead;
@@ -1344,7 +1333,6 @@ function CallLogDetailContent({
   isDrawer: boolean;
   allCompanyContacts: CompanyContact[];
   onOpenCompanyContact: (contact: CompanyContact) => void;
-  contactTypeOptions: Array<{ label: string; value: string }>;
   leadTypeOptions: Array<{ label: string; value: string }>;
 }) {
   const companySymbol =
@@ -1423,12 +1411,14 @@ function CallLogDetailContent({
       </DetailCard>
 
       <DetailCard label="Lead Details">
+        {/* Read-only: the contact type of the number the lead is being called
+            on, set by the server (see contactTypeHint). */}
         <EditableField label="Contact Type">
-          <Select
-            value={form.contactType}
-            onChange={(value) => onUpdateForm("contactType", String(value))}
-            options={contactTypeOptions}
-            className="text-xs font-semibold"
+          <TextInput
+            value={detail.lead.contactType || "-"}
+            readOnly
+            title={contactTypeHint(detail.nextPhone?.phoneE164)}
+            className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
           />
         </EditableField>
         <EditableField label="Lead Type">

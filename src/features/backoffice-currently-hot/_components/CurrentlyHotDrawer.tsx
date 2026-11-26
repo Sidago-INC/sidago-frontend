@@ -20,7 +20,7 @@ import {
 import { useUsers } from "@/features/backoffice-shared/use-users";
 import { openPrintFrame } from "@/lib/print-html";
 import { useDrawerCompanyIdentity } from "@/features/backoffice-shared/use-drawer-company-select";
-import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
+import { contactTypeHint } from "@/features/lead-phones/_lib/format";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import {
   useUpdateLead,
@@ -227,10 +227,6 @@ export function CurrentlyHotDrawer({
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
-  const contactTypeOptions = useMemo(
-    () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
-    [],
-  );
 
   const detailItems = useMemo(() => {
     if (!row) return [];
@@ -356,9 +352,6 @@ export function CurrentlyHotDrawer({
     if (form.phone !== initialForm.phone) leadDiff.phone = form.phone;
     if (form.email !== initialForm.email) leadDiff.email = form.email;
     if (form.role !== initialForm.role) leadDiff.role = form.role;
-    if (form.contactType !== initialForm.contactType) {
-      leadDiff.contact_type = form.contactType;
-    }
     if (form.companyName !== initialForm.companyName) {
       leadDiff.company_name = form.companyName;
     }
@@ -602,13 +595,14 @@ export function CurrentlyHotDrawer({
         </DetailCard>
 
         <DetailCard label="Lead Details">
+          {/* Read-only: the contact type of the number the lead is being called
+              on, set by the server (see contactTypeHint). */}
           <EditableField label="Contact Type">
-            <Select
-              value={form.contactType}
-              onChange={(value) => updateForm("contactType", String(value))}
-              options={contactTypeOptions}
-              placeholder="Select contact type"
-              className="py-1.5 text-xs"
+            <TextInput
+              value={form.contactType || "-"}
+              readOnly
+              title={contactTypeHint()}
+              className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
             />
           </EditableField>
           <div className="py-1.5">

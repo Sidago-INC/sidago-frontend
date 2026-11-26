@@ -22,6 +22,17 @@ export function formatPhoneWithExtension(
   return extension ? `${number} ext. ${extension}` : number;
 }
 
+/**
+ * Tooltip for the read-only Contact Type field. A lead's Contact Type is the
+ * contact type of the number it is being called on: Validated only when that
+ * number reached the person. Pass that number when the screen has it.
+ */
+export function contactTypeHint(currentNumber?: string | null): string {
+  const base =
+    "Follows the number the lead is being called on: Validated only if that number reached the person, otherwise Prospecting.";
+  return currentNumber ? `${base} Current number: ${formatPhone(currentNumber)}.` : base;
+}
+
 /** Under every field that edits a lead's main number, so the effect is visible. */
 export const PREFERRED_PHONE_HINT =
   "A new number here replaces the preferred one; the old number is kept as retired.";

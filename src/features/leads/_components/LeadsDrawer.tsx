@@ -35,7 +35,6 @@ import {
   resolveMarkVoidAgentSlug,
   toggleMarkVoid,
 } from "@/features/agent-calls/_lib/markVoid";
-import { CONTACT_TYPE_VALUES } from "@/types/contact-type.types";
 import { LEAD_TYPE_VALUES } from "@/types/lead-type.types";
 import { useAuth } from "@/providers/AuthProvider";
 import { useBrandsWithAgents } from "@/hooks/useBrandsWithAgents";
@@ -47,7 +46,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { AssociatedContactsSection } from "./AssociatedContacts";
 import { LeadPhonesPanel } from "@/features/lead-phones/_components/LeadPhonesPanel";
 import { PreferredPhoneHint } from "@/features/lead-phones/_components/PreferredPhoneHint";
-import { preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
+import { contactTypeHint, preferredPhoneLabel } from "@/features/lead-phones/_lib/format";
 import {
   directoryRowToFormState,
   leadDetailToDirectoryRow,
@@ -366,10 +365,6 @@ export function LeadsDrawer({
     () => LEAD_TYPE_VALUES.map((value) => ({ label: value, value })),
     [],
   );
-  const contactTypeOptions = useMemo(
-    () => CONTACT_TYPE_VALUES.map((value) => ({ label: value, value })),
-    [],
-  );
 
   const detailItems = useMemo(() => {
     if (!displayRow) return [];
@@ -588,9 +583,6 @@ export function LeadsDrawer({
     if (form.role !== initialForm.role) leadDiff.role = form.role;
     if (form.otherContacts !== initialForm.otherContacts) {
       leadDiff.other_contacts = form.otherContacts;
-    }
-    if (form.contactType !== initialForm.contactType) {
-      leadDiff.contact_type = form.contactType;
     }
     if (form.companyName !== initialForm.companyName) {
       leadDiff.company_name = form.companyName;
@@ -916,13 +908,16 @@ export function LeadsDrawer({
         ) : null}
 
         <DetailCard label="Lead Details">
+          {/* Read-only: it is the contact type of the number the lead is being
+              called on (Validated only if that number reached the person), set
+              by the server. The detail query is refetched after every phone
+              change and save, so it stays current. */}
           <EditableField label="Contact Type">
-            <Select
-              value={form.contactType}
-              onChange={(value) => updateForm("contactType", String(value))}
-              options={contactTypeOptions}
-              placeholder="Select contact type"
-              className="py-1.5 text-xs"
+            <TextInput
+              value={detailQuery.data?.lead.contactType || form.contactType || "-"}
+              readOnly
+              title={contactTypeHint(detailQuery.data?.nextPhone?.phoneE164)}
+              className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
             />
           </EditableField>
           <div className="py-1.5">

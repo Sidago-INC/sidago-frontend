@@ -15,12 +15,9 @@ import {
 import { OutcomeButton } from "@/features/agent-calls/_components/OutcomeButton";
 import { AdditionalContactsList } from "@/features/backoffice-shared/AdditionalContactsList";
 import { printHtml } from "@/lib/print-html";
-import {
-  contactTypeOptions,
-  leadTypeOptions,
-} from "@/features/backoffice-closed-contacts/_lib/data";
+import { leadTypeOptions } from "@/features/backoffice-closed-contacts/_lib/data";
 import { getLeadDrawerTitle } from "@/features/backoffice-shared/constants";
-import { formatPhone } from "@/features/lead-phones/_lib/format";
+import { contactTypeHint, formatPhone } from "@/features/lead-phones/_lib/format";
 import {
   Ban,
   Check,
@@ -397,15 +394,14 @@ export function AgentSmsDrawer({
           </DetailCard>
 
           <DetailCard label="Lead Details">
+            {/* Read-only: the contact type of the number the lead is being
+                called on, set by the server (see contactTypeHint). */}
             <EditableField label="Contact Type">
-              <Select
-                value={row.contactType}
-                onChange={(value) => onChange("contactType", String(value))}
-                options={contactTypeOptions.map((value) => ({
-                  label: value,
-                  value,
-                }))}
-                className="text-xs font-semibold"
+              <TextInput
+                value={row.contactType || "-"}
+                readOnly
+                title={contactTypeHint()}
+                className="cursor-default bg-slate-100/80 text-xs font-semibold dark:bg-slate-900/50"
               />
             </EditableField>
             <EditableField label="Lead Type Benton">
